@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Reset básico para o PDV não ter scroll indesejado */
+body {
+    @apply bg-gray-100 overflow-hidden;
+}
