@@ -15,4 +15,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  // Configurações de Servidor adicionadas para o sistema SaaS (Tenancy)
+  server: {
+    host: true, // Expõe o servidor para a rede local e subdomínios
+    cors: true, // Permite requisições de diferentes origens (CORS)
+    allowedHosts: true, // Liberta o acesso via nomes customizados como "dubai.localhost"
+  }
 })

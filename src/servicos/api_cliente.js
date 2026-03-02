@@ -1,26 +1,23 @@
 import axios from 'axios';
 
-/**
- * Instância configurada do Axios para comunicação com a API Laravel.
- * * @type {import('axios').AxiosInstance}
- */
+// Verifica se existe uma API de tenant ativa, senão usa a central
+const url_base = localStorage.getItem('nitec_api_tenant') || 'http://localhost:8000/api';
+
 const api_cliente = axios.create({
-    baseURL: 'http://localhost:8000/api', // URL base do seu servidor Laravel
+    baseURL: url_base,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
 });
 
-/**
- * Intercetor para injetar o Token de Acesso em todas as requisições automaticamente.
- */
-api_cliente.interceptors.request.use((configuracao) => {
-    const token_salvo = localStorage.getItem('nitec_token');
-    if (token_salvo) {
-        configuracao.headers.Authorization = `Bearer ${token_salvo}`;
+// Interceptor para injetar o token dinâmico
+api_cliente.interceptors.request.use((config) => {
+    const token = localStorage.getItem('nitec_token');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
     }
-    return configuracao;
+    return config;
 });
 
 export default api_cliente;
