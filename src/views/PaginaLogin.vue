@@ -15,7 +15,12 @@
                 </div>
 
                 <div class="grupo_input">
-                    <label class="rotulo_campo block text-sm font-bold text-gray-700 mb-1">Senha</label>
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="rotulo_campo block text-sm font-bold text-gray-700">Senha</label>
+                        <a href="#" @click.prevent="esqueci_senha" class="text-xs text-nitec_blue hover:text-blue-800 hover:underline font-bold transition-colors">
+                            Esqueci minha senha
+                        </a>
+                    </div>
                     <input v-model="senha_input" type="password" placeholder="••••••••" class="campo_texto w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-nitec_blue outline-none transition-all" required>
                 </div>
 
@@ -30,7 +35,6 @@
                         <span class="font-medium">Lembrar meus dados</span>
                     </label>
                 </div>
-                
                 <button type="submit" class="botao_entrar w-full bg-nitec_blue hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors mt-2">
                     ACESSAR O SISTEMA
                 </button>
@@ -46,12 +50,12 @@
 <script setup>
 import { useLogicaLogin } from './pagina_login_logica.js';
 
-// CORREÇÃO: Agora importamos TODAS as variáveis para o v-model funcionar
 const { 
     codigo_loja_input, 
     email_input, 
     senha_input, 
     lembrar_credenciais, 
-    processar_formulario 
+    processar_formulario,
+    esqueci_senha
 } = useLogicaLogin();
 </script>

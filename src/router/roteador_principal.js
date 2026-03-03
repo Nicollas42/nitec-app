@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth_store.js';
 import PaginaLogin from '../views/PaginaLogin.vue';
 import PaginaDashboard from '../views/PaginaDashboard.vue';
 import AdminEstabelecimentos from '../views/AdminEstabelecimentos.vue';
+import RedefinirSenha from '../views/RedefinirSenha.vue'; // <-- Importação da nova tela
 
 const rotas_do_aplicativo = [
     {
@@ -17,10 +18,17 @@ const rotas_do_aplicativo = [
         meta: { requer_auth: false }
     },
     {
+        // <-- NOVA ROTA AQUI
+        path: '/redefinir-senha',
+        name: 'redefinir_senha',
+        component: RedefinirSenha,
+        meta: { requer_auth: false } 
+    },
+    {
         path: '/painel-central',
         name: 'painel_dashboard',
         component: PaginaDashboard,
-        meta: { requer_auth: true } // Todos acessam o dashboard inicial
+        meta: { requer_auth: true } 
     },
     {
         path: '/admin-estabelecimentos',
@@ -38,13 +46,13 @@ const rotas_do_aplicativo = [
         path: '/pdv-caixa',
         name: 'pdv_frente_caixa',
         component: () => import('../views/PaginaPdv.vue'),
-        meta: { requer_auth: true, papeis_permitidos: ['dono', 'caixa'] } // Garçom não acessa o caixa
+        meta: { requer_auth: true, papeis_permitidos: ['dono', 'caixa'] } 
     },
     {
         path: '/produtos',
         name: 'gestao_produtos',
         component: () => import('../views/PaginaProdutos.vue'),
-        meta: { requer_auth: true, papeis_permitidos: ['dono'] } // Apenas o dono cadastra produtos
+        meta: { requer_auth: true, papeis_permitidos: ['dono'] } 
     },
     {
         path: '/comandas',
@@ -64,7 +72,9 @@ roteador_principal.beforeEach((to, from, next) => {
     
     // 1. Interceção do Token de Suporte SaaS
     const token_suporte = to.query.token;
-    if (token_suporte) {
+    
+    // O PULO DO GATO: Se a rota for de redefinir senha, deixa o token em paz!
+    if (token_suporte && to.path !== '/redefinir-senha') {
         localStorage.setItem('nitec_token', token_suporte);
         loja_auth.token_acesso = token_suporte;
         
@@ -82,11 +92,10 @@ roteador_principal.beforeEach((to, from, next) => {
 
     // 3. Controle de Acesso Baseado em Perfis (RBAC)
     if (to.meta.papeis_permitidos && esta_autenticado) {
-        // Busca o usuário da Store ou do LocalStorage (prevenindo F5 na página)
         const usuario = loja_auth.usuario_logado || JSON.parse(localStorage.getItem('nitec_usuario'));
 
         if (!usuario || !to.meta.papeis_permitidos.includes(usuario.tipo_usuario)) {
-            alert('Acesso negado. O seu perfil ('+ usuario?.tipo_usuario +') não tem permissão para acessar esta área.');
+            alert('Acesso negado. O seu perfil ('+ (usuario?.tipo_usuario || 'desconhecido') +') não tem permissão para acessar esta área.');
             return next('/painel-central');
         }
     }

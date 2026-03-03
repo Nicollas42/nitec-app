@@ -2,6 +2,10 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth_store.js';
+import api_cliente from '../servicos/api_cliente.js';
+import axios from 'axios';
+import { configurar_url_base } from '../servicos/api_cliente.js';
+
 
 export function useLogicaLogin() {
     const roteador = useRouter();
@@ -13,18 +17,15 @@ export function useLogicaLogin() {
     const lembrar_credenciais = ref(false);
 
     onMounted(() => {
-        // 1. Tenta detetar a loja pelo hostname (Web)
         const hostname = window.location.hostname;
         let loja_detectada = '';
         
         if (hostname && !hostname.startsWith('nitec.') && !hostname.startsWith('localhost') && hostname !== '127.0.0.1') {
             loja_detectada = hostname.split('.')[0];
         } else {
-            // Puxa o último cache de navegação (Automático)
             loja_detectada = localStorage.getItem('nitec_tenant_id') || '';
         }
 
-        // 2. RECUPERAÇÃO DE CREDENCIAIS (Prioridade Máxima)
         const email_salvo = localStorage.getItem('nitec_saved_email');
         const senha_salva = localStorage.getItem('nitec_saved_password');
         const loja_salva = localStorage.getItem('nitec_saved_loja'); 
@@ -32,7 +33,6 @@ export function useLogicaLogin() {
         if (email_salvo && senha_salva) {
             email_input.value = email_salvo;
             senha_input.value = atob(senha_salva); 
-            
             codigo_loja_input.value = loja_salva || loja_detectada;
             lembrar_credenciais.value = true;
         } else {
@@ -43,7 +43,6 @@ export function useLogicaLogin() {
     const processar_formulario = async () => {
         try {
             const loja = codigo_loja_input.value.trim() || 'master';
-            
             await loja_autenticacao.realizar_login(loja, email_input.value, senha_input.value);
             
             if (lembrar_credenciais.value) {
@@ -62,11 +61,42 @@ export function useLogicaLogin() {
         }
     };
 
+    // NOVA FUNÇÃO CORRIGIDA PARA ELECTRON E WEB
+    const esqueci_senha = async () => {
+        const loja = codigo_loja_input.value.trim() || 'master';
+        
+        if (!email_input.value) {
+            alert("Por favor, digite o seu e-mail no campo acima antes de clicar em 'Esqueci minha senha'.");
+            return;
+        }
+
+        const confirmacao = confirm(`Deseja enviar um link de recuperação para ${email_input.value} na loja "${loja}"?`);
+        if (!confirmacao) return;
+
+        try {
+            // CORREÇÃO: Bate sempre na central para gerir a recuperação
+            const url_central = configurar_url_base('master');
+            const resposta = await axios.post(`${url_central}/admin/esqueci-senha`, {
+                email: email_input.value,
+                loja: loja
+            }, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            alert(resposta.data.mensagem);
+
+        } catch (erro) {
+            const msg = erro.response?.data?.mensagem || "Erro ao tentar conectar com o servidor.";
+            alert(msg);
+        }
+    };
+
     return { 
         codigo_loja_input, 
         email_input, 
         senha_input, 
         lembrar_credenciais, 
-        processar_formulario 
+        processar_formulario,
+        esqueci_senha
     };
 }
