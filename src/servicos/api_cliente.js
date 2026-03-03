@@ -1,33 +1,33 @@
+// C:\PDP\NITEC_APP\src\servicos\api_cliente.js
 import axios from 'axios';
 
 /**
- * Define a URL base dinamicamente garantindo que o deploy na VPS nunca quebre.
- * @return {string}
+ * Monta a URL da API baseado no ambiente e no código do lojista.
  */
-const obter_url_base = () => {
-    const api_salva = localStorage.getItem('nitec_api_tenant');
-    if (api_salva) return api_salva;
-
-    const hostname_atual = window.location.hostname;
-    
-    // Detecta se é desenvolvimento (Browser com .localhost, Vite IP, ou Electron puro)
+export const configurar_url_base = (codigo_loja = null) => {
+    const hostname = window.location.hostname;
     const eh_desenvolvimento = import.meta.env.DEV || 
-                               hostname_atual === 'localhost' || 
-                               hostname_atual === '127.0.0.1' ||
-                               hostname_atual.endsWith('.localhost');
+                               hostname.endsWith('.localhost') ||
+                               hostname === 'localhost' ||
+                               hostname === ''; 
 
-    if (eh_desenvolvimento) {
-        // Se estiver rodando como file:// no Electron sem hostname, força localhost
-        const host_api = hostname_atual === '' ? 'localhost' : hostname_atual;
-        return `http://${host_api}:8000/api`;
+    let dominio_final = '';
+
+    if (!codigo_loja || codigo_loja.toLowerCase() === 'master') {
+        dominio_final = eh_desenvolvimento ? 'nitec.localhost:8000' : 'nitec.dev.br';
+    } else {
+        // CORREÇÃO: Garante o sufixo .nitec.localhost para o Windows resolver o DNS
+        const sufixo = eh_desenvolvimento ? '.nitec.localhost:8000' : '.nitec.dev.br';
+        dominio_final = codigo_loja + sufixo;
     }
 
-    // Se o código cair aqui, significa que está rodando na VPS compilado.
-    return 'https://nitec.dev.br/api';
+    const protocolo = eh_desenvolvimento ? 'http' : 'https';
+    return `${protocolo}://${dominio_final}/api`;
 };
 
+// Inicia com a loja salva, ou aponta para a central
 const api_cliente = axios.create({
-    baseURL: obter_url_base(),
+    baseURL: configurar_url_base(localStorage.getItem('nitec_tenant_id')),
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
