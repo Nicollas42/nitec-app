@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Verifica se existe uma API de tenant ativa, senão usa a central
-const url_base = localStorage.getItem('nitec_api_tenant') || 'http://localhost:8000/api';
+const url_base = localStorage.getItem('nitec_api_tenant') || 'https://nitec.dev.br/api';
 
 const api_cliente = axios.create({
     baseURL: url_base,

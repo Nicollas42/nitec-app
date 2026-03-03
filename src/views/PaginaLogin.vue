@@ -4,7 +4,7 @@
             
             <div class="cabecalho_login text-center mb-8">
                 <h1 class="titulo_sistema text-3xl font-black text-gray-800 tracking-tight">NitecSystem</h1>
-                <p class="subtitulo_sistema text-sm text-gray-500 mt-2">Painel de Gestão e PDV</p>
+                <p class="subtitulo_sistema text-sm text-gray-500 mt-2">Painssel de Gestão e PDV</p>
             </div>
 
             <form @submit.prevent="processar_formulario" class="formulario_login flex flex-col gap-5">
