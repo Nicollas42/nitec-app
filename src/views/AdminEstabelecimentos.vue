@@ -2,7 +2,7 @@
   <div class="admin_container min-h-screen bg-gray-100 font-sans p-8">
     <header class="flex justify-between items-center mb-8 bg-nitec_dark p-6 rounded-2xl shadow-lg">
         <div>
-            <h2 class="text-2xl font-black text-nitec_blue uppercase tracking-tighter">Gestão22 de Estabelecimentos (SaaS)</h2>
+            <h2 class="text-2xl font-black text-nitec_blue uppercase tracking-tighter">Gestão de Estabelecimentos (SaaS)</h2>
             <p class="text-xs text-gray-400 uppercase font-bold">Painel de Controle Central Nitec</p>
         </div>
         <button @click="$router.push('/painel-central')" class="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-sm uppercase font-bold">
