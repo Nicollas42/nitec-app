@@ -5,7 +5,7 @@
             <div class="flex items-center gap-3">
                 <span class="text-xl">⚠️</span>
                 <p class="text-sm font-bold uppercase tracking-wider">
-                    Modo de Suporte Ativo: Visualizando dados de <span class="text-yellow-300">{{ nome_cliente }}</span>
+                    Modo de Suporte Ativo: 122Visualizando dados de <span class="text-yellow-300">{{ nome_cliente }}</span>
                 </p>
             </div>
             <button @click="encerrar_suporte" class="bg-white text-red-600 hover:bg-gray-100 px-4 py-2 rounded-lg text-xs font-black uppercase transition-all shadow-sm">
