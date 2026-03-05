@@ -37,3 +37,12 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+
+node_modules/
+dist/
+dist_electron/
+*.exe
+*.blockmap
+latest.yml
+.env
