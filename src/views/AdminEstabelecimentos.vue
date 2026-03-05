@@ -341,10 +341,12 @@ const excluir_cliente = async (id) => {
     }
 };
 
+// Localize a função acessar_suporte no final do arquivo e substitua por esta:
 const acessar_suporte = async (tenant_id) => {
   try {
     const url_central = configurar_url_base('master'); 
     
+    // CORREÇÃO: A URL agora inclui /admin/ antes de /gerar-acesso-suporte/
     const resposta = await axios.get(`${url_central}/admin/gerar-acesso-suporte/${tenant_id}`, {
         headers: {
             'Authorization': `Bearer ${localStorage.getItem('nitec_token')}`

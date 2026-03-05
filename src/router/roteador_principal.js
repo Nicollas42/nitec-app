@@ -67,27 +67,29 @@ const roteador_principal = createRouter({
     routes: rotas_do_aplicativo
 });
 
-roteador_principal.beforeEach((to, from, next) => {
+// Removemos o 'next' dos parâmetros, agora usamos apenas (to, from)
+roteador_principal.beforeEach((to, from) => {
     const loja_auth = useAuthStore();
     
     // 1. Interceção do Token de Suporte SaaS
     const token_suporte = to.query.token;
     
-    // O PULO DO GATO: Se a rota for de redefinir senha, deixa o token em paz!
     if (token_suporte && to.path !== '/redefinir-senha') {
         localStorage.setItem('nitec_token', token_suporte);
         loja_auth.token_acesso = token_suporte;
         
         const query_limpa = { ...to.query };
         delete query_limpa.token;
-        return next({ path: to.path, query: query_limpa });
+        // NOVA SINTAXE: Apenas retornar o objeto
+        return { path: to.path, query: query_limpa };
     }
 
     const esta_autenticado = !!loja_auth.token_acesso || !!localStorage.getItem('nitec_token');
 
     // 2. Proteção de Autenticação Básica
     if (to.meta.requer_auth && !esta_autenticado) {
-        return next('/login');
+        // NOVA SINTAXE: Apenas retornar a string do caminho
+        return '/login';
     }
 
     // 3. Controle de Acesso Baseado em Perfis (RBAC)
@@ -96,11 +98,12 @@ roteador_principal.beforeEach((to, from, next) => {
 
         if (!usuario || !to.meta.papeis_permitidos.includes(usuario.tipo_usuario)) {
             alert('Acesso negado. O seu perfil ('+ (usuario?.tipo_usuario || 'desconhecido') +') não tem permissão para acessar esta área.');
-            return next('/painel-central');
+            return '/painel-central';
         }
     }
 
-    next();
+    // NOVA SINTAXE: Retornar true significa "pode passar"
+    return true; 
 });
 
 export default roteador_principal;

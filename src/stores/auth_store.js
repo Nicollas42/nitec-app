@@ -7,39 +7,30 @@ export const useAuthStore = defineStore('auth_store', () => {
     const usuario_logado = ref(JSON.parse(localStorage.getItem('nitec_usuario')) || null);
     const token_acesso = ref(localStorage.getItem('nitec_token') || null);
 
-    const realizar_login = async (codigo_loja, email_digitado, senha_digitada) => {
+    const realizar_login = async (loja, email, senha) => {
         try {
-            // Limpeza preventiva
-            localStorage.removeItem('nitec_api_tenant');
-            localStorage.removeItem('nitec_modo_suporte');
+            // Se for master, bate no Admin. Se for cliente, bate no Tenant.
+            const rota_login = (loja === 'master') ? '/admin/login' : '/realizar-login';
 
-            const url_correta = configurar_url_base(codigo_loja);
-            api_cliente.defaults.baseURL = url_correta;
-
-            const eh_master = !codigo_loja || codigo_loja.toLowerCase() === 'master';
-            const endpoint_login = eh_master ? '/admin/login' : '/realizar-login';
-
-            const resposta = await api_cliente.post(endpoint_login, {
-                email: email_digitado,
-                password: senha_digitada 
+            const resposta = await api_cliente.post(rota_login, {
+                email: email,
+                password: senha
             });
 
-            if (resposta.data.status) {
-                token_acesso.value = resposta.data.token;
-                usuario_logado.value = resposta.data.usuario;
+            // Salva o token e os dados
+            const token = resposta.data.token;
+            const usuario = resposta.data.usuario;
 
-                localStorage.setItem('nitec_tenant_id', codigo_loja);
-                localStorage.setItem('nitec_token', token_acesso.value);
-                localStorage.setItem('nitec_usuario', JSON.stringify(usuario_logado.value));
-            }
-        } catch (erro_http) {
-            localStorage.removeItem('nitec_tenant_id');
-            console.error('Falha na autenticação:', erro_http);
-            
-            if (erro_http.response && erro_http.response.data.mensagem) {
-                throw new Error(erro_http.response.data.mensagem);
-            }
-            throw new Error('Credenciais inválidas ou erro de conexão com a unidade selecionada.');
+            token_acesso.value = token;
+            usuario_logado.value = usuario;
+
+            localStorage.setItem('nitec_token', token);
+            localStorage.setItem('nitec_usuario', JSON.stringify(usuario));
+
+            return resposta.data;
+        } catch (erro) {
+            console.error("Erro no login:", erro);
+            throw new Error(erro.response?.data?.mensagem || "Credenciais inválidas ou loja inativa.");
         }
     };
 

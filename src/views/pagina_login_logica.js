@@ -43,6 +43,11 @@ export function useLogicaLogin() {
     const processar_formulario = async () => {
         try {
             const loja = codigo_loja_input.value.trim() || 'master';
+            
+            // CORREÇÃO: Grava na memória ANTES de chamar a API! 
+            // Assim o Axios (api_cliente.js) já sabe qual é o subdomínio.
+            localStorage.setItem('nitec_tenant_id', loja);
+            
             await loja_autenticacao.realizar_login(loja, email_input.value, senha_input.value);
             
             if (lembrar_credenciais.value) {
@@ -57,7 +62,7 @@ export function useLogicaLogin() {
 
             roteador.push('/painel-central');
         } catch (erro) {
-            alert(erro.message);
+            alert(erro.message || "Erro ao fazer login.");
         }
     };
 

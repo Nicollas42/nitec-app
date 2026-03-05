@@ -1,5 +1,5 @@
 <template>
-    <div class="painel_principal flex flex-col h-screen bg-gray-100 font-sans">
+    <div class="painel_principal flex flex-col h-screen bg-gray-100 font-sans relative">
         
         <div v-if="em_modo_suporte" class="bg-red-600 text-white p-3 flex justify-between items-center shadow-md z-50 rounded-b-lg mb-2">
             <div class="flex items-center gap-3">
@@ -71,8 +71,56 @@
 
                 </template>
 
+                <button @click="abrir_modal_atualizacoes" class="card_modulo bg-white p-8 rounded-3xl shadow-sm hover:shadow-xl border border-gray-200 transition-all flex flex-col items-center group active:scale-95 relative overflow-hidden">
+                    <div class="icone_fundo bg-green-50 p-6 rounded-2xl mb-4 group-hover:bg-green-500 transition-colors">
+                        <span class="text-5xl group-hover:filter group-hover:brightness-0 group-hover:invert">🔄</span>
+                    </div>
+                    <h3 class="titulo_card text-xl font-black text-gray-800 uppercase italic">Atualizações</h3>
+                    <p class="desc_card text-sm text-gray-500 mt-2 text-center">Versão e novidades do sistema</p>
+                    
+                    <span class="absolute top-4 right-4 bg-gray-100 text-gray-400 text-[10px] font-black uppercase px-2 py-1 rounded-md border border-gray-200">
+                        v{{ versao_atual }}
+                    </span>
+                </button>
+
             </div>
         </main>
+
+        <div v-if="modal_visivel" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border-t-4 border-green-500 transform transition-all">
+                <div class="text-center mb-6">
+                    <span class="text-6xl mb-2 block">🚀</span>
+                    <h2 class="text-2xl font-black text-gray-800 uppercase italic">Central de Atualização</h2>
+                    <p class="text-sm text-gray-500 mt-1">Verifique se há novas funcionalidades</p>
+                </div>
+
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6 text-center min-h-[80px] flex flex-col justify-center">
+                    <p class="text-sm font-bold" :class="status_erro ? 'text-red-500' : 'text-gray-700'">{{ mensagem_status }}</p>
+                    
+                    <div v-if="progresso > 0 && progresso < 100" class="w-full bg-gray-200 rounded-full h-2.5 mt-4 overflow-hidden">
+                        <div class="bg-green-500 h-2.5 rounded-full transition-all duration-300" :style="`width: ${progresso}%`"></div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <button v-if="estado_atualizacao === 'parado' || estado_atualizacao === 'atualizado'" @click="checar_atualizacoes" class="w-full bg-nitec_dark hover:bg-black text-white font-black py-4 rounded-xl shadow-lg transition-all uppercase">
+                        🔍 Procurar Atualizações
+                    </button>
+
+                    <button v-if="estado_atualizacao === 'disponivel'" @click="baixar_atualizacao" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg transition-all uppercase">
+                        ⬇️ Baixar Versão {{ versao_nova }}
+                    </button>
+
+                    <button v-if="estado_atualizacao === 'pronto'" @click="instalar_atualizacao" class="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl shadow-lg transition-all uppercase animate-pulse">
+                        🔄 Reiniciar e Instalar
+                    </button>
+
+                    <button @click="fechar_modal" class="text-xs text-gray-400 font-bold uppercase hover:text-red-500 transition-colors mt-2 text-center w-full">
+                        Fechar Janela
+                    </button>
+                </div>
+            </div>
+        </div>
         
         <footer class="rodape_infos bg-white border-t border-gray-200 p-4 text-center">
             <p class="copyright_texto text-[10px] text-gray-400 uppercase tracking-widest font-bold">Nitec Tecnologia &copy; 2026 - Todos os direitos reservados</p>
@@ -81,19 +129,19 @@
 </template>
 
 <script setup>
+import { useAuthStore } from '../stores/auth_store.js'; // ISSO FALTAVA E FAZIA OS V-IF FALHAREM
 import { useLogicaDashboard } from './pagina_dashboard_logica.js';
-import { useAuthStore } from '../stores/auth_store.js';
 
-const auth_store = useAuthStore();
+const auth_store = useAuthStore(); // ISSO FALTAVA E FAZIA OS V-IF FALHAREM
 
-/**
- * Desestruturação da lógica profissional vinda do Composable
- */
 const { 
-    nome_cliente, 
-    em_modo_suporte, 
-    ir_para, 
-    sair, 
-    encerrar_suporte 
+    // Dados Gerais
+    nome_cliente, em_modo_suporte, ir_para, sair, encerrar_suporte,
+    
+    // Dados de Atualização
+    versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
+    progresso, versao_nova, status_erro, 
+    abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
+    baixar_atualizacao, instalar_atualizacao
 } = useLogicaDashboard();
 </script>

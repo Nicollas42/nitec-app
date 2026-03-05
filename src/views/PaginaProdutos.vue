@@ -16,6 +16,12 @@
                 <h2 class="titulo_secao text-xl font-black mb-6 text-blue-600 border-b pb-2">Novo Produto</h2>
                 
                 <form @submit.prevent="cadastrar_novo_produto" class="formulario_produto flex flex-col gap-5">
+                    
+                    <div class="grupo_input">
+                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Código de Barras (Opcional)</label>
+                        <input v-model="formulario_dados.codigo_barras" type="text" placeholder="Ex: 7891234567890" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono text-sm">
+                    </div>
+
                     <div class="grupo_input">
                         <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Nome do Produto</label>
                         <input v-model="formulario_dados.nome_produto" type="text" placeholder="Ex: Teclado Mecânico" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600" required>
@@ -44,17 +50,19 @@
                     <table class="tabela_produtos w-full text-left border-collapse">
                         <thead>
                             <tr class="cabecalho_tabela bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-                                <th class="p-4 font-bold rounded-tl-lg">Nome do Item</th>
+                                <th class="p-4 font-bold rounded-tl-lg">Item</th>
+                                <th class="p-4 font-bold">Cód. Barras</th>
                                 <th class="p-4 font-bold">Preço</th>
-                                <th class="p-4 font-bold rounded-tr-lg">Qtd. Stock</th>
+                                <th class="p-4 font-bold rounded-tr-lg">Stock</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="lista_produtos.length === 0">
-                                <td colspan="3" class="p-8 text-center text-gray-500 italic">Nenhum produto cadastrado ainda.</td>
+                            <tr v-if="!lista_produtos || lista_produtos.length === 0">
+                                <td colspan="4" class="p-8 text-center text-gray-500 italic">Nenhum produto cadastrado ainda.</td>
                             </tr>
                             <tr v-for="produto in lista_produtos" :key="produto.id" class="linha_produto border-b hover:bg-blue-50 transition-colors">
                                 <td class="p-4 font-semibold text-gray-800">{{ produto.nome_produto }}</td>
+                                <td class="p-4 text-gray-500 font-mono text-xs">{{ produto.codigo_barras || 'N/A' }}</td>
                                 <td class="p-4 text-green-600 font-bold">R$ {{ produto.preco_venda }}</td>
                                 <td class="p-4">
                                     <span class="badge_stock bg-gray-200 text-gray-800 py-1 px-3 rounded-full text-xs font-black">{{ produto.estoque_atual }}</span>
