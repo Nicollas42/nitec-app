@@ -1,16 +1,17 @@
 <template>
-  <div class="admin_container h-screen overflow-y-auto bg-gray-100 font-sans p-8">
-    <header class="flex justify-between items-center mb-8 bg-nitec_dark p-6 rounded-2xl shadow-lg">
+  <div class="admin_container h-full overflow-y-auto bg-gray-100 font-sans p-8">
+    
+    <header class="flex justify-between items-center mb-8 bg-nitec_dark p-6 rounded-2xl shadow-lg shrink-0">
         <div>
             <h2 class="text-2xl font-black text-nitec_blue uppercase tracking-tighter">Gestão SaaS</h2>
             <p class="text-xs text-gray-400 uppercase font-bold">Painel de Controle Central Nitec</p>
         </div>
-        <button @click="$router.push('/painel-central')" class="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-sm uppercase font-bold">
-            Voltar ao Dashboard
+        <button @click="$router.push('/painel-central')" class="md:hidden text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all text-sm uppercase font-bold">
+            Voltar
         </button>
     </header>
 
-    <section class="card_cadastro bg-white p-8 rounded-3xl shadow-sm border border-gray-200 mb-8">
+    <section class="card_cadastro bg-white p-8 rounded-3xl shadow-sm border border-gray-200 mb-8 shrink-0">
         <h3 class="text-xl font-black text-gray-800 uppercase italic mb-6">Provisionar Novo Cliente SaaS</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             
@@ -28,7 +29,7 @@
             </div>
 
             <div class="flex flex-col">
-                <label class="text-xs font-bold text-gray-500 mb-1 ml-1">Nome do Proprietário</label>
+                <label class="text-xs font-bold text-gray-500 mb-1 ml-1">Proprietário</label>
                 <input v-model="novo_bar.nome_dono" class="p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-nitec_blue" placeholder="Ex: João da Silva" />
             </div>
             
@@ -47,7 +48,7 @@
                 <input v-model="novo_bar.cnpj" @input="formatarDocumento" class="p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-nitec_blue font-mono" placeholder="000.000.000-00 ou 00.000.000/0001-00" />
             </div>
             
-            <div class="flex flex-col">
+            <div class="flex flex-col lg:col-span-1">
                 <label class="text-xs font-bold text-gray-500 mb-1 ml-1">Telefone / WhatsApp</label>
                 <input v-model="novo_bar.telefone" @input="formatarTelefone" class="p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-nitec_blue font-mono" placeholder="+55 (00) 00000-0000" />
             </div>
@@ -66,10 +67,9 @@
                     <tr class="border-b border-gray-100">
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">ID / Tenant</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Domínio</th>
-                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Contato (Nome/Tel)</th>
+                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Contato</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">E-mail</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Senha</th>
-                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">CPF/CNPJ</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400 text-right">Ações</th>
                     </tr>
                 </thead>
@@ -92,7 +92,6 @@
                                 </button>
                             </div>
                         </td>
-                        <td class="py-4 px-2 text-sm text-gray-600 font-mono">{{ bar.cnpj || 'Não informado' }}</td>
                         <td class="py-4 px-2 text-right flex justify-end gap-2 items-center">
                             <button @click="acessar_suporte(bar.id)" class="bg-gray-800 hover:bg-black text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-colors">
                                 Suporte
@@ -103,14 +102,14 @@
                         </td>
                     </tr>
                     <tr v-if="estabelecimentos_ativos.length === 0">
-                        <td colspan="7" class="text-center py-6 text-gray-400 text-sm">Nenhum cliente ativo no momento.</td>
+                        <td colspan="6" class="text-center py-6 text-gray-400 text-sm">Nenhum cliente ativo no momento.</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </section>
 
-    <section class="lista_estabelecimentos bg-white p-8 rounded-3xl shadow-sm border border-gray-200 border-t-4 border-t-red-500 opacity-90">
+    <section class="lista_estabelecimentos bg-white p-8 rounded-3xl shadow-sm border border-gray-200 border-t-4 border-t-red-500 opacity-90 pb-10">
         <h3 class="text-xl font-black text-gray-800 uppercase italic mb-6">🔴 Clientes Inativos (Bloqueados)</h3>
         <div class="overflow-x-auto">
             <table class="w-full text-left whitespace-nowrap">
@@ -118,10 +117,8 @@
                     <tr class="border-b border-gray-100">
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">ID / Tenant</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Domínio</th>
-                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Contato (Nome/Tel)</th>
+                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Contato</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">E-mail</th>
-                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">Senha</th>
-                        <th class="py-4 px-2 text-xs font-black uppercase text-gray-400">CPF/CNPJ</th>
                         <th class="py-4 px-2 text-xs font-black uppercase text-gray-400 text-right">Ações</th>
                     </tr>
                 </thead>
@@ -131,20 +128,8 @@
                         <td class="py-4 px-2 text-blue-400 font-medium text-sm line-through">http://{{ bar.domains?.[0]?.domain }}:5173</td>
                         <td class="py-4 px-2">
                             <p class="text-sm font-bold text-gray-500">{{ bar.nome_dono || 'N/A' }}</p>
-                            <p class="text-xs text-gray-400 font-mono mt-1">{{ bar.telefone || 'Sem telefone' }}</p>
                         </td>
                         <td class="py-4 px-2 text-sm font-bold text-gray-500">{{ bar.email_dono || 'Sem e-mail' }}</td>
-                        <td class="py-4 px-2">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-400 min-w-[70px] text-center border border-gray-200">
-                                    {{ senhas_visiveis[bar.id] ? (bar.senha_inicial || '***') : '••••••••' }}
-                                </span>
-                                <button @click="alternar_senha(bar.id)" class="text-gray-300 hover:text-gray-500 transition-colors outline-none">
-                                    {{ senhas_visiveis[bar.id] ? '🙈' : '👁️' }}
-                                </button>
-                            </div>
-                        </td>
-                        <td class="py-4 px-2 text-sm text-gray-400 font-mono">{{ bar.cnpj || 'Não informado' }}</td>
                         <td class="py-4 px-2 text-right flex justify-end gap-2 items-center">
                             <button @click="alternar_status(bar.id)" class="bg-green-500 hover:bg-green-600 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg shadow-md transition-colors">
                                 Reativar
@@ -155,32 +140,22 @@
                         </td>
                     </tr>
                     <tr v-if="estabelecimentos_inativos.length === 0">
-                        <td colspan="7" class="text-center py-6 text-gray-400 text-sm">Nenhum cliente inativo.</td>
+                        <td colspan="5" class="text-center py-6 text-gray-400 text-sm">Nenhum cliente inativo.</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </section>
+
   </div>
 </template>
 
 <script setup>
 import { useAdminEstabelecimentos } from './AdminEstabelecimentos.js';
-
-// Importa e desestrutura tudo o que precisamos do ficheiro de lógica
 const {
-    estabelecimentos_ativos,
-    estabelecimentos_inativos,
-    novo_bar,
-    senhas_visiveis,
-    dominio_base,
-    dominio_prefixo,
-    alternar_senha,
-    formatarTelefone,
-    formatarDocumento,
-    registrar_estabelecimento,
-    alternar_status,
-    excluir_cliente,
-    acessar_suporte
+    estabelecimentos_ativos, estabelecimentos_inativos, novo_bar,
+    senhas_visiveis, dominio_base, dominio_prefixo, alternar_senha,
+    formatarTelefone, formatarDocumento, registrar_estabelecimento,
+    alternar_status, excluir_cliente, acessar_suporte
 } = useAdminEstabelecimentos();
 </script>

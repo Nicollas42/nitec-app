@@ -1,39 +1,39 @@
 <template>
-    <div class="pagina_produtos p-8 bg-gray-100 min-h-screen font-sans">
-        <header class="cabecalho_pagina flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+    <div class="pagina_produtos p-8 bg-gray-100 h-full overflow-y-auto font-sans flex flex-col">
+        
+        <header class="cabecalho_pagina shrink-0 flex justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
             <div>
                 <h1 class="titulo_pagina text-2xl font-black text-gray-800 uppercase tracking-tight">Gestão de Produtos</h1>
                 <p class="subtitulo_pagina text-sm text-gray-500">Adicione itens para o seu PDV</p>
             </div>
-            <button @click="voltar_painel" class="botao_voltar bg-gray-800 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
-                ⬅ Voltar ao Painel
+            <button @click="voltar_painel" class="md:hidden botao_voltar bg-gray-800 hover:bg-black text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
+                ⬅ Voltar
             </button>
         </header>
 
-        <div class="grelha_conteudo grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grelha_conteudo grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 pb-6">
             
-            <section class="secao_formulario col-span-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+            <section class="secao_formulario col-span-1 bg-white p-8 rounded-2xl shadow-sm border border-gray-200 h-fit">
                 <h2 class="titulo_secao text-xl font-black mb-6 text-blue-600 border-b pb-2">Novo Produto</h2>
                 
                 <form @submit.prevent="cadastrar_novo_produto" class="formulario_produto flex flex-col gap-5">
-                    
                     <div class="grupo_input">
-                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Código de Barras (Opcional)</label>
+                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Código de Barras</label>
                         <input v-model="formulario_dados.codigo_barras" type="text" placeholder="Ex: 7891234567890" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono text-sm">
                     </div>
 
                     <div class="grupo_input">
                         <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Nome do Produto</label>
-                        <input v-model="formulario_dados.nome_produto" type="text" placeholder="Ex: Teclado Mecânico" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600" required>
+                        <input v-model="formulario_dados.nome_produto" type="text" placeholder="Ex: Cerveja" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600" required>
                     </div>
 
                     <div class="grupo_input">
-                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Preço de Venda (R$)</label>
+                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Preço (R$)</label>
                         <input v-model="formulario_dados.preco_venda" type="number" step="0.01" placeholder="0.00" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600" required>
                     </div>
 
                     <div class="grupo_input">
-                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Stock Inicial</label>
+                        <label class="rotulo block text-sm font-bold text-gray-700 mb-1">Estoque</label>
                         <input v-model="formulario_dados.estoque_atual" type="number" placeholder="0" class="campo_texto w-full p-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600" required>
                     </div>
 
@@ -43,17 +43,17 @@
                 </form>
             </section>
 
-            <section class="secao_lista col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
-                <h2 class="titulo_secao text-xl font-black mb-6 text-gray-800 border-b pb-2">Itens em Stock</h2>
+            <section class="secao_lista col-span-2 bg-white p-8 rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+                <h2 class="titulo_secao text-xl font-black mb-6 text-gray-800 border-b pb-2 shrink-0">Itens em Estoque</h2>
                 
-                <div class="tabela_container overflow-x-auto">
+                <div class="tabela_container overflow-y-auto flex-1 pr-2">
                     <table class="tabela_produtos w-full text-left border-collapse">
-                        <thead>
-                            <tr class="cabecalho_tabela bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
-                                <th class="p-4 font-bold rounded-tl-lg">Item</th>
-                                <th class="p-4 font-bold">Cód. Barras</th>
-                                <th class="p-4 font-bold">Preço</th>
-                                <th class="p-4 font-bold rounded-tr-lg">Stock</th>
+                        <thead class="sticky top-0 bg-gray-50 z-10">
+                            <tr class="cabecalho_tabela text-gray-600 text-sm uppercase tracking-wider">
+                                <th class="p-4 font-bold rounded-tl-lg border-b">Item</th>
+                                <th class="p-4 font-bold border-b">Cód. Barras</th>
+                                <th class="p-4 font-bold border-b">Preço</th>
+                                <th class="p-4 font-bold rounded-tr-lg border-b">Estoque</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -72,6 +72,7 @@
                     </table>
                 </div>
             </section>
+            
         </div>
     </div>
 </template>

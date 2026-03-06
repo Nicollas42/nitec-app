@@ -1,6 +1,6 @@
 import { reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { storeToRefs } from 'pinia'; // <- A ferramenta oficial e blindada
+import { storeToRefs } from 'pinia'; 
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
 
@@ -8,7 +8,6 @@ export function useLogicaProdutos() {
     const roteador = useRouter();
     const loja_produtos = useProdutosStore();
     
-    // Extrai a lista de forma 100% reativa. Se a RAM mudar, a tela pisca na hora!
     const { lista_produtos } = storeToRefs(loja_produtos);
 
     const formulario_dados = reactive({
@@ -43,9 +42,6 @@ export function useLogicaProdutos() {
     });
 
     return { 
-        formulario_dados, 
-        lista_produtos,
-        cadastrar_novo_produto, 
-        voltar_painel 
+        formulario_dados, lista_produtos, cadastrar_novo_produto, voltar_painel 
     };
 }

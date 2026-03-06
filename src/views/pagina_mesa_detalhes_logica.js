@@ -11,22 +11,18 @@ export function useLogicaMesaDetalhes() {
     const id_mesa_atual = rota_atual.params.id_mesa;
 
     const dados_mesa = ref(null);
-    const estado_carregamento = ref(true);
 
-    // Controles do Modal de Novo Cliente
     const modal_cliente_visivel = ref(false);
     const input_novo_cliente = ref('');
 
     const carregar_dados_completos = async () => {
         try {
-            estado_carregamento.value = true;
-            const resposta = await api_cliente.get(`/mesas/${id_mesa_atual}/detalhes`);
-            dados_mesa.value = resposta.data.mesa;
+            const resposta = await api_cliente.get(`/detalhes-mesa/${id_mesa_atual}`);
+            // 👇 LER DE 'dados' PARA NÃO DAR TELA BRANCA
+            dados_mesa.value = resposta.data.dados;
         } catch (erro) {
-            alert("Erro ao carregar informações da mesa. Ela pode ter sido fechada.");
+            alert("Erro ao carregar informações da mesa.");
             voltar_mapa();
-        } finally {
-            estado_carregamento.value = false;
         }
     };
 
@@ -34,7 +30,6 @@ export function useLogicaMesaDetalhes() {
         roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
     };
 
-    // Abre a nossa janela em vez do prompt()
     const adicionar_novo_cliente = () => {
         input_novo_cliente.value = '';
         modal_cliente_visivel.value = true;
@@ -44,7 +39,6 @@ export function useLogicaMesaDetalhes() {
         modal_cliente_visivel.value = false;
     };
 
-    // Confirma a criação do cliente no back-end
     const confirmar_novo_cliente = async () => {
         if (!input_novo_cliente.value) {
             alert("Por favor, digite o nome do cliente.");
@@ -52,9 +46,10 @@ export function useLogicaMesaDetalhes() {
         }
 
         try {
-            await api_cliente.post('/comandas/abrir', {
+            await api_cliente.post('/abrir-comanda', {
                 mesa_id: id_mesa_atual,
-                nome_cliente: input_novo_cliente.value
+                nome_cliente: input_novo_cliente.value,
+                tipo_conta: 'individual' 
             });
             fechar_modal_cliente();
             carregar_dados_completos();
@@ -63,23 +58,21 @@ export function useLogicaMesaDetalhes() {
         }
     };
 
-    // Comunica com os botões + e -
     const alterar_quantidade = async (id_item, acao) => {
         try {
-            await api_cliente.post(`/comandas/item/${id_item}/alterar-quantidade`, { acao });
+            await api_cliente.post(`/alterar-quantidade-item/${id_item}`, { acao });
             carregar_dados_completos();
-            loja_produtos.buscar_produtos(true); // Atualiza o estoque global
+            loja_produtos.buscar_produtos(true);
         } catch (erro) {
             alert(erro.response?.data?.mensagem || "Erro ao atualizar quantidade.");
         }
     };
 
-    // Remove toda a linha de uma vez (Lixeira)
     const remover_item_consumido = async (id_item_comanda) => {
-        if (!confirm("Tem a certeza que deseja cancelar todos estes itens? Eles voltarão para o estoque.")) return;
+        if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
 
         try {
-            await api_cliente.delete(`/comandas/item/${id_item_comanda}`);
+            await api_cliente.delete(`/remover-item-comanda/${id_item_comanda}`);
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
         } catch (erro) {
@@ -98,17 +91,9 @@ export function useLogicaMesaDetalhes() {
     });
 
     return {
-        dados_mesa,
-        estado_carregamento,
-        voltar_mapa,
-        abrir_pdv_para_comanda,
-        adicionar_novo_cliente,
-        modal_cliente_visivel,
-        input_novo_cliente,
-        fechar_modal_cliente,
-        confirmar_novo_cliente,
-        alterar_quantidade,
-        remover_item_consumido,
-        fechar_conta_comanda
+        dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
+        adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
+        fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
+        remover_item_consumido, fechar_conta_comanda
     };
 }

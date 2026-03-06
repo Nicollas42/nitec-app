@@ -1,11 +1,8 @@
-// C:\PDP\NITEC_APP\src\views\pagina_login_logica.js
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth_store.js';
-import api_cliente from '../servicos/api_cliente.js';
 import axios from 'axios';
 import { configurar_url_base } from '../servicos/api_cliente.js';
-
 
 export function useLogicaLogin() {
     const roteador = useRouter();
@@ -44,8 +41,6 @@ export function useLogicaLogin() {
         try {
             const loja = codigo_loja_input.value.trim() || 'master';
             
-            // CORREÇÃO: Grava na memória ANTES de chamar a API! 
-            // Assim o Axios (api_cliente.js) já sabe qual é o subdomínio.
             localStorage.setItem('nitec_tenant_id', loja);
             
             await loja_autenticacao.realizar_login(loja, email_input.value, senha_input.value);
@@ -66,7 +61,6 @@ export function useLogicaLogin() {
         }
     };
 
-    // NOVA FUNÇÃO CORRIGIDA PARA ELECTRON E WEB
     const esqueci_senha = async () => {
         const loja = codigo_loja_input.value.trim() || 'master';
         
@@ -79,7 +73,6 @@ export function useLogicaLogin() {
         if (!confirmacao) return;
 
         try {
-            // CORREÇÃO: Bate sempre na central para gerir a recuperação
             const url_central = configurar_url_base('master');
             const resposta = await axios.post(`${url_central}/admin/esqueci-senha`, {
                 email: email_input.value,
@@ -97,11 +90,7 @@ export function useLogicaLogin() {
     };
 
     return { 
-        codigo_loja_input, 
-        email_input, 
-        senha_input, 
-        lembrar_credenciais, 
-        processar_formulario,
-        esqueci_senha
+        codigo_loja_input, email_input, senha_input, 
+        lembrar_credenciais, processar_formulario, esqueci_senha
     };
 }

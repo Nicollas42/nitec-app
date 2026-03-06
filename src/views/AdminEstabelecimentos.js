@@ -15,13 +15,9 @@ export function useAdminEstabelecimentos() {
         senhas_visiveis.value[id] = !senhas_visiveis.value[id];
     };
 
-    // ==========================================
-    // FORMATAÇÕES E MÁSCARAS
-    // ==========================================
     const formatarTelefone = (e) => {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 0 && !v.startsWith('55')) v = '55' + v;
-
         if (v.length <= 12) {
             v = v.replace(/^(\d{2})(\d{2})(\d{4})(\d{0,4})/, '+$1 ($2) $3-$4');
         } else {
@@ -88,9 +84,6 @@ export function useAdminEstabelecimentos() {
         return false;
     };
 
-    // ==========================================
-    // COMUNICAÇÃO COM A API
-    // ==========================================
     const carregar_dados = async () => {
         try {
             const resposta = await api_cliente.get('/admin/listar-estabelecimentos');
@@ -184,22 +177,12 @@ export function useAdminEstabelecimentos() {
         }
     };
 
-    // Chama os dados automaticamente quando o componente for montado
     onMounted(carregar_dados);
 
     return {
-        estabelecimentos_ativos,
-        estabelecimentos_inativos,
-        novo_bar,
-        senhas_visiveis,
-        dominio_base,
-        dominio_prefixo,
-        alternar_senha,
-        formatarTelefone,
-        formatarDocumento,
-        registrar_estabelecimento,
-        alternar_status,
-        excluir_cliente,
-        acessar_suporte
+        estabelecimentos_ativos, estabelecimentos_inativos, novo_bar,
+        senhas_visiveis, dominio_base, dominio_prefixo, alternar_senha,
+        formatarTelefone, formatarDocumento, registrar_estabelecimento,
+        alternar_status, excluir_cliente, acessar_suporte
     };
 }

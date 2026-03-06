@@ -1,6 +1,6 @@
 {
   "name": "nitec_app",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "main": "app_desktop.cjs",
@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "axios": "^1.13.6",
-    "electron-updater": "^6.1.8", 
+    "dexie": "^4.3.0",
+    "electron-updater": "^6.1.8",
     "pinia": "^3.0.4",
     "sweetalert2": "^11.10.0",
     "vue": "^3.5.29",
@@ -28,7 +29,7 @@
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.27",
     "electron": "^40.6.1",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.8.1",
     "npm-run-all2": "^8.0.4",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.2.1",
@@ -48,7 +49,9 @@
       "app_desktop.cjs"
     ],
     "win": {
-      "target": ["nsis"]
+      "target": [
+        "nsis"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -60,7 +63,7 @@
       {
         "provider": "github",
         "owner": "Nicollas42",
-        "repo": "nitec-atualizacoes" 
+        "repo": "nitec-atualizacoes"
       }
     ]
   },
