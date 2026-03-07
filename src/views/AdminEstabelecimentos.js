@@ -5,6 +5,11 @@ import api_cliente, { configurar_url_base } from '../servicos/api_cliente.js';
 export function useAdminEstabelecimentos() {
     const estabelecimentos_ativos = ref([]);
     const estabelecimentos_inativos = ref([]);
+    
+    // 🟢 ESTADOS DA NOVA INTERFACE MINIMALISTA
+    const aba_atual = ref('ativos'); // Controla qual lista mostrar na tabela
+    const modal_novo_cliente = ref(false); // Controla a janela de cadastro
+
     const novo_bar = ref({ id_do_bar: '', dominio: '', nome_dono: '', email_dono: '', senha_dono: '', cnpj: '', telefone: '' });
     const senhas_visiveis = ref({});
 
@@ -112,6 +117,7 @@ export function useAdminEstabelecimentos() {
             await api_cliente.post('/admin/cadastrar-novo-bar', novo_bar.value);
             novo_bar.value = { id_do_bar: '', dominio: '', nome_dono: '', email_dono: '', senha_dono: '', cnpj: '', telefone: '' };
             dominio_prefixo.value = '';
+            modal_novo_cliente.value = false; // Fecha o modal após sucesso
             carregar_dados();
             alert("Cliente SaaS criado com sucesso!");
         } catch (erro) {
@@ -183,6 +189,7 @@ export function useAdminEstabelecimentos() {
         estabelecimentos_ativos, estabelecimentos_inativos, novo_bar,
         senhas_visiveis, dominio_base, dominio_prefixo, alternar_senha,
         formatarTelefone, formatarDocumento, registrar_estabelecimento,
-        alternar_status, excluir_cliente, acessar_suporte
+        alternar_status, excluir_cliente, acessar_suporte,
+        aba_atual, modal_novo_cliente // 🟢 Exportando as novas variáveis de controle
     };
 }

@@ -49,6 +49,12 @@
                 <span>⚙️</span> Gestão SaaS
             </button>
 
+            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" 
+                    :class="rota_atual.path.includes('/analises') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                <span>📈</span> Análises
+            </button>
+
             <button @click="ir_para('/mapa-mesas')" 
                     :class="rota_atual.path.includes('/mapa-mesas') || rota_atual.path.includes('/mesa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
@@ -93,6 +99,11 @@
                 <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" class="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 flex flex-col items-center">
                     <span class="text-4xl mb-2">⚙️</span><h3 class="font-black text-purple-800 uppercase text-sm">Gestão SaaS</h3>
                 </button>
+                
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
+                    <span class="text-4xl mb-2">📈</span><h3 class="font-black text-gray-800 uppercase text-sm">Análises</h3>
+                </button>
+
                 <button @click="ir_para('/mapa-mesas')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
                     <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-gray-800 uppercase text-sm">Mapa de Mesas</h3>
                 </button>
@@ -108,7 +119,24 @@
             </div>
 
             <div class="flex-1 w-full h-full relative">
-                <router-view></router-view> 
+                <router-view v-slot="{ Component }">
+                    <keep-alive>
+                        <component :is="Component" />
+                    </keep-alive>
+                </router-view>
+
+                <div v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master' && !['/painel-central', '/admin-estabelecimentos'].includes(rota_atual.path)" 
+                     class="absolute inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-[3px]">
+                    
+                    <div class="bg-white border-2 border-purple-200 p-8 rounded-3xl shadow-2xl text-center max-w-sm transform transition-all">
+                        <h2 class="text-lg font-black uppercase text-purple-800 tracking-tight">Modo de Visualização</h2>
+                        <p class="text-sm text-gray-500 mt-2 font-bold">A conta Admin Master não permite operação de vendas.</p>
+                        <p class="text-xs text-gray-400 mt-3 bg-gray-50 py-2 rounded-lg border border-gray-100">
+                            Acesse a conta de um cliente pelo Modo Suporte para interagir.
+                        </p>
+                    </div>
+
+                </div>
             </div>
 
         </main>

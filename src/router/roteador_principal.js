@@ -81,6 +81,13 @@ const rotas_do_aplicativo = [
                 name: 'gestao_permissoes',
                 component: () => import('../views/PaginaPermissoes.vue'),
                 meta: { papeis_permitidos: ['admin_master', 'dono'] }
+            },
+            // 🟢 NOVA ROTA ADICIONADA: ANÁLISES DE NEGÓCIOS (BI)
+            {
+                path: '/analises',
+                name: 'gestao_analises',
+                component: () => import('../views/PaginaAnalises.vue'),
+                meta: { papeis_permitidos: ['admin_master', 'dono'] }
             }
         ]
     }

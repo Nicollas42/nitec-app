@@ -1,6 +1,9 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router'; 
 import { useAuthStore } from '../stores/auth_store.js';
+import { iniciar_sincronizacao_de_fundo, parar_sincronizacao_de_fundo } from '../servicos/sincronizador_bg.js'; 
+import { db } from '../banco_local/db.js';
+
 
 export function useLogicaDashboard() {
     const roteador = useRouter();
@@ -9,9 +12,11 @@ export function useLogicaDashboard() {
 
     const em_modo_suporte = ref(localStorage.getItem('nitec_modo_suporte') === 'ativo');
     const nome_cliente = ref(localStorage.getItem('nitec_nome_cliente') || '');
-
     const esta_offline = ref(!navigator.onLine);
-    const atualizar_status_rede = () => { esta_offline.value = !navigator.onLine; };
+
+    const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+    let ipcRenderer = null;
+    if (isElectron) ipcRenderer = window.require('electron').ipcRenderer;
 
     const versao_atual = ref(import.meta.env.PACKAGE_VERSION || '1.0.2');
     const modal_visivel = ref(false);
@@ -24,11 +29,22 @@ export function useLogicaDashboard() {
     const historico_versoes = ref([]);
     const carregando_historico = ref(false);
 
-    const isElectron = window && window.process && window.process.type;
-    let ipcRenderer = null;
+    async function limpar_dados_locais_completos() {
+        try {
+            await db.transaction('rw', db.tables, async () => {
+                for (const tabela of db.tables) {
+                    await tabela.clear();
+                }
+            });
 
-    if (isElectron) {
-        ipcRenderer = window.require('electron').ipcRenderer;
+            const chaves = [
+                'nitec_token_admin', 'nitec_modo_suporte', 'nitec_api_tenant',
+                'nitec_nome_cliente', 'nitec_usuario_admin'
+            ];
+            chaves.forEach(k => localStorage.removeItem(k));
+        } catch (erro) {
+            console.error("Erro na limpeza de sessão:", erro);
+        }
     }
 
     const buscar_historico_github = async () => {
@@ -37,91 +53,79 @@ export function useLogicaDashboard() {
             const resposta = await fetch('https://api.github.com/repos/Nicollas42/nitec-atualizacoes/releases');
             const dados = await resposta.json();
             historico_versoes.value = dados.filter(release => !release.draft);
-        } catch (erro) {
-            console.error("Erro ao buscar histórico:", erro);
-        } finally {
-            carregando_historico.value = false;
-        }
-    };
-
-    const baixar_versao_antiga = (url_download) => {
-        if (isElectron) {
-            window.require('electron').shell.openExternal(url_download);
-        } else {
-            window.open(url_download, '_blank');
-        }
+        } catch (erro) { console.error(erro); } finally { carregando_historico.value = false; }
     };
 
     const abrir_modal_atualizacoes = () => {
         modal_visivel.value = true;
-        progresso.value = 0;
-        status_erro.value = false;
-        tem_atualizacao_nova.value = false; 
-        
         buscar_historico_github();
-        
-        if (!isElectron) {
-            mensagem_status.value = 'Você está usando a versão Web. O PDV atualiza-se automaticamente.';
-            estado_atualizacao.value = 'atualizado';
-        } else {
-            mensagem_status.value = 'Pronto para verificar atualizações no servidor.';
+        if (isElectron) {
             estado_atualizacao.value = 'parado';
+            ipcRenderer.send('checar-atualizacoes');
         }
     };
 
-    const fechar_modal = () => modal_visivel.value = false;
-    const checar_atualizacoes = () => { if (ipcRenderer) ipcRenderer.send('checar-atualizacoes'); };
-    const baixar_atualizacao = () => {
-        if (ipcRenderer) {
-            estado_atualizacao.value = 'baixando';
-            mensagem_status.value = 'Baixando atualização... Por favor, aguarde.';
-            ipcRenderer.send('baixar-atualizacao');
+    const checar_atualizacoes = () => ipcRenderer?.send('checar-atualizacoes');
+    const baixar_atualizacao = () => ipcRenderer?.send('baixar-atualizacao');
+    const instalar_atualizacao = () => ipcRenderer?.send('instalar-atualizacao');
+    const baixar_versao_antiga = (url) => isElectron ? window.require('electron').shell.openExternal(url) : window.open(url, '_blank');
+
+    // --- 🟢 CORREÇÃO: ORDEM DE EXECUÇÃO DO SUPORTE ---
+    const encerrar_suporte = async () => {
+        parar_sincronizacao_de_fundo(); 
+        
+        // 1. PRIMEIRO: Salva as informações do Admin Master na memória temporária
+        const token_admin = localStorage.getItem('nitec_token_admin');
+        const usuario_admin_raw = localStorage.getItem('nitec_usuario_admin');
+        
+        // 2. SEGUNDO: Limpa todo o lixo do cliente atual (Isso apagaria o Admin se não tivéssemos salvo no passo 1)
+        await limpar_dados_locais_completos();
+        
+        // 3. TERCEIRO: Restaura as informações do Admin no sistema principal
+        if (token_admin && usuario_admin_raw) {
+            localStorage.setItem('nitec_tenant_id', 'master');
+            localStorage.setItem('nitec_token', token_admin);
+            localStorage.setItem('nitec_usuario', usuario_admin_raw); 
         }
+
+        // 4. QUARTO: Redireciona e força o recarregamento
+        roteador.replace('/admin-estabelecimentos').then(() => window.location.reload());
     };
-    
-    const instalar_atualizacao = () => {
-        if (ipcRenderer) {
-            mensagem_status.value = 'Fechando o sistema e instalando...';
-            ipcRenderer.send('instalar-atualizacao');
-        }
+
+    const sair = async () => {
+        if (!confirm("Deseja realmente sair do sistema?")) return;
+        
+        parar_sincronizacao_de_fundo(); 
+        await limpar_dados_locais_completos();
+        loja_autenticacao.encerrar_sessao();
+        
+        roteador.replace('/login').then(() => window.location.reload());
     };
 
     onMounted(() => {
-        window.addEventListener('online', atualizar_status_rede);
-        window.addEventListener('offline', atualizar_status_rede);
+        iniciar_sincronizacao_de_fundo();
+        window.addEventListener('online', () => esta_offline.value = false);
+        window.addEventListener('offline', () => esta_offline.value = true);
 
         if (ipcRenderer) {
             ipcRenderer.send('pedir-versao');
             ipcRenderer.on('resposta-versao', (event, v) => versao_atual.value = v);
-            ipcRenderer.send('checar-atualizacoes');
+            
             ipcRenderer.on('status-atualizacao', (event, info) => {
-                if (modal_visivel.value) {
-                    status_erro.value = info.status === 'erro';
-                    mensagem_status.value = info.mensagem;
-                    estado_atualizacao.value = info.status;
-                }
+                estado_atualizacao.value = info.status;
+                mensagem_status.value = info.mensagem;
+                status_erro.value = info.status === 'erro';
                 if (info.status === 'disponivel') {
                     tem_atualizacao_nova.value = true;
-                    if (info.versao) versao_nova.value = info.versao;
+                    versao_nova.value = info.versao;
                 }
             });
-            ipcRenderer.on('progresso-download', (event, p) => {
-                if (modal_visivel.value) {
-                    progresso.value = Math.round(p);
-                    mensagem_status.value = `Baixando... ${progresso.value}%`;
-                }
-            });
-            ipcRenderer.on('mensagem-atualizacao', (event, msg) => {
-                 if (modal_visivel.value) mensagem_status.value = msg;
-            });
-        } else {
-            versao_atual.value = 'Web';
+            ipcRenderer.on('progresso-download', (event, p) => progresso.value = Math.round(p));
+            ipcRenderer.on('mensagem-atualizacao', (event, msg) => mensagem_status.value = msg);
         }
     });
 
     onUnmounted(() => {
-        window.removeEventListener('online', atualizar_status_rede);
-        window.removeEventListener('offline', atualizar_status_rede);
         if (ipcRenderer) {
             ipcRenderer.removeAllListeners('status-atualizacao');
             ipcRenderer.removeAllListeners('progresso-download');
@@ -130,62 +134,12 @@ export function useLogicaDashboard() {
         }
     });
 
-    const ir_para = (rota_url) => roteador.push(rota_url);
-
-    const encerrar_suporte = () => {
-        try {
-            const token_admin = localStorage.getItem('nitec_token_admin');
-            const usuario_admin_raw = localStorage.getItem('nitec_usuario_admin');
-            
-            localStorage.removeItem('nitec_modo_suporte');
-            localStorage.removeItem('nitec_api_tenant');
-            localStorage.removeItem('nitec_nome_cliente');
-            
-            if (token_admin && usuario_admin_raw) {
-                localStorage.setItem('nitec_tenant_id', 'master');
-                localStorage.setItem('nitec_token', token_admin);
-                localStorage.setItem('nitec_usuario', usuario_admin_raw); 
-            }
-
-            localStorage.removeItem('nitec_token_admin');
-            localStorage.removeItem('nitec_usuario_admin');
-
-            window.location.href = window.location.origin + window.location.pathname + '#/admin-estabelecimentos';
-            window.location.reload();
-        } catch (erro) {
-            console.error("Erro ao sair do suporte:", erro);
-            alert("Ocorreu um erro ao sair. Limpando a sessão forçadamente...");
-            localStorage.clear();
-            window.location.href = window.location.origin + window.location.pathname + '#/login';
-            window.location.reload();
-        }
-    };
-
-    const sair = () => {
-        try {
-            if (confirm("Deseja realmente sair do sistema?")) {
-                localStorage.removeItem('nitec_token_admin');
-                localStorage.removeItem('nitec_modo_suporte');
-                localStorage.removeItem('nitec_api_tenant');
-                localStorage.removeItem('nitec_nome_cliente');
-                localStorage.removeItem('nitec_usuario_admin');
-                
-                loja_autenticacao.encerrar_sessao();
-                
-                window.location.href = window.location.origin + window.location.pathname + '#/login';
-                window.location.reload();
-            }
-        } catch (erro) {
-            console.error("Erro no logout:", erro);
-        }
-    };
-
     return { 
-        nome_cliente, em_modo_suporte, ir_para, sair, encerrar_suporte,
+        nome_cliente, em_modo_suporte, sair, encerrar_suporte,
         versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
         progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
-        abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
-        baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
-        esta_offline, rota_atual
+        abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
+        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
+        esta_offline, rota_atual, ir_para: (url) => roteador.push(url)
     };
 }

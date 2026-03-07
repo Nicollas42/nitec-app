@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onActivated, watch } from 'vue'; 
 import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
@@ -8,23 +8,33 @@ export function useLogicaMesaDetalhes() {
     const roteador = useRouter();
     const loja_produtos = useProdutosStore();
     
-    const id_mesa_atual = rota_atual.params.id_mesa;
-
     const dados_mesa = ref(null);
-
     const modal_cliente_visivel = ref(false);
     const input_novo_cliente = ref('');
 
     const carregar_dados_completos = async () => {
+        const id_dinamico = rota_atual.params.id_mesa;
+        if (!id_dinamico) return; 
+
+        // 🟢 VACINA VISUAL: Apaga a mesa antiga da tela antes mesmo de fazer a requisição.
+        // Como o Vue tem um 'v-if="dados_mesa"', a tela ficará limpa neste milissegundo.
+        dados_mesa.value = null;
+
         try {
-            const resposta = await api_cliente.get(`/detalhes-mesa/${id_mesa_atual}`);
-            // 👇 LER DE 'dados' PARA NÃO DAR TELA BRANCA
+            const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             dados_mesa.value = resposta.data.dados;
         } catch (erro) {
+            console.error(erro);
             alert("Erro ao carregar informações da mesa.");
             voltar_mapa();
         }
     };
+
+    watch(() => rota_atual.params.id_mesa, (novo_id) => {
+        if (novo_id) {
+            carregar_dados_completos();
+        }
+    });
 
     const abrir_pdv_para_comanda = (id_comanda) => {
         roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
@@ -47,9 +57,9 @@ export function useLogicaMesaDetalhes() {
 
         try {
             await api_cliente.post('/abrir-comanda', {
-                mesa_id: id_mesa_atual,
+                mesa_id: rota_atual.params.id_mesa, 
                 nome_cliente: input_novo_cliente.value,
-                tipo_conta: 'individual' 
+                tipo_conta: 'individual'
             });
             fechar_modal_cliente();
             carregar_dados_completos();
@@ -86,9 +96,8 @@ export function useLogicaMesaDetalhes() {
 
     const voltar_mapa = () => roteador.push('/mapa-mesas');
 
-    onMounted(() => {
-        carregar_dados_completos();
-    });
+    onMounted(() => carregar_dados_completos());
+    onActivated(() => carregar_dados_completos());
 
     return {
         dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
