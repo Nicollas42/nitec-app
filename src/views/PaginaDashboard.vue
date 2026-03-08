@@ -176,8 +176,10 @@
                             <button v-if="estado_atualizacao === 'disponivel'" @click="baixar_atualizacao" class="bg-green-500 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-green-600 shadow-md transition-all active:scale-95">
                                 Baixar v{{ versao_nova }}
                             </button>
-                            <button v-if="estado_atualizacao === 'baixado'" @click="instalar_atualizacao" class="bg-purple-600 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-purple-700 shadow-md transition-all active:scale-95">
-                                Reiniciar e Instalar
+                            <button v-if="estado_atualizacao === 'pronto'" 
+                                    @click="instalar_atualizacao" 
+                                    class="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-xl shadow-lg transition-all uppercase animate-pulse">
+                                🔄 Reiniciar e Instalar Agora
                             </button>
                         </div>
                     </div>

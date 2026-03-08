@@ -9,7 +9,7 @@ export function useLogicaDashboard() {
     const roteador = useRouter();
     const rota_atual = useRoute(); 
     const loja_autenticacao = useAuthStore();
-    const toast_store = useToastStore(); // 🟢 Instanciando o Toast
+    const toast_store = useToastStore(); // 🟢 Instanciando o Toast Global
 
     const em_modo_suporte = ref(localStorage.getItem('nitec_modo_suporte') === 'ativo');
     const nome_cliente = ref(localStorage.getItem('nitec_nome_cliente') || '');
@@ -59,14 +59,20 @@ export function useLogicaDashboard() {
 
     const abrir_modal_atualizacoes = () => {
         modal_visivel.value = true;
+        progresso.value = 0;
+        status_erro.value = false;
         buscar_historico_github();
-        if (isElectron) {
+        
+        if (!isElectron) {
+            mensagem_status.value = 'Você está usando a versão Web. O PDV atualiza-se automaticamente ao recarregar.';
+            estado_atualizacao.value = 'atualizado';
+        } else {
+            mensagem_status.value = 'Pronto para verificar atualizações no servidor.';
             estado_atualizacao.value = 'parado';
-            ipcRenderer.send('checar-atualizacoes');
+            checar_atualizacoes();
         }
     };
 
-    // 🟢 NOVA FUNÇÃO: Garante que baixa o .EXE e não o .YML no histórico
     const obter_link_executavel = (assets) => {
         if (!assets || assets.length === 0) return '#';
         const asset_exe = assets.find(a => a.name.endsWith('.exe'));
@@ -74,16 +80,28 @@ export function useLogicaDashboard() {
     };
 
     const checar_atualizacoes = () => ipcRenderer?.send('checar-atualizacoes');
-    const baixar_atualizacao = () => ipcRenderer?.send('baixar-atualizacao');
-    const instalar_atualizacao = () => ipcRenderer?.send('instalar-atualizacao');
+    
+    const baixar_atualizacao = () => {
+        if (ipcRenderer) {
+            estado_atualizacao.value = 'baixando';
+            mensagem_status.value = 'Baixando atualização... Por favor, aguarde.';
+            ipcRenderer.send('baixar-atualizacao');
+        }
+    };
+
+    const instalar_atualizacao = () => {
+        if (ipcRenderer) {
+            mensagem_status.value = 'Fechando o sistema e instalando...';
+            ipcRenderer.send('instalar-atualizacao');
+        }
+    };
+
     const baixar_versao_antiga = (url) => isElectron ? window.require('electron').shell.openExternal(url) : window.open(url, '_blank');
 
     const encerrar_suporte = async () => {
         parar_sincronizacao_de_fundo(); 
-        
         const token_admin = localStorage.getItem('nitec_token_admin');
         const usuario_admin_raw = localStorage.getItem('nitec_usuario_admin');
-        
         await limpar_dados_locais_completos();
         
         if (token_admin && usuario_admin_raw) {
@@ -91,17 +109,14 @@ export function useLogicaDashboard() {
             localStorage.setItem('nitec_token', token_admin);
             localStorage.setItem('nitec_usuario', usuario_admin_raw); 
         }
-
         roteador.replace('/admin-estabelecimentos').then(() => window.location.reload());
     };
 
     const sair = async () => {
         if (!confirm("Deseja realmente sair do sistema?")) return;
-        
         parar_sincronizacao_de_fundo(); 
         await limpar_dados_locais_completos();
         loja_autenticacao.encerrar_sessao();
-        
         roteador.replace('/login').then(() => window.location.reload());
     };
 
@@ -124,15 +139,23 @@ export function useLogicaDashboard() {
                     versao_nova.value = info.versao;
                 }
 
-                // 🟢 AUTOMAÇÃO: Se o download terminou, avisa e instala sozinho!
-                if (info.status === 'baixado') {
-                    toast_store.exibir_toast("Atualização concluída! Reiniciando o sistema...", "sucesso");
+                // 🟢 AUTOMAÇÃO RESTAURADA: Usando o status 'pronto' que o seu Electron envia
+                if (info.status === 'pronto') {
+                    console.log("Download concluído. Iniciando instalação automática...");
+                    toast_store.exibir_toast("Sistema atualizado! Reiniciando em instantes...", "sucesso");
+                    
                     setTimeout(() => {
+                        estado_atualizacao.value = 'instalando'; 
                         instalar_atualizacao();
                     }, 2500);
                 }
             });
-            ipcRenderer.on('progresso-download', (event, p) => progresso.value = Math.round(p));
+
+            ipcRenderer.on('progresso-download', (event, p) => {
+                progresso.value = Math.round(p);
+                mensagem_status.value = `Baixando... ${progresso.value}%`;
+            });
+
             ipcRenderer.on('mensagem-atualizacao', (event, msg) => mensagem_status.value = msg);
         }
     });
@@ -152,7 +175,7 @@ export function useLogicaDashboard() {
         progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
         abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
         checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
-        obter_link_executavel, // 🟢 Exportado para a página
+        obter_link_executavel,
         esta_offline, rota_atual, ir_para: (url) => roteador.push(url)
     };
 }
