@@ -190,7 +190,11 @@
                                 <p class="font-black text-sm text-gray-800">{{ versao.name || versao.tag_name }}</p>
                                 <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{{ new Date(versao.published_at).toLocaleDateString() }}</p>
                             </div>
-                            <button v-if="versao.assets && versao.assets.length > 0" @click="baixar_versao_antiga(versao.assets[0].browser_download_url)" class="text-[10px] text-nitec_blue hover:bg-blue-50 font-black px-4 py-2 border border-blue-100 rounded-lg transition-colors uppercase">Baixar</button>
+                            <button v-if="versao.assets && versao.assets.length > 0" 
+                                    @click="baixar_versao_antiga(obter_link_executavel(versao.assets))" 
+                                    class="text-[10px] text-nitec_blue hover:bg-blue-50 font-black px-4 py-2 border border-blue-100 rounded-lg transition-colors uppercase">
+                                Baixar .EXE
+                            </button>
                         </div>
                         <div v-if="historico_versoes.length === 0 && !carregando_historico" class="text-center text-xs text-gray-400 italic">Nenhum histórico disponível.</div>
                     </div>
@@ -234,7 +238,7 @@ const {
     versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
     progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
     abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
-    baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
+    baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,obter_link_executavel,
     esta_offline, rota_atual
 } = useLogicaDashboard();
 </script>

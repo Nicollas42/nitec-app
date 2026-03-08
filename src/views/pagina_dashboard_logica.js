@@ -134,12 +134,25 @@ export function useLogicaDashboard() {
         }
     });
 
+    // 🟢 NOVA FUNÇÃO: Procura o ficheiro .exe dentro dos assets do GitHub
+    const obter_link_executavel = (assets) => {
+        if (!assets || assets.length === 0) return '#';
+        
+        // Tenta achar o ficheiro executável do Windows
+        const asset_exe = assets.find(a => a.name.endsWith('.exe'));
+        if (asset_exe) return asset_exe.browser_download_url;
+        
+        // Se for Mac/Linux ou não tiver .exe, pega o primeiro que não seja .yml ou .blockmap
+        const asset_fallback = assets.find(a => !a.name.endsWith('.yml') && !a.name.endsWith('.blockmap'));
+        return asset_fallback ? asset_fallback.browser_download_url : assets[0].browser_download_url;
+    };
+
     return { 
         nome_cliente, em_modo_suporte, sair, encerrar_suporte,
         versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
         progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
         abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
-        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
+        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,obter_link_executavel,
         esta_offline, rota_atual, ir_para: (url) => roteador.push(url)
     };
 }
