@@ -1,4 +1,4 @@
-import { ref, onMounted, onActivated, watch } from 'vue'; 
+import { ref, reactive, onMounted, onActivated, watch } from 'vue'; 
 import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
@@ -12,12 +12,19 @@ export function useLogicaMesaDetalhes() {
     const modal_cliente_visivel = ref(false);
     const input_novo_cliente = ref('');
 
+    // 🟢 NOVO: CONTROLE DE CANCELAMENTO / CALOTE
+    const modal_cancelamento_visivel = ref(false);
+    const cancelando = ref(false);
+    const form_cancelamento = reactive({
+        comanda_id: null,
+        motivo_cancelamento: 'Cliente saiu sem pagar (Calote)',
+        retornar_ao_estoque: false
+    });
+
     const carregar_dados_completos = async () => {
         const id_dinamico = rota_atual.params.id_mesa;
         if (!id_dinamico) return; 
 
-        // 🟢 VACINA VISUAL: Apaga a mesa antiga da tela antes mesmo de fazer a requisição.
-        // Como o Vue tem um 'v-if="dados_mesa"', a tela ficará limpa neste milissegundo.
         dados_mesa.value = null;
 
         try {
@@ -31,30 +38,18 @@ export function useLogicaMesaDetalhes() {
     };
 
     watch(() => rota_atual.params.id_mesa, (novo_id) => {
-        if (novo_id) {
-            carregar_dados_completos();
-        }
+        if (novo_id) carregar_dados_completos();
     });
 
-    const abrir_pdv_para_comanda = (id_comanda) => {
-        roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
-    };
+    const abrir_pdv_para_comanda = (id_comanda) => roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
+    
+    const fechar_conta_comanda = (id_comanda) => roteador.push(`/pdv-caixa?pagamento=${id_comanda}`);
 
-    const adicionar_novo_cliente = () => {
-        input_novo_cliente.value = '';
-        modal_cliente_visivel.value = true;
-    };
-
-    const fechar_modal_cliente = () => {
-        modal_cliente_visivel.value = false;
-    };
+    const adicionar_novo_cliente = () => { input_novo_cliente.value = ''; modal_cliente_visivel.value = true; };
+    const fechar_modal_cliente = () => modal_cliente_visivel.value = false;
 
     const confirmar_novo_cliente = async () => {
-        if (!input_novo_cliente.value) {
-            alert("Por favor, digite o nome do cliente.");
-            return;
-        }
-
+        if (!input_novo_cliente.value) return alert("Por favor, digite o nome do cliente.");
         try {
             await api_cliente.post('/abrir-comanda', {
                 mesa_id: rota_atual.params.id_mesa, 
@@ -63,9 +58,7 @@ export function useLogicaMesaDetalhes() {
             });
             fechar_modal_cliente();
             carregar_dados_completos();
-        } catch (erro) {
-            alert("Erro ao criar sub-comanda separada.");
-        }
+        } catch (erro) { alert("Erro ao criar sub-comanda separada."); }
     };
 
     const alterar_quantidade = async (id_item, acao) => {
@@ -73,25 +66,44 @@ export function useLogicaMesaDetalhes() {
             await api_cliente.post(`/alterar-quantidade-item/${id_item}`, { acao });
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) {
-            alert(erro.response?.data?.mensagem || "Erro ao atualizar quantidade.");
-        }
+        } catch (erro) { alert(erro.response?.data?.mensagem || "Erro ao atualizar quantidade."); }
     };
 
     const remover_item_consumido = async (id_item_comanda) => {
         if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
-
         try {
             await api_cliente.delete(`/remover-item-comanda/${id_item_comanda}`);
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) {
-            alert("Erro ao remover os itens.");
-        }
+        } catch (erro) { alert("Erro ao remover os itens."); }
     };
 
-    const fechar_conta_comanda = (id_comanda) => {
-        roteador.push(`/pdv-caixa?pagamento=${id_comanda}`);
+    // 🟢 NOVAS FUNÇÕES DE CANCELAMENTO
+    const abrir_modal_cancelamento = (id_comanda) => {
+        form_cancelamento.comanda_id = id_comanda;
+        form_cancelamento.motivo_cancelamento = 'Cliente saiu sem pagar (Calote)';
+        form_cancelamento.retornar_ao_estoque = false;
+        modal_cancelamento_visivel.value = true;
+    };
+
+    const confirmar_cancelamento = async () => {
+        cancelando.value = true;
+        try {
+            await api_cliente.post(`/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, {
+                motivo_cancelamento: form_cancelamento.motivo_cancelamento,
+                retornar_ao_estoque: form_cancelamento.retornar_ao_estoque
+            });
+            modal_cancelamento_visivel.value = false;
+            
+            // 🟢 Redireciona para o Menu de Mesas
+            voltar_mapa(); 
+
+            loja_produtos.buscar_produtos(true); 
+        } catch (erro) {
+            alert(erro.response?.data?.mensagem || "Erro ao cancelar comanda.");
+        } finally {
+            cancelando.value = false;
+        }
     };
 
     const voltar_mapa = () => roteador.push('/mapa-mesas');
@@ -103,6 +115,9 @@ export function useLogicaMesaDetalhes() {
         dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
         fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
-        remover_item_consumido, fechar_conta_comanda
+        remover_item_consumido, fechar_conta_comanda,
+        // 🟢 Exportando as variáveis do cancelamento
+        modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
+        confirmar_cancelamento, cancelando
     };
 }

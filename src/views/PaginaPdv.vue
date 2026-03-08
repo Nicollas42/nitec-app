@@ -1,10 +1,10 @@
 <template>
-    <div class="tela_pdv_layout flex flex-col md:flex-row h-full bg-gray-50 font-sans overflow-hidden">
+    <div class="tela_pdv_layout flex flex-col md:flex-row h-full bg-gray-50 font-sans overflow-hidden relative">
         
         <section class="w-full md:w-2/3 p-4 md:p-6 flex flex-col h-full md:border-r border-gray-200">
             <header class="flex justify-between items-center mb-6 shrink-0">
                 <h1 class="text-xl md:text-2xl font-black text-gray-800 tracking-tight">
-                    {{ id_comanda_pagamento ? '💳 Pagamento' : 'Terminal de Vendas' }}
+                    {{ id_comanda_pagamento ? '💳 Pagamento de Conta' : (id_comanda_vinculada ? '📥 Lançar na Mesa' : 'Terminal de Vendas Avulso') }}
                 </h1>
                 <button @click="voltar_painel" class="md:hidden px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-bold transition-all shadow-sm">Voltar</button>
             </header>
@@ -22,11 +22,11 @@
             </div>
         </section>
 
-        <section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[50vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
+        <section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[55vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
             
             <div class="bg-gray-50/80 backdrop-blur-md border-b border-gray-100 p-4 text-center shrink-0 rounded-t-3xl md:rounded-none">
                 <h2 class="text-xs font-black text-gray-600 uppercase tracking-widest">
-                    {{ id_comanda_pagamento ? 'Resumo da Conta' : 'Comanda Atual' }}
+                    {{ id_comanda_pagamento ? 'Resumo da Conta' : 'Carrinho Atual' }}
                 </h2>
                 <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-2 md:hidden"></div>
             </div>
@@ -52,9 +52,24 @@
             </div>
 
             <div class="p-5 md:p-6 bg-white border-t border-gray-100 shrink-0 pb-safe">
+                
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subtotal:</span>
+                    <span class="text-sm font-black text-gray-600">R$ {{ subtotal_comanda.toFixed(2) }}</span>
+                </div>
+                
+                <div v-if="!id_comanda_vinculada" class="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
+                    <span class="text-[10px] font-black text-orange-500 uppercase tracking-widest flex items-center gap-1">
+                        <span>🏷️</span> Desconto (R$):
+                    </span>
+                    <input type="number" v-model="valor_desconto" min="0" step="0.01" placeholder="0.00" class="w-24 p-2 text-right bg-orange-50 border border-orange-200 rounded-lg outline-none focus:border-orange-400 text-sm font-black text-orange-700 transition-colors placeholder:text-orange-300">
+                </div>
+
                 <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Calculado:</span>
-                    <span class="text-2xl md:text-3xl font-black text-nitec_blue tracking-tighter">R$ {{ valor_total_comanda.toFixed(2) }}</span>
+                    <span class="text-[10px] font-black text-gray-800 uppercase tracking-widest">Total a Pagar:</span>
+                    <span class="text-2xl md:text-3xl font-black text-nitec_blue tracking-tighter" :class="valor_desconto > 0 ? 'text-green-600' : ''">
+                        R$ {{ valor_final_comanda.toFixed(2) }}
+                    </span>
                 </div>
                 
                 <button @click="processar_acao_principal" :class="id_comanda_pagamento ? 'bg-green-500 hover:bg-green-600' : 'bg-nitec_blue hover:bg-blue-700'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2">
@@ -72,13 +87,22 @@
 import { useLogicaPdv } from './pagina_pdv_logica.js';
 const { 
     lista_produtos, carrinho_venda, adicionar_ao_carrinho, 
-    remover_do_carrinho, valor_total_comanda, 
+    remover_do_carrinho, subtotal_comanda, valor_final_comanda, valor_desconto,
     id_comanda_vinculada, id_comanda_pagamento, processar_acao_principal, voltar_painel 
 } = useLogicaPdv();
 </script>
 
 <style scoped>
-/* Evita que botões fiquem cortados no iPhone */
 .pb-safe { padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); }
-.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 🟢 Aviso CSS Corrigido: Adicionada a propriedade padrão line-clamp */
+.line-clamp-2 { 
+    display: -webkit-box; 
+    -webkit-line-clamp: 2; 
+    line-clamp: 2;
+    -webkit-box-orient: vertical; 
+    overflow: hidden; 
+}
+
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 </style>

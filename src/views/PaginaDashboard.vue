@@ -201,13 +201,33 @@
             </div>
         </div>
 
+        <Teleport to="body">
+            <transition 
+                enter-active-class="transition ease-out duration-300"
+                enter-from-class="opacity-0 -translate-y-10"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition ease-in duration-200"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 -translate-y-10">
+                
+                <div v-if="toast_store.visivel" 
+                     :class="toast_store.tipo === 'sucesso' ? 'bg-green-500 shadow-green-200' : 'bg-red-500 shadow-red-200'"
+                     class="fixed top-8 left-1/2 transform -translate-x-1/2 z-[9999] text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20">
+                    <span class="text-2xl">{{ toast_store.tipo === 'sucesso' ? '✅' : '❌' }}</span>
+                    <p class="font-black uppercase text-xs tracking-widest">{{ toast_store.mensagem }}</p>
+                </div>
+            </transition>
+        </Teleport>
+
     </div>
 </template>
 
 <script setup>
 import { useAuthStore } from '../stores/auth_store.js'; 
 import { useLogicaDashboard } from './pagina_dashboard_logica.js';
+import { useToastStore } from '../stores/toast_store.js'; // 🟢 Importar o novo store
 
+const toast_store = useToastStore(); // 🟢 Instanciar
 const auth_store = useAuthStore(); 
 const { 
     nome_cliente, em_modo_suporte, ir_para, sair, encerrar_suporte,

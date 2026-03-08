@@ -58,8 +58,11 @@ export function useLogicaMesas() {
 
     const confirmar_abertura_comanda = async () => {
         try {
+            // 🟢 Guardamos o ID antes de fechar o modal
+            const id_mesa_aberta = mesa_em_abertura.value.id; 
+
             await api_cliente.post('/abrir-comanda', {
-                mesa_id: mesa_em_abertura.value.id,
+                mesa_id: id_mesa_aberta,
                 nome_cliente: input_nome_cliente.value,
                 tipo_conta: 'geral',
                 data_hora_abertura: new Date().toISOString(),
@@ -67,6 +70,10 @@ export function useLogicaMesas() {
 
             loja_mesas.buscar_mesas(true); 
             fechar_modal();
+
+            // 🟢 Redireciona diretamente para a tela da mesa aberta!
+            roteador.push(`/mesa/${id_mesa_aberta}/detalhes`);
+            
         } catch (erro) {
             alert("Erro ao abrir a comanda. Verifique a conexão com o servidor.");
         }

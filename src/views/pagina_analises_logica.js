@@ -1,10 +1,10 @@
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import api_cliente from '../servicos/api_cliente.js';
 
 export function useLogicaAnalises() {
     const carregando = ref(true);
     const dados_dashboard = ref(null);
-    const aba_ativa = ref('inteligência'); // Pode ser: 'inteligência', 'encalhados', 'equipe', 'auditoria'
+    const aba_ativa = ref('inteligência'); 
 
     const visibilidade = ref({
         vendas_dia: true, mapa_calor: true, comparador: true, ranking_mesas: true, curva_abc: true
@@ -17,6 +17,33 @@ export function useLogicaAnalises() {
 
     const data_inicio = ref(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
     const data_fim = ref(new Date().toISOString().split('T')[0]);
+
+    // 🟢 NOVO: ESTADOS DOS FILTROS DA AUDITORIA
+    const filtro_auditoria_texto = ref('');
+    const filtro_auditoria_tipo = ref('todos'); // 'todos', 'venda', 'perda', 'entrada'
+
+    // 🟢 NOVO: MOTOR DE FILTRAGEM EM TEMPO REAL
+    const log_auditoria_filtrado = computed(() => {
+        if (!dados_dashboard.value || !dados_dashboard.value.log_auditoria) return [];
+
+        return dados_dashboard.value.log_auditoria.filter(evento => {
+            // 1. Filtro por Categoria (Venda, Entrada, Perda)
+            if (filtro_auditoria_tipo.value !== 'todos' && evento.tipo_evento !== filtro_auditoria_tipo.value) {
+                return false;
+            }
+
+            // 2. Filtro por Pesquisa de Texto (Busca em tudo: Título, Descrição, Usuário)
+            if (filtro_auditoria_texto.value) {
+                const termo = filtro_auditoria_texto.value.toLowerCase();
+                const string_busca = `${evento.titulo} ${evento.descricao} ${evento.usuario} ${evento.detalhes_extras || ''}`.toLowerCase();
+                if (!string_busca.includes(termo)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    });
 
     const definir_periodo = (tipo) => {
         const hoje = new Date();
@@ -42,10 +69,10 @@ export function useLogicaAnalises() {
         finally { carregando.value = false; }
     };
 
-    // 🟢 Função utilitária para embelezar a data do Log
     const formatarDataLog = (dataString) => {
         const data = new Date(dataString);
-        return data.toLocaleDateString('pt-BR') + ' às ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        // Formato bem curto para caber na tabela: "08/03 14:30"
+        return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
     onMounted(() => buscar_dados());
@@ -54,6 +81,7 @@ export function useLogicaAnalises() {
         carregando, dados_dashboard, aba_ativa, 
         visibilidade, alternar_visibilidade, 
         data_inicio, data_fim, definir_periodo, buscar_dados,
-        produto_comp_1, produto_comp_2, formatarDataLog
+        produto_comp_1, produto_comp_2, formatarDataLog,
+        filtro_auditoria_texto, filtro_auditoria_tipo, log_auditoria_filtrado // 🟢 Exportados!
     };
 }

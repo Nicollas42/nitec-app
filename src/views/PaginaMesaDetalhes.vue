@@ -34,7 +34,7 @@
                     
                     <div class="absolute left-0 top-0 bottom-0 w-1" :class="comanda.tipo_conta === 'geral' ? 'bg-nitec_blue' : 'bg-purple-500'"></div>
 
-                    <div class="flex justify-between items-start mb-4 border-b border-gray-100 pb-4 pl-2">
+                    <div class="flex justify-between items-start mb-4 border-b border-gray-100 pb-4 pl-2 relative">
                         <div>
                             <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 mb-1 inline-block">CMD #{{ comanda.id }}</span>
                             <h2 class="text-base font-black text-gray-800 leading-tight">
@@ -44,7 +44,13 @@
                                 Cliente: <span class="font-bold text-gray-700">{{ comanda.buscar_cliente?.nome_cliente || 'Não informado' }}</span>
                             </p>
                         </div>
-                        <span class="text-xl font-black text-gray-800">R$ {{ comanda.valor_total }}</span>
+
+                        <div class="flex flex-col items-end gap-1">
+                            <button @click="abrir_modal_cancelamento(comanda.id)" class="text-gray-300 hover:text-red-500 bg-white hover:bg-red-50 h-8 w-8 rounded-lg flex items-center justify-center transition-colors shadow-sm border border-transparent hover:border-red-100" title="Cancelar Comanda">
+                                🗑️
+                            </button>
+                            <span class="text-xl font-black text-gray-800">R$ {{ Number(comanda.valor_total).toFixed(2) }}</span>
+                        </div>
                     </div>
 
                     <div class="flex gap-2 mb-5 pl-2">
@@ -106,6 +112,56 @@
             </div>
         </div>
 
+        <div v-if="modal_cancelamento_visivel" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div class="bg-white w-full max-w-md p-8 rounded-[2rem] shadow-2xl border-2 border-red-100 flex flex-col text-center">
+                
+                <div class="mx-auto w-16 h-16 rounded-2xl bg-red-50 text-red-500 border-2 border-red-100 flex items-center justify-center mb-4 shadow-inner text-2xl">
+                    🚨
+                </div>
+
+                <h2 class="text-xl font-black text-gray-800">Cancelar Comanda</h2>
+                <p class="text-xs text-gray-500 font-bold mt-1 mb-6">Esta ação fechará a conta e libertará a mesa.</p>
+                
+                <div class="flex flex-col gap-4 text-left">
+                    <div class="flex flex-col gap-1">
+                        <label class="text-[10px] font-black uppercase tracking-widest text-gray-400">Motivo do Cancelamento</label>
+                        <select v-model="form_cancelamento.motivo_cancelamento" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm font-bold text-gray-700">
+                            <option value="Cliente saiu sem pagar (Calote)">🏃 Cliente saiu sem pagar (Calote)</option>
+                            <option value="Erro de Digitação / Lançamento">⌨️ Erro de Lançamento</option>
+                            <option value="Cliente desistiu antes de consumir">🚶 Desistiu de consumir</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-2">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-3">O que fazer com os itens lançados?</p>
+                        
+                        <label class="flex items-center gap-3 cursor-pointer mb-3 p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-200 shadow-sm">
+                            <input type="radio" :value="false" v-model="form_cancelamento.retornar_ao_estoque" class="w-4 h-4 text-red-500 focus:ring-red-500">
+                            <div>
+                                <span class="block text-xs font-black text-gray-800">Foram consumidos (Gerar Perda)</span>
+                                <span class="block text-[10px] text-gray-500 font-bold">O sistema registrará o prejuízo na Auditoria.</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-200 shadow-sm">
+                            <input type="radio" :value="true" v-model="form_cancelamento.retornar_ao_estoque" class="w-4 h-4 text-green-500 focus:ring-green-500">
+                            <div>
+                                <span class="block text-xs font-black text-gray-800">Foi um erro (Devolver ao Estoque)</span>
+                                <span class="block text-[10px] text-gray-500 font-bold">Os itens voltam para a prateleira.</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button @click="modal_cancelamento_visivel = false" class="flex-1 py-3.5 bg-gray-100 border border-gray-200 text-gray-500 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-gray-200 transition-colors shadow-sm">Cancelar</button>
+                    <button @click="confirmar_cancelamento" :disabled="cancelando" class="flex-[1.5] py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md transition-all disabled:opacity-50">
+                        {{ cancelando ? 'Processando...' : 'Confirmar Encerramento' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </template>
 
@@ -115,6 +171,8 @@ const {
     dados_mesa, voltar_mapa, abrir_pdv_para_comanda, 
     adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente, 
     fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
-    remover_item_consumido, fechar_conta_comanda 
+    remover_item_consumido, fechar_conta_comanda,
+    modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
+    confirmar_cancelamento, cancelando 
 } = useLogicaMesaDetalhes();
 </script>
