@@ -43,16 +43,12 @@
             </div>
         </header>
 
-        <div class="hidden md:flex bg-white border-b border-gray-200 px-6 pt-4 gap-2 shadow-sm z-30">
-            <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" 
-                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 mr-4">
-                <span>⚙️</span> Gestão SaaS
-            </button>
-
-            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" 
-                    :class="rota_atual.path.includes('/analises') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+        <div class="hidden md:flex bg-white border-b border-gray-200 px-6 pt-4 gap-2 shadow-sm z-30 overflow-x-auto">
+            
+            <button @click="ir_para('/pdv-caixa')" 
+                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
-                <span>📈</span> Análises
+                <span>💰</span> PDV / Caixa
             </button>
 
             <button @click="ir_para('/mapa-mesas')" 
@@ -67,54 +63,67 @@
                 <span>📝</span> Comandas
             </button>
 
-            <button @click="ir_para('/pdv-caixa')" 
-                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
-                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
-                <span>💰</span> PDV / Caixa
-            </button>
-
-            <button @click="ir_para('/produtos')" 
+            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" 
                     :class="rota_atual.path.includes('/produtos') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
-                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 ml-4">
                 <span>📦</span> Produtos
             </button>
 
-            <button @click="ir_para('/permissoes')" 
+            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" 
+                    :class="rota_atual.path.includes('/equipe') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                <span>👥</span> Equipa
+            </button>
+
+            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" 
+                    :class="rota_atual.path.includes('/analises') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                <span>📈</span> Análises
+            </button>
+
+            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" 
                     :class="rota_atual.path.includes('/permissoes') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>🔐</span> Permissões
             </button>
 
             <div class="flex-1"></div> 
+
+            <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" 
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 mr-2">
+                <span>⚙️</span> Gestão SaaS
+            </button>
             
             <button @click="abrir_modal_atualizacoes" class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider bg-gray-50 text-gray-500 hover:bg-green-50 transition-all flex items-center gap-2 relative">
                  <span v-if="tem_atualizacao_nova" class="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
-                <span>🔄</span> Atualizações
+                <span>🔄</span>
             </button>
         </div>
 
         <main class="conteudo_principal flex-1 bg-gray-100 flex flex-col md:overflow-hidden overflow-y-auto">
             
             <div v-if="rota_atual.path === '/painel-central'" class="md:hidden p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 shrink-0">
-                <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" class="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">⚙️</span><h3 class="font-black text-purple-800 uppercase text-sm">Gestão SaaS</h3>
+                <button @click="ir_para('/pdv-caixa')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
+                    <span class="text-4xl mb-2">💰</span><h3 class="font-black text-gray-800 uppercase text-sm">PDV / Caixa</h3>
                 </button>
-                
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">📈</span><h3 class="font-black text-gray-800 uppercase text-sm">Análises</h3>
-                </button>
-
                 <button @click="ir_para('/mapa-mesas')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-gray-800 uppercase text-sm">Mapa de Mesas</h3>
+                    <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-gray-800 uppercase text-sm">Mesas</h3>
                 </button>
                 <button @click="ir_para('/comandas')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
                     <span class="text-4xl mb-2">📝</span><h3 class="font-black text-gray-800 uppercase text-sm">Comandas</h3>
                 </button>
-                <button @click="ir_para('/pdv-caixa')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">💰</span><h3 class="font-black text-gray-800 uppercase text-sm">Frente de Caixa</h3>
-                </button>
-                <button @click="ir_para('/produtos')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
                     <span class="text-4xl mb-2">📦</span><h3 class="font-black text-gray-800 uppercase text-sm">Produtos</h3>
+                </button>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
+                    <span class="text-4xl mb-2">👥</span><h3 class="font-black text-gray-800 uppercase text-sm">Equipa</h3>
+                </button>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
+                    <span class="text-4xl mb-2">📈</span><h3 class="font-black text-gray-800 uppercase text-sm">Análises</h3>
+                </button>
+                
+                <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" class="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 flex flex-col items-center sm:col-span-2">
+                    <span class="text-4xl mb-2">⚙️</span><h3 class="font-black text-purple-800 uppercase text-sm">Gestão SaaS</h3>
                 </button>
             </div>
 

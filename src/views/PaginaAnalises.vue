@@ -30,64 +30,27 @@
 
         <div v-else-if="dados_dashboard" class="animate-in fade-in duration-500 pb-20">
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-                
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col relative overflow-hidden group hover:shadow-md transition-all hover:-translate-y-1">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-50 to-transparent rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
-                    
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-lg shadow-inner border border-green-100">
-                            💰
-                        </div>
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Faturamento Bruto</h3>
-                    </div>
-                    <div class="relative z-10">
-                        <p class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.faturamento_bruto }}</p>
-                    </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-6xl opacity-5">💰</div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-widest">Faturamento Bruto</p>
+                    <p class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.faturamento_bruto }}</p>
                 </div>
-
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col relative overflow-hidden group hover:shadow-md transition-all hover:-translate-y-1">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-50 to-transparent rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
-                    
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-lg shadow-inner border border-blue-100">
-                            🏷️
-                        </div>
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ticket Médio</h3>
-                    </div>
-                    <div class="relative z-10">
-                        <p class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.ticket_medio }}</p>
-                    </div>
+                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-6xl opacity-5">🏷️</div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-widest">Ticket Médio</p>
+                    <p class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.ticket_medio }}</p>
                 </div>
-
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col relative overflow-hidden group hover:shadow-md transition-all hover:-translate-y-1">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-50 to-transparent rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
-                    
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-lg shadow-inner border border-purple-100">
-                            🧾
-                        </div>
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Comandas</h3>
-                    </div>
-                    <div class="relative z-10">
-                        <p class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.total_pedidos }}</p>
-                    </div>
+                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-6xl opacity-5">🧾</div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-widest">Total Comandas</p>
+                    <p class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.total_pedidos }}</p>
                 </div>
-
-                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col relative overflow-hidden group hover:shadow-md transition-all hover:-translate-y-1">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-50 to-transparent rounded-bl-full -z-0 opacity-50 group-hover:scale-125 transition-transform duration-500"></div>
-                    
-                    <div class="flex items-center gap-3 mb-4 relative z-10">
-                        <div class="w-10 h-10 rounded-2xl bg-orange-50 flex items-center justify-center text-lg shadow-inner border border-orange-100">
-                            ⏳
-                        </div>
-                        <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tempo de Mesa</h3>
-                    </div>
-                    <div class="relative z-10">
-                        <p class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.tempo_permanencia }}</p>
-                    </div>
+                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-6xl opacity-5">⏳</div>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 tracking-widest">Permanência Média</p>
+                    <p class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.tempo_permanencia }}</p>
                 </div>
-
             </div>
 
             <nav class="flex gap-1 mb-6 bg-gray-200/50 p-1 rounded-2xl w-fit overflow-x-auto max-w-full">
@@ -101,40 +64,11 @@
 
             <main>
                 <div v-if="aba_ativa === 'inteligência'" class="flex flex-col gap-10">
-                    <SecaoVendasPorDia 
-                        :visivel="visibilidade.vendas_dia"
-                        @alternar="alternar_visibilidade('vendas_dia')"
-                        :dados_dias="dados_dashboard.vendas_por_dia"
-                    />
-
-                    <SecaoMapaCalor 
-                        :visivel="visibilidade.mapa_calor" 
-                        @alternar="alternar_visibilidade('mapa_calor')"
-                        :horarios="dados_dashboard.horarios"
-                        :dados_por_hora="dados_dashboard.produtos_por_hora" 
-                        :produtos_disponiveis="dados_dashboard.ranking_produtos"
-                    />
-
-                    <TabelaRankingMesas 
-                        :visivel="visibilidade.ranking_mesas"
-                        @alternar="alternar_visibilidade('ranking_mesas')"
-                        :mesas="dados_dashboard.ranking_mesas"
-                    />
-
-                    <SecaoComparador 
-                        :visivel="visibilidade.comparador"
-                        @alternar="alternar_visibilidade('comparador')"
-                        :dados_por_hora="dados_dashboard.produtos_por_hora"
-                        :produtos_disponiveis="dados_dashboard.ranking_produtos"
-                        v-model:produto1="produto_comp_1"
-                        v-model:produto2="produto_comp_2"
-                    />
-
-                    <TabelaCurvaABC 
-                        :visivel="visibilidade.curva_abc"
-                        @alternar="alternar_visibilidade('curva_abc')"
-                        :produtos="dados_dashboard.ranking_produtos"
-                    />
+                    <SecaoVendasPorDia :visivel="visibilidade.vendas_dia" @alternar="alternar_visibilidade('vendas_dia')" :dados_dias="dados_dashboard.vendas_por_dia" />
+                    <SecaoMapaCalor :visivel="visibilidade.mapa_calor" @alternar="alternar_visibilidade('mapa_calor')" :horarios="dados_dashboard.horarios" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" />
+                    <TabelaRankingMesas :visivel="visibilidade.ranking_mesas" @alternar="alternar_visibilidade('ranking_mesas')" :mesas="dados_dashboard.ranking_mesas" />
+                    <SecaoComparador :visivel="visibilidade.comparador" @alternar="alternar_visibilidade('comparador')" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" v-model:produto1="produto_comp_1" v-model:produto2="produto_comp_2" />
+                    <TabelaCurvaABC :visivel="visibilidade.curva_abc" @alternar="alternar_visibilidade('curva_abc')" :produtos="dados_dashboard.ranking_produtos" />
                 </div>
 
                 <div v-if="aba_ativa === 'encalhados'" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -154,27 +88,66 @@
                     </table>
                 </div>
 
-                <div v-if="aba_ativa === 'equipe'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-if="aba_ativa === 'equipe'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div v-for="(garcom, idx) in dados_dashboard.equipe" :key="garcom.name" 
-                        class="bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between shadow-sm hover:border-blue-200 transition-colors relative overflow-hidden">
+                        class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all relative overflow-hidden flex flex-col gap-5">
                         
-                        <div class="flex items-center gap-4 relative z-10">
-                            <span class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center font-black text-blue-600 text-sm border border-blue-100">{{ idx + 1 }}º</span>
-                            <div>
-                                <p class="font-black text-gray-800 uppercase text-sm tracking-tight">{{ garcom.name }}</p>
-                                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{{ garcom.total_mesas }} Mesas Atendidas</p>
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -z-0 opacity-50"></div>
+                        
+                        <div class="flex justify-between items-start relative z-10">
+                            <div class="flex items-center gap-4">
+                                <span class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center font-black text-blue-600 text-lg border border-blue-100 shadow-inner">{{ idx + 1 }}º</span>
+                                <div>
+                                    <p class="font-black text-gray-800 uppercase text-base tracking-tight">{{ garcom.name }}</p>
+                                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{{ garcom.total_mesas }} Mesas Atendidas</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Receita Gerada</p>
+                                <p class="font-black text-gray-800 text-xl tracking-tighter">R$ {{ Number(garcom.total_vendas).toFixed(2) }}</p>
                             </div>
                         </div>
-                        
-                        <div class="text-right relative z-10">
-                            <p class="font-black text-green-600 text-lg">R$ {{ Number(garcom.total_vendas).toFixed(2) }}</p>
-                            <p class="text-[9px] text-gray-400 font-bold uppercase mt-1">Ticket Médio: <span class="text-gray-700">R$ {{ garcom.total_mesas > 0 ? (Number(garcom.total_vendas) / Number(garcom.total_mesas)).toFixed(2) : '0.00' }}</span></p>
+
+                        <div class="grid grid-cols-2 gap-3 relative z-10 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                            <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>📈</span> Lucro Líquido</span>
+                                <span class="font-black text-green-600 text-sm">R$ {{ Number(garcom.lucro_gerado).toFixed(2) }}</span>
+                            </div>
+                            
+                            <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>🏷️</span> Ticket Médio</span>
+                                <span class="font-bold text-gray-700 text-sm">R$ {{ garcom.total_mesas > 0 ? (Number(garcom.total_vendas) / Number(garcom.total_mesas)).toFixed(2) : '0.00' }}</span>
+                            </div>
+                            
+                            <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>⏳</span> Tempo / Mesa</span>
+                                <span class="font-bold text-gray-700 text-sm">{{ garcom.tempo_medio_minutos }} min</span>
+                            </div>
+                            
+                            <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>🏃</span> Esforço Físico</span>
+                                <span class="font-bold text-gray-700 text-sm">{{ garcom.itens_servidos }} itens</span>
+                            </div>
                         </div>
+
+                        <div class="relative z-10 bg-orange-50 border border-orange-100 rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-2xl drop-shadow-sm">🏆</span>
+                                <div>
+                                    <span class="text-[9px] font-black uppercase tracking-widest text-orange-600 block">Ponto Forte (Mais Vendido)</span>
+                                    <span class="font-bold text-orange-800 text-sm mt-0.5 block truncate max-w-[150px]" :title="garcom.produto_campeao">{{ garcom.produto_campeao }}</span>
+                                </div>
+                            </div>
+                            <span class="font-black text-orange-600 text-lg bg-white px-3 py-1 rounded-lg shadow-sm border border-orange-200">{{ garcom.qtd_campeao }}x</span>
+                        </div>
+
                     </div>
+                    
                     <div v-if="!dados_dashboard.equipe || dados_dashboard.equipe.length === 0" class="col-span-full text-center py-10 text-gray-500 font-medium italic bg-white rounded-3xl shadow-sm border border-gray-100">
                         Nenhuma venda registada neste período para a equipa.
                     </div>
                 </div>
+
             </main>
         </div>
     </div>
@@ -183,12 +156,9 @@
 <script setup>
 import { useLogicaAnalises } from './pagina_analises_logica.js';
 
-// Componentes Antigos
 import SecaoMapaCalor from './componentes_analises/SecaoMapaCalor.vue';
 import SecaoComparador from './componentes_analises/SecaoComparador.vue';
 import TabelaCurvaABC from './componentes_analises/TabelaCurvaABC.vue';
-
-// Componentes Novos
 import SecaoVendasPorDia from './componentes_analises/SecaoVendasPorDia.vue';
 import TabelaRankingMesas from './componentes_analises/TabelaRankingMesas.vue';
 
