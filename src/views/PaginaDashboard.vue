@@ -190,11 +190,7 @@
                                 <p class="font-black text-sm text-gray-800">{{ versao.name || versao.tag_name }}</p>
                                 <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{{ new Date(versao.published_at).toLocaleDateString() }}</p>
                             </div>
-                            <button v-if="versao.assets && versao.assets.length > 0" 
-                                    @click="baixar_versao_antiga(obter_link_executavel(versao.assets))" 
-                                    class="text-[10px] text-nitec_blue hover:bg-blue-50 font-black px-4 py-2 border border-blue-100 rounded-lg transition-colors uppercase">
-                                Baixar .EXE
-                            </button>
+                            <button v-if="versao.assets && versao.assets.length > 0" @click="baixar_versao_antiga(obter_link_executavel(versao.assets))" class="text-[10px] text-nitec_blue hover:bg-blue-50 font-black px-4 py-2 border border-blue-100 rounded-lg transition-colors uppercase">Baixar .EXE</button>
                         </div>
                         <div v-if="historico_versoes.length === 0 && !carregando_historico" class="text-center text-xs text-gray-400 italic">Nenhum histórico disponível.</div>
                     </div>
@@ -229,16 +225,17 @@
 <script setup>
 import { useAuthStore } from '../stores/auth_store.js'; 
 import { useLogicaDashboard } from './pagina_dashboard_logica.js';
-import { useToastStore } from '../stores/toast_store.js'; // 🟢 Importar o novo store
+import { useToastStore } from '../stores/toast_store.js'; 
 
-const toast_store = useToastStore(); // 🟢 Instanciar
+const toast_store = useToastStore(); 
 const auth_store = useAuthStore(); 
 const { 
     nome_cliente, em_modo_suporte, ir_para, sair, encerrar_suporte,
     versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
     progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
     abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
-    baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,obter_link_executavel,
+    baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
+    obter_link_executavel, // 🟢 Certificando de que está exposto
     esta_offline, rota_atual
 } = useLogicaDashboard();
 </script>

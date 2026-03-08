@@ -1,14 +1,15 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router'; 
 import { useAuthStore } from '../stores/auth_store.js';
+import { useToastStore } from '../stores/toast_store.js'; // 🟢 Importando o Pop-up Global
 import { iniciar_sincronizacao_de_fundo, parar_sincronizacao_de_fundo } from '../servicos/sincronizador_bg.js'; 
 import { db } from '../banco_local/db.js';
-
 
 export function useLogicaDashboard() {
     const roteador = useRouter();
     const rota_atual = useRoute(); 
     const loja_autenticacao = useAuthStore();
+    const toast_store = useToastStore(); // 🟢 Instanciando o Toast
 
     const em_modo_suporte = ref(localStorage.getItem('nitec_modo_suporte') === 'ativo');
     const nome_cliente = ref(localStorage.getItem('nitec_nome_cliente') || '');
@@ -65,30 +66,32 @@ export function useLogicaDashboard() {
         }
     };
 
+    // 🟢 NOVA FUNÇÃO: Garante que baixa o .EXE e não o .YML no histórico
+    const obter_link_executavel = (assets) => {
+        if (!assets || assets.length === 0) return '#';
+        const asset_exe = assets.find(a => a.name.endsWith('.exe'));
+        return asset_exe ? asset_exe.browser_download_url : assets[0].browser_download_url;
+    };
+
     const checar_atualizacoes = () => ipcRenderer?.send('checar-atualizacoes');
     const baixar_atualizacao = () => ipcRenderer?.send('baixar-atualizacao');
     const instalar_atualizacao = () => ipcRenderer?.send('instalar-atualizacao');
     const baixar_versao_antiga = (url) => isElectron ? window.require('electron').shell.openExternal(url) : window.open(url, '_blank');
 
-    // --- 🟢 CORREÇÃO: ORDEM DE EXECUÇÃO DO SUPORTE ---
     const encerrar_suporte = async () => {
         parar_sincronizacao_de_fundo(); 
         
-        // 1. PRIMEIRO: Salva as informações do Admin Master na memória temporária
         const token_admin = localStorage.getItem('nitec_token_admin');
         const usuario_admin_raw = localStorage.getItem('nitec_usuario_admin');
         
-        // 2. SEGUNDO: Limpa todo o lixo do cliente atual (Isso apagaria o Admin se não tivéssemos salvo no passo 1)
         await limpar_dados_locais_completos();
         
-        // 3. TERCEIRO: Restaura as informações do Admin no sistema principal
         if (token_admin && usuario_admin_raw) {
             localStorage.setItem('nitec_tenant_id', 'master');
             localStorage.setItem('nitec_token', token_admin);
             localStorage.setItem('nitec_usuario', usuario_admin_raw); 
         }
 
-        // 4. QUARTO: Redireciona e força o recarregamento
         roteador.replace('/admin-estabelecimentos').then(() => window.location.reload());
     };
 
@@ -115,9 +118,18 @@ export function useLogicaDashboard() {
                 estado_atualizacao.value = info.status;
                 mensagem_status.value = info.mensagem;
                 status_erro.value = info.status === 'erro';
+                
                 if (info.status === 'disponivel') {
                     tem_atualizacao_nova.value = true;
                     versao_nova.value = info.versao;
+                }
+
+                // 🟢 AUTOMAÇÃO: Se o download terminou, avisa e instala sozinho!
+                if (info.status === 'baixado') {
+                    toast_store.exibir_toast("Atualização concluída! Reiniciando o sistema...", "sucesso");
+                    setTimeout(() => {
+                        instalar_atualizacao();
+                    }, 2500);
                 }
             });
             ipcRenderer.on('progresso-download', (event, p) => progresso.value = Math.round(p));
@@ -134,25 +146,13 @@ export function useLogicaDashboard() {
         }
     });
 
-    // 🟢 NOVA FUNÇÃO: Procura o ficheiro .exe dentro dos assets do GitHub
-    const obter_link_executavel = (assets) => {
-        if (!assets || assets.length === 0) return '#';
-        
-        // Tenta achar o ficheiro executável do Windows
-        const asset_exe = assets.find(a => a.name.endsWith('.exe'));
-        if (asset_exe) return asset_exe.browser_download_url;
-        
-        // Se for Mac/Linux ou não tiver .exe, pega o primeiro que não seja .yml ou .blockmap
-        const asset_fallback = assets.find(a => !a.name.endsWith('.yml') && !a.name.endsWith('.blockmap'));
-        return asset_fallback ? asset_fallback.browser_download_url : assets[0].browser_download_url;
-    };
-
     return { 
         nome_cliente, em_modo_suporte, sair, encerrar_suporte,
         versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
         progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
         abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
-        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,obter_link_executavel,
+        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
+        obter_link_executavel, // 🟢 Exportado para a página
         esta_offline, rota_atual, ir_para: (url) => roteador.push(url)
     };
 }
