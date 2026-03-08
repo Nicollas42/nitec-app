@@ -4,19 +4,13 @@ import api_cliente from '../servicos/api_cliente.js';
 export function useLogicaAnalises() {
     const carregando = ref(true);
     const dados_dashboard = ref(null);
-    const aba_ativa = ref('inteligência'); 
+    const aba_ativa = ref('inteligência'); // Pode ser: 'inteligência', 'encalhados', 'equipe', 'auditoria'
 
     const visibilidade = ref({
-        vendas_dia: true,
-        mapa_calor: true,
-        comparador: true,
-        ranking_mesas: true, 
-        curva_abc: true
+        vendas_dia: true, mapa_calor: true, comparador: true, ranking_mesas: true, curva_abc: true
     });
 
-    const alternar_visibilidade = (painel) => {
-        visibilidade.value[painel] = !visibilidade.value[painel];
-    };
+    const alternar_visibilidade = (painel) => visibilidade.value[painel] = !visibilidade.value[painel];
 
     const produto_comp_1 = ref('');
     const produto_comp_2 = ref('');
@@ -41,14 +35,17 @@ export function useLogicaAnalises() {
 
             if (res.data.ranking_produtos && res.data.ranking_produtos.length > 0) {
                 produto_comp_1.value = res.data.ranking_produtos[0].produto_id;
-                if (res.data.ranking_produtos.length > 1) {
-                    produto_comp_2.value = res.data.ranking_produtos[1].produto_id;
-                } else {
-                    produto_comp_2.value = res.data.ranking_produtos[0].produto_id;
-                }
+                if (res.data.ranking_produtos.length > 1) produto_comp_2.value = res.data.ranking_produtos[1].produto_id;
+                else produto_comp_2.value = res.data.ranking_produtos[0].produto_id;
             }
         } catch (e) { console.error(e); } 
         finally { carregando.value = false; }
+    };
+
+    // 🟢 Função utilitária para embelezar a data do Log
+    const formatarDataLog = (dataString) => {
+        const data = new Date(dataString);
+        return data.toLocaleDateString('pt-BR') + ' às ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
     onMounted(() => buscar_dados());
@@ -57,6 +54,6 @@ export function useLogicaAnalises() {
         carregando, dados_dashboard, aba_ativa, 
         visibilidade, alternar_visibilidade, 
         data_inicio, data_fim, definir_periodo, buscar_dados,
-        produto_comp_1, produto_comp_2 // Removemos a função velha daqui!
+        produto_comp_1, produto_comp_2, formatarDataLog
     };
 }

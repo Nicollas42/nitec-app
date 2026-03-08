@@ -54,7 +54,7 @@
             </div>
 
             <nav class="flex gap-1 mb-6 bg-gray-200/50 p-1 rounded-2xl w-fit overflow-x-auto max-w-full">
-                <button v-for="aba in ['inteligência', 'encalhados', 'equipe']" :key="aba"
+                <button v-for="aba in ['inteligência', 'encalhados', 'equipe', 'auditoria']" :key="aba"
                     @click="aba_ativa = aba"
                     :class="aba_ativa === aba ? 'bg-white shadow-sm text-nitec_blue font-black' : 'text-gray-500 hover:text-gray-700 font-bold'"
                     class="px-6 py-2 rounded-xl text-xs uppercase tracking-widest transition-all whitespace-nowrap">
@@ -145,6 +145,58 @@
                     
                     <div v-if="!dados_dashboard.equipe || dados_dashboard.equipe.length === 0" class="col-span-full text-center py-10 text-gray-500 font-medium italic bg-white rounded-3xl shadow-sm border border-gray-100">
                         Nenhuma venda registada neste período para a equipa.
+                    </div>
+                </div>
+
+                <div v-if="aba_ativa === 'auditoria'" class="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                    <div class="mb-8 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-black text-gray-800 tracking-tight">Timeline de Auditoria</h2>
+                            <p class="text-xs text-gray-500 font-bold mt-1">Rastreio completo de vendas, quebras e entradas no estoque.</p>
+                        </div>
+                    </div>
+
+                    <div class="relative border-l-2 border-gray-100 ml-4 space-y-8 pb-4">
+                        
+                        <div v-if="!dados_dashboard.log_auditoria || dados_dashboard.log_auditoria.length === 0" class="pl-6 text-gray-400 text-sm italic">
+                            Nenhum registo encontrado neste período.
+                        </div>
+
+                        <div v-for="(evento, idx) in dados_dashboard.log_auditoria" :key="idx" class="relative pl-8 group">
+                            
+                            <div class="absolute -left-[21px] top-1 h-10 w-10 rounded-full border-4 border-white flex items-center justify-center text-lg shadow-sm transition-transform group-hover:scale-110"
+                                 :class="{
+                                     'bg-blue-100 text-blue-600': evento.cor === 'blue',
+                                     'bg-red-100 text-red-600': evento.cor === 'red',
+                                     'bg-green-100 text-green-600': evento.cor === 'green'
+                                 }">
+                                {{ evento.icone }}
+                            </div>
+                            
+                            <div class="bg-gray-50 hover:bg-white p-5 rounded-2xl border border-gray-100 shadow-sm transition-colors cursor-default">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest">
+                                        {{ formatarDataLog(evento.data_hora) }} • <span class="text-gray-600">Por {{ evento.usuario }}</span>
+                                    </p>
+                                    <span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded"
+                                          :class="{
+                                            'bg-blue-100 text-blue-700': evento.tipo_evento === 'entrada',
+                                            'bg-red-100 text-red-700': evento.tipo_evento === 'perda',
+                                            'bg-green-100 text-green-700': evento.tipo_evento === 'venda'
+                                          }">
+                                        {{ evento.tipo_evento }}
+                                    </span>
+                                </div>
+                                
+                                <h3 class="text-sm font-black text-gray-800">{{ evento.titulo }}</h3>
+                                <p class="text-xs text-gray-600 mt-1 font-medium">{{ evento.descricao }}</p>
+                                
+                                <p v-if="evento.detalhes_extras" class="text-[10px] text-gray-500 font-bold bg-white border border-gray-200 p-2 rounded-lg mt-3">
+                                    {{ evento.detalhes_extras }}
+                                </p>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
