@@ -34,7 +34,6 @@
         <div v-else-if="dados_dashboard" class="animate-in fade-in duration-500 pb-20">
             
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                
                 <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
                     <div class="flex justify-between items-center mb-3">
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Faturamento Bruto</span>
@@ -66,11 +65,10 @@
                     </div>
                     <h3 class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.tempo_permanencia }}</h3>
                 </div>
-
             </div>
 
             <nav class="flex gap-1 mb-8 bg-gray-200/50 p-1.5 rounded-2xl w-fit overflow-x-auto max-w-full shadow-inner">
-                <button v-for="aba in ['inteligência', 'encalhados', 'equipe', 'auditoria']" :key="aba"
+                <button v-for="aba in ['estatísticas', 'estoque S/ giro', 'equipe', 'auditoria']" :key="aba"
                     @click="aba_ativa = aba"
                     :class="aba_ativa === aba ? 'bg-white shadow-sm text-nitec_blue font-black' : 'text-gray-500 hover:text-gray-700 font-bold'"
                     class="px-6 py-2.5 rounded-xl text-xs uppercase tracking-widest transition-all whitespace-nowrap">
@@ -79,10 +77,17 @@
             </nav>
 
             <main class="flex-1 relative">
-                <div v-show="aba_ativa === 'inteligência'" class="flex flex-col gap-10">
+                <div v-show="aba_ativa === 'estatísticas'" class="flex flex-col gap-10">
+                    
+                    <SecaoEvolucaoVendas :visivel="visibilidade.evolucao_vendas" @alternar="alternar_visibilidade('evolucao_vendas')" :dados_cronologicos="dados_dashboard.vendas_cronologicas" />
+                    
                     <SecaoVendasPorDia :visivel="visibilidade.vendas_dia" @alternar="alternar_visibilidade('vendas_dia')" :dados_dias="dados_dashboard.vendas_por_dia" />
                     
-                    <TabelaCategorias v-if="dados_dashboard.vendas_por_categoria" :categorias="dados_dashboard.vendas_por_categoria" />
+                    <TabelaCategorias 
+                        :visivel="visibilidade.categorias" 
+                        @alternar="alternar_visibilidade('categorias')" 
+                        :categorias="dados_dashboard.vendas_por_categoria" 
+                    />
 
                     <SecaoMapaCalor :visivel="visibilidade.mapa_calor" @alternar="alternar_visibilidade('mapa_calor')" :horarios="dados_dashboard.horarios" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" />
                     <TabelaRankingMesas :visivel="visibilidade.ranking_mesas" @alternar="alternar_visibilidade('ranking_mesas')" :mesas="dados_dashboard.ranking_mesas" />
@@ -90,7 +95,7 @@
                     <TabelaCurvaABC :visivel="visibilidade.curva_abc" @alternar="alternar_visibilidade('curva_abc')" :produtos="dados_dashboard.ranking_produtos" />
                 </div>
 
-                <div v-show="aba_ativa === 'encalhados'">
+                <div v-show="aba_ativa === 'estoque S/ giro'">
                     <TabelaEncalhados :encalhados="dados_dashboard.encalhados" />
                 </div>
 
@@ -117,12 +122,10 @@
                 <p class="text-[11px] text-gray-500 font-bold mb-6 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100">
                     Defina o horário em que o seu bar encerra o expediente da madrugada. O sistema usará isto para agrupar as vendas do dia corretamente.
                 </p>
-                
                 <div class="text-left mb-8">
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-2">Horário de Virada</label>
                     <input type="time" v-model="hora_virada_turno" class="w-full bg-white border-2 border-gray-200 rounded-2xl p-4 text-2xl font-black text-gray-700 outline-none focus:border-nitec_blue text-center transition-colors shadow-sm">
                 </div>
-                
                 <div class="flex gap-3">
                     <button @click="modal_config_visivel = false" class="flex-1 py-4 bg-gray-100 text-gray-500 font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-colors">Cancelar</button>
                     <button @click="salvar_config_turno" class="flex-1 py-4 bg-nitec_blue hover:bg-blue-700 text-white font-black rounded-2xl text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95">Salvar</button>
@@ -135,13 +138,11 @@
                 <header class="p-8 bg-gray-50 border-b border-gray-100 flex justify-between items-start">
                     <div>
                         <h2 class="text-xl font-black text-gray-800 tracking-tighter uppercase italic">Recibo Detalhado</h2>
-                        
                         <div class="text-[10px] font-black uppercase tracking-widest mt-2 flex flex-wrap items-center gap-1.5">
                             <span class="bg-gray-200 text-gray-600 px-2 py-0.5 rounded">CMD #{{ comanda_selecionada.id }}</span>
                             <span class="text-gray-400">•</span>
                             <span class="text-gray-500">{{ comanda_selecionada.buscar_mesa ? comanda_selecionada.buscar_mesa.nome_mesa : 'BALCÃO' }}</span>
                             <span class="text-gray-400">•</span>
-                            
                             <span v-if="comanda_selecionada.buscar_cliente || comanda_selecionada.nome_cliente" class="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded flex items-center gap-1">
                                 <span>👤</span> {{ comanda_selecionada.buscar_cliente?.nome_cliente || comanda_selecionada.nome_cliente }}
                             </span>
@@ -181,15 +182,18 @@
 <script setup>
 import { useLogicaAnalises } from './pagina_analises_logica.js';
 
+// 🟢 TODOS AS IMPORTAÇÕES AQUI!
+import SecaoEvolucaoVendas from './componentes_analises/SecaoEvolucaoVendas.vue';
+import SecaoVendasPorDia from './componentes_analises/SecaoVendasPorDia.vue';
+import TabelaCategorias from './componentes_analises/TabelaCategorias.vue';
 import SecaoMapaCalor from './componentes_analises/SecaoMapaCalor.vue';
+import TabelaRankingMesas from './componentes_analises/TabelaRankingMesas.vue';
 import SecaoComparador from './componentes_analises/SecaoComparador.vue';
 import TabelaCurvaABC from './componentes_analises/TabelaCurvaABC.vue';
-import SecaoVendasPorDia from './componentes_analises/SecaoVendasPorDia.vue';
-import TabelaRankingMesas from './componentes_analises/TabelaRankingMesas.vue';
+
 import TabelaEncalhados from './componentes_analises/TabelaEncalhados.vue';
 import SecaoEquipe from './componentes_analises/SecaoEquipe.vue';
 import TabelaAuditoria from './componentes_analises/TabelaAuditoria.vue';
-import TabelaCategorias from './componentes_analises/TabelaCategorias.vue';
 
 const { 
     carregando, dados_dashboard, aba_ativa, 

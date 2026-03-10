@@ -14,6 +14,9 @@ export function useLogicaMesaDetalhes() {
 
     const modal_cancelamento_visivel = ref(false);
     const cancelando = ref(false);
+    // 🟢 Controle de loading individual para cada item!
+    const item_processando = ref(null); 
+
     const form_cancelamento = reactive({
         comanda_id: null,
         motivo_cancelamento: 'Erro de Digitação / Lançamento',
@@ -23,14 +26,10 @@ export function useLogicaMesaDetalhes() {
     const carregar_dados_completos = async () => {
         const id_dinamico = rota_atual.params.id_mesa;
         if (!id_dinamico) return; 
-
-        dados_mesa.value = null;
-
         try {
             const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             dados_mesa.value = resposta.data.dados;
         } catch (erro) {
-            console.error(erro);
             alert("Erro ao carregar informações da mesa.");
             voltar_mapa();
         }
@@ -41,7 +40,6 @@ export function useLogicaMesaDetalhes() {
     });
 
     const abrir_pdv_para_comanda = (id_comanda) => roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
-    
     const fechar_conta_comanda = (id_comanda) => roteador.push(`/pdv-caixa?pagamento=${id_comanda}`);
 
     const adicionar_novo_cliente = () => { input_novo_cliente.value = ''; modal_cliente_visivel.value = true; };
@@ -60,21 +58,34 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) { alert("Erro ao criar sub-comanda separada."); }
     };
 
+    // 🟢 FUNÇÕES CORRIGIDAS DE QUANTIDADE E REMOÇÃO
     const alterar_quantidade = async (id_item, acao) => {
+        if (item_processando.value) return; // Evita duplo clique
+        item_processando.value = id_item;
         try {
             await api_cliente.post(`/alterar-quantidade-item/${id_item}`, { acao });
-            carregar_dados_completos();
+            await carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) { alert(erro.response?.data?.mensagem || "Erro ao atualizar quantidade."); }
+        } catch (erro) { 
+            alert(erro.response?.data?.mensagem || "Erro ao atualizar quantidade. Verifique o servidor."); 
+        } finally {
+            item_processando.value = null;
+        }
     };
 
     const remover_item_consumido = async (id_item_comanda) => {
-        if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
+        if (!confirm("Deseja cancelar este item? O produto voltará para o estoque.")) return;
+        if (item_processando.value) return;
+        item_processando.value = id_item_comanda;
         try {
             await api_cliente.delete(`/remover-item-comanda/${id_item_comanda}`);
-            carregar_dados_completos();
+            await carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) { alert("Erro ao remover os itens."); }
+        } catch (erro) { 
+            alert("Erro ao remover os itens do servidor."); 
+        } finally {
+            item_processando.value = null;
+        }
     };
 
     const abrir_modal_cancelamento = (id_comanda) => {
@@ -110,7 +121,7 @@ export function useLogicaMesaDetalhes() {
         dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
         fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
-        remover_item_consumido, fechar_conta_comanda,
+        remover_item_consumido, fechar_conta_comanda, item_processando, // 🟢 Variável Exportada
         modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
         confirmar_cancelamento, cancelando 
     };

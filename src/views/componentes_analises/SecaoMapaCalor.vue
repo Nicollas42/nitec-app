@@ -9,10 +9,10 @@
 
         <div v-show="visivel" class="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col relative transition-all">
             <div class="p-6 bg-gray-50 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-t-3xl">
-                <div class="flex items-center gap-3">
-                    <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight">Mapa de Calor por Horário</h2>
-                    <div class="relative group mt-1">
-                        <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs shadow-sm">ℹ️</span>
+                <div class="flex items-center gap-2">
+                    <h2 class="text-sm font-black text-gray-800 uppercase">Mapa de Calor por Horário</h2>
+                    <div class="relative group">
+                        <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
                         <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
                             <p>Mostra o volume geral de comandas. <strong class="text-blue-300">Clique em qualquer produto da lista</strong> ou pesquise para que o gráfico mostre <strong class="text-orange-400">exatamente</strong> as vendas desse item!</p>
                             <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>

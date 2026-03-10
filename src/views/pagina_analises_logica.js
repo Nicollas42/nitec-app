@@ -8,26 +8,28 @@ export function useLogicaAnalises() {
     const aba_ativa = ref('inteligência'); 
     const toast_global = useToastStore(); 
 
+    // 🟢 TODOS os gráficos registados aqui para não sumirem!
     const visibilidade = ref({
-        vendas_dia: true, mapa_calor: true, comparador: true, ranking_mesas: true, curva_abc: true
+        vendas_dia: true, 
+        mapa_calor: true, 
+        comparador: true, 
+        ranking_mesas: true, 
+        curva_abc: true, 
+        evolucao_vendas: true,
+        categorias: true
     });
 
     const alternar_visibilidade = (painel) => visibilidade.value[painel] = !visibilidade.value[painel];
 
-    // 🟢 ESTADOS DO COMPARADOR (Multi-Select)
     const produtos_comparador = ref([]);
-
-    // 🟢 ESTADOS DO TURNO (O Problema da Madrugada)
     const data_inicio = ref('');
     const data_fim = ref('');
     const modal_config_visivel = ref(false);
     const hora_virada_turno = ref(localStorage.getItem('nitec_hora_virada') || '04:00'); 
 
-    // 🟢 ESTADOS DA AUDITORIA
     const filtro_auditoria_texto = ref('');
     const filtro_auditoria_tipo = ref('todos'); 
 
-    // 🟢 ESTADOS DO RECIBO
     const modal_recibo_visivel = ref(false);
     const comanda_selecionada = ref(null);
 
@@ -46,25 +48,20 @@ export function useLogicaAnalises() {
         });
     });
 
-    // 🟢 FUNÇÃO DO RECIBO
     const abrir_recibo_auditoria = async (evento) => {
         let id_comanda = evento.referencia_id;
-        
         if (!id_comanda) {
             const extrair_id = (evento.titulo + " " + evento.descricao).match(/#(\d+)/);
             if (extrair_id) id_comanda = extrair_id[1];
         }
-
-        if (!id_comanda) {
-            return toast_global.exibir_toast("Não foi possível identificar o número da comanda neste registo.", "erro");
-        }
+        if (!id_comanda) return toast_global.exibir_toast("Não foi possível identificar a comanda.", "erro");
 
         try {
             const res = await api_cliente.get(`/buscar-comanda/${id_comanda}`);
             comanda_selecionada.value = res.data.dados;
             modal_recibo_visivel.value = true;
         } catch (e) {
-            toast_global.exibir_toast("Erro ao carregar detalhes do recibo no servidor.", "erro");
+            toast_global.exibir_toast("Erro ao carregar detalhes do recibo.", "erro");
         }
     };
 
@@ -73,18 +70,16 @@ export function useLogicaAnalises() {
         comanda_selecionada.value = null;
     };
 
-    // 🟢 LÓGICA DA VIRADA DE TURNO
     const salvar_config_turno = () => {
         localStorage.setItem('nitec_hora_virada', hora_virada_turno.value);
         modal_config_visivel.value = false;
-        definir_periodo('hoje'); // Recalcula o "hoje" com base na nova hora
+        definir_periodo('hoje'); 
     };
 
     const definir_periodo = (tipo) => {
         const agora = new Date();
         const [hora_virada, min_virada] = hora_virada_turno.value.split(':').map(Number);
         
-        // Se ainda não passamos da "Hora da Virada", o "Hoje" do bar ainda é o dia de ontem no calendário!
         if (agora.getHours() < hora_virada || (agora.getHours() === hora_virada && agora.getMinutes() < min_virada)) {
             agora.setDate(agora.getDate() - 1);
         }
@@ -107,7 +102,6 @@ export function useLogicaAnalises() {
     const buscar_dados = async () => {
         carregando.value = true;
         try {
-            // Em vez de enviar apenas as datas, junta o Horário de Virada à string!
             const inicio_real = `${data_inicio.value}T${hora_virada_turno.value}:00`;
             const [a, m, d] = data_fim.value.split('-');
             const d_fim = new Date(a, m - 1, d);

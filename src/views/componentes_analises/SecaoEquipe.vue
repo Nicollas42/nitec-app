@@ -1,61 +1,116 @@
 <template>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div v-for="(garcom, idx) in equipe" :key="garcom.name" 
-            class="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all relative overflow-hidden flex flex-col gap-5">
-            
-            <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -z-0 opacity-50"></div>
-            
-            <div class="flex justify-between items-start relative z-10">
-                <div class="flex items-center gap-4">
-                    <span class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center font-black text-blue-600 text-lg border border-blue-100 shadow-inner">{{ idx + 1 }}º</span>
-                    <div>
-                        <p class="font-black text-gray-800 uppercase text-base tracking-tight">{{ garcom.name }}</p>
-                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{{ garcom.total_mesas }} Mesas Atendidas</p>
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col relative transition-all mb-10">
+        
+        <div class="p-6 bg-gray-50 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-t-3xl">
+            <div class="flex items-center gap-2">
+                <h2 class="text-sm font-black text-gray-800 uppercase">Desempenho da Equipa</h2>
+                <div class="relative group">
+                    <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
+                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
+                        <p>Mede a produtividade de cada funcionário. Compare quem atende mais mesas, gera mais receita e vende mais itens.</p>
+                        <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
                     </div>
-                </div>
-                <div class="text-right">
-                    <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1">Receita Gerada</p>
-                    <p class="font-black text-gray-800 text-xl tracking-tighter">R$ {{ Number(garcom.total_vendas).toFixed(2) }}</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 relative z-10 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>📈</span> Lucro Líquido</span>
-                    <span class="font-black text-green-600 text-sm">R$ {{ Number(garcom.lucro_gerado).toFixed(2) }}</span>
-                </div>
-                <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>🏷️</span> Ticket Médio</span>
-                    <span class="font-bold text-gray-700 text-sm">R$ {{ garcom.total_mesas > 0 ? (Number(garcom.total_vendas) / Number(garcom.total_mesas)).toFixed(2) : '0.00' }}</span>
-                </div>
-                <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>⏳</span> Tempo / Mesa</span>
-                    <span class="font-bold text-gray-700 text-sm">{{ garcom.tempo_medio_minutos }} min</span>
-                </div>
-                <div class="flex flex-col bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                    <span class="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1"><span>🏃</span> Esforço Físico</span>
-                    <span class="font-bold text-gray-700 text-sm">{{ garcom.itens_servidos }} itens</span>
-                </div>
-            </div>
-
-            <div class="relative z-10 bg-orange-50 border border-orange-100 rounded-xl p-4 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl drop-shadow-sm">🏆</span>
-                    <div>
-                        <span class="text-[9px] font-black uppercase tracking-widest text-orange-600 block">Ponto Forte (Mais Vendido)</span>
-                        <span class="font-bold text-orange-800 text-sm mt-0.5 block truncate max-w-[150px]" :title="garcom.produto_campeao">{{ garcom.produto_campeao }}</span>
-                    </div>
-                </div>
-                <span class="font-black text-orange-600 text-lg bg-white px-3 py-1 rounded-lg shadow-sm border border-orange-200">{{ garcom.qtd_campeao }}x</span>
+            <div class="flex gap-2 w-full md:w-auto">
+                <select v-model="filtro_status" class="bg-white border border-gray-200 text-[10px] font-black text-gray-600 uppercase tracking-widest rounded-xl px-4 py-2.5 outline-none shadow-sm focus:border-blue-400 transition-colors">
+                    <option value="ativos">Apenas Equipa Ativa</option>
+                    <option value="todos">Exibir Todos (Inc. Inativos/Demitidos)</option>
+                </select>
             </div>
         </div>
-        
-        <div v-if="!equipe || equipe.length === 0" class="col-span-full text-center py-10 text-gray-500 font-medium italic bg-white rounded-3xl shadow-sm border border-gray-100">
-            Nenhuma venda registada neste período para a equipa.
+
+        <div class="overflow-x-auto rounded-b-3xl">
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead class="bg-white text-gray-400 border-b border-gray-100">
+                    <tr>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider">Membro da Equipa</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Atendimentos</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Ticket Médio</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Volume Físico</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-left">Produto Campeão</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-green-600">Performance Real</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    <tr v-for="(garcom, index) in equipe_filtrada" :key="garcom.name" class="hover:bg-blue-50 transition-colors group">
+                        
+                        <td class="py-4 px-6">
+                            <div class="flex items-center gap-3">
+                                <span class="w-6 h-6 rounded bg-gray-100 text-[10px] font-bold text-gray-400 flex items-center justify-center shadow-inner">{{ index + 1 }}º</span>
+                                <div class="flex flex-col">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-black text-gray-800">{{ garcom.name }}</span>
+                                        <span v-if="garcom.status_conta !== 'ativo'" class="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-50 text-red-500 border border-red-100">
+                                            {{ garcom.status_conta }}
+                                        </span>
+                                    </div>
+                                    <span class="text-[9px] font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                                        <span :class="garcom.tipo_contrato === 'temporario' ? 'text-orange-500' : 'text-blue-500'">
+                                            {{ garcom.tipo_contrato === 'temporario' ? '⏳ Temporário' : '📄 Fixo' }}
+                                        </span>
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td class="py-4 px-6 text-center">
+                            <div class="flex flex-col">
+                                <span class="font-bold text-gray-700">{{ garcom.total_mesas }} mesas</span>
+                                <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">~{{ garcom.tempo_medio_minutos }} min/mesa</span>
+                            </div>
+                        </td>
+
+                        <td class="py-4 px-6 text-center font-bold text-gray-600">
+                            R$ {{ garcom.total_mesas > 0 ? (Number(garcom.total_vendas) / Number(garcom.total_mesas)).toFixed(2) : '0.00' }}
+                        </td>
+                        
+                        <td class="py-4 px-6 text-center">
+                            <div class="flex flex-col">
+                                <span class="font-bold text-gray-700">{{ garcom.itens_servidos }} Itens</span>
+                                <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Servidos</span>
+                            </div>
+                        </td>
+
+                        <td class="py-4 px-6">
+                            <div class="flex flex-col">
+                                <span class="font-bold text-orange-600 truncate max-w-[150px]" :title="garcom.produto_campeao">{{ garcom.produto_campeao }}</span>
+                                <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{{ garcom.qtd_campeao }}x vendidos</span>
+                            </div>
+                        </td>
+                        
+                        <td class="py-4 px-6 text-right">
+                            <div class="flex flex-col items-end">
+                                <span class="font-black text-green-600 text-base">R$ {{ Number(garcom.total_vendas).toFixed(2) }}</span>
+                                <span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Lucro: R$ {{ Number(garcom.lucro_gerado).toFixed(2) }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <tr v-if="!equipe_filtrada || equipe_filtrada.length === 0">
+                        <td colspan="6" class="p-10 text-center text-xs text-gray-400 font-medium italic">Nenhum membro da equipa atende a estes critérios de pesquisa.</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </template>
 
 <script setup>
-defineProps({ equipe: { type: Array, default: () => [] } });
+import { ref, computed } from 'vue';
+
+const props = defineProps({ equipe: { type: Array, default: () => [] } });
+
+const filtro_status = ref('ativos');
+
+const equipe_filtrada = computed(() => {
+    if (!props.equipe) return [];
+    return props.equipe.filter(membro => {
+        if (filtro_status.value === 'ativos') {
+            return membro.status_conta === 'ativo';
+        }
+        return true; // Se for 'todos', mostra tudo
+    });
+});
 </script>

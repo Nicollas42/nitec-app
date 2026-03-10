@@ -9,10 +9,15 @@
 
         <div v-show="visivel" class="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col relative">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-gray-100 gap-4 bg-gray-50 rounded-t-3xl">
+                
                 <div class="flex items-center gap-2">
-                    <div>
-                        <h2 class="text-lg font-black text-gray-800 uppercase tracking-tight">Guerra de Produtos</h2>
-                        <p class="text-xs text-gray-500">Selecione vários produtos e cruze o desempenho ao longo das 24h.</p>
+                    <h2 class="text-sm font-black text-gray-800 uppercase">Guerra de Produtos</h2>
+                    <div class="relative group">
+                        <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
+                        <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
+                            <p>Selecione até 5 produtos diferentes na lista ao lado e cruze o desempenho deles ao longo das 24 horas para descobrir em que período vendem mais.</p>
+                            <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -51,7 +56,6 @@ ChartJS.register(Title, Tooltip, Legend, CategoryScale, LinearScale, LineElement
 
 const props = defineProps({
     visivel: Boolean, dados_por_hora: Array, produtos_disponiveis: Array,
-    // 🟢 Proteção nativa do Vue para evitar 'undefined'
     produtosSelecionados: { type: Array, default: () => [] } 
 });
 
@@ -60,8 +64,16 @@ const emit = defineEmits(['alternar', 'update:produtosSelecionados']);
 const menu_aberto = ref(false);
 const selecionados_locais = ref(props.produtosSelecionados ? [...props.produtosSelecionados] : []);
 
-watch(selecionados_locais, (novo) => emit('update:produtosSelecionados', novo));
-watch(() => props.produtosSelecionados, (novo) => selecionados_locais.value = novo ? [...novo] : []);
+// 🟢 CORREÇÃO: "deep: true" adicionado para o Vue entender quando a checkbox muda o array!
+watch(selecionados_locais, (novo) => {
+    emit('update:produtosSelecionados', [...novo]);
+}, { deep: true });
+
+watch(() => props.produtosSelecionados, (novo) => {
+    if (JSON.stringify(novo) !== JSON.stringify(selecionados_locais.value)) {
+        selecionados_locais.value = novo ? [...novo] : [];
+    }
+}, { deep: true });
 
 const containerMenu = ref(null);
 const fecharMenu = (e) => { if (containerMenu.value && !containerMenu.value.contains(e.target)) menu_aberto.value = false; };
