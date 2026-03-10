@@ -14,20 +14,16 @@
                     <div class="relative group mt-1">
                         <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-6 w-6 flex items-center justify-center font-bold text-xs shadow-sm">ℹ️</span>
                         <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
-                            <p>Por padrão, mostra o volume geral de comandas e <strong class="text-blue-300">todos os produtos</strong> de cada hora numa mini-tabela rolável. <br><br>Pesquise um produto específico para ver o gráfico e a lista filtrarem <strong class="text-orange-400">exatamente</strong> as vendas dele!</p>
+                            <p>Mostra o volume geral de comandas. <strong class="text-blue-300">Clique em qualquer produto da lista</strong> ou pesquise para que o gráfico mostre <strong class="text-orange-400">exatamente</strong> as vendas desse item!</p>
                             <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
                         </div>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2 w-full md:w-auto">
-                    <SelectPesquisavel 
-                        :opcoes="produtos_disponiveis" 
-                        v-model="filtro_produto" 
-                        placeholder="Pesquisar Produto Específico..." 
-                    />
-                    <button v-if="filtro_produto" @click="filtro_produto = ''" class="text-[10px] text-red-500 hover:text-red-700 font-bold px-3 py-2 bg-red-50 rounded-lg transition-colors uppercase tracking-widest">
-                        Geral
+                    <SelectPesquisavel :opcoes="produtos_disponiveis" v-model="filtro_produto" placeholder="Pesquisar Produto..." />
+                    <button v-if="filtro_produto" @click="filtro_produto = ''" class="text-[10px] text-red-500 hover:text-red-700 font-black px-4 py-2.5 bg-red-50 border border-red-100 rounded-xl transition-colors uppercase tracking-widest shadow-sm">
+                        Limpar / Geral
                     </button>
                 </div>
             </div>
@@ -43,11 +39,10 @@
                 </div>
 
                 <div class="space-y-4 flex flex-col h-full">
-                    <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest">Detalhes do que saiu em cada hora</h3>
-                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100 h-80 overflow-y-auto shadow-inner">
+                    <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest">Detalhes da hora (Clique para filtrar)</h3>
+                    <div class="bg-gray-50 p-6 rounded-3xl border border-gray-100 h-80 overflow-y-auto shadow-inner custom-scrollbar">
                         
                         <div v-for="h in horarios" :key="h.hora" class="flex flex-col mb-8 last:mb-0 group">
-                            
                             <div class="flex items-center gap-4 mb-3">
                                 <span class="text-xs font-black text-gray-500 w-8 group-hover:text-blue-600 transition-colors">{{ h.hora }}h</span>
                                 <div class="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
@@ -67,18 +62,22 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-50">
-                                            <tr v-for="(p, i) in obter_detalhes(h.hora)" :key="p.produto_id" class="hover:bg-blue-50 transition-colors">
-                                                <td class="py-2 px-3 text-center text-gray-400 font-bold">
+                                            <tr v-for="(p, i) in obter_detalhes(h.hora)" :key="p.produto_id" 
+                                                @click="filtro_produto = p.produto_id"
+                                                class="hover:bg-orange-50 transition-colors cursor-pointer group/linha"
+                                                title="Clique para destacar este produto no gráfico">
+                                                
+                                                <td class="py-2 px-3 text-center text-gray-400 font-bold group-hover/linha:text-orange-500">
                                                     <span v-if="!filtro_produto && i === 0">🥇</span>
                                                     <span v-else-if="!filtro_produto && i === 1">🥈</span>
                                                     <span v-else-if="!filtro_produto && i === 2">🥉</span>
                                                     <span v-else-if="filtro_produto">🎯</span>
                                                     <span v-else>{{ i + 1 }}º</span>
                                                 </td>
-                                                <td class="py-2 px-3 font-black" :class="filtro_produto ? 'text-orange-600' : 'text-gray-700'">
+                                                <td class="py-2 px-3 font-black group-hover/linha:text-orange-600" :class="filtro_produto ? 'text-orange-600' : 'text-gray-700'">
                                                     {{ p.nome_produto }}
                                                 </td>
-                                                <td class="py-2 px-3 text-right font-black" :class="filtro_produto ? 'text-orange-600' : 'text-blue-600'">
+                                                <td class="py-2 px-3 text-right font-black group-hover/linha:text-orange-600" :class="filtro_produto ? 'text-orange-600' : 'text-blue-600'">
                                                     {{ p.quantidade }}x
                                                 </td>
                                             </tr>
@@ -89,7 +88,6 @@
                                     </table>
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -106,26 +104,16 @@ import SelectPesquisavel from './SelectPesquisavel.vue';
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale);
 
-const props = defineProps({
-    visivel: Boolean,
-    horarios: Array,
-    dados_por_hora: Array,
-    produtos_disponiveis: Array
-});
-
+const props = defineProps({ visivel: Boolean, horarios: Array, dados_por_hora: Array, produtos_disponiveis: Array });
 defineEmits(['alternar']);
 
 const filtro_produto = ref('');
 
-// 🟢 Função Atualizada: Agora retorna TODOS os produtos vendidos na hora (sem o slice)
 const obter_detalhes = (hora) => {
     if (!props.dados_por_hora) return [];
     let produtos_da_hora = props.dados_por_hora.filter(p => p.hora === hora);
-
-    if (filtro_produto.value) {
-        return produtos_da_hora.filter(p => p.produto_id === filtro_produto.value);
-    } else {
-        // Ordena e devolve tudo!
+    if (filtro_produto.value) return produtos_da_hora.filter(p => p.produto_id === filtro_produto.value);
+    else {
         produtos_da_hora.sort((a, b) => b.quantidade - a.quantidade);
         return produtos_da_hora; 
     }
@@ -138,44 +126,22 @@ const dados_grafico = computed(() => {
 
     if (filtro_produto.value && props.dados_por_hora) {
         props.dados_por_hora.forEach(item => {
-            if (item.produto_id === filtro_produto.value) {
-                dados[item.hora] = Number(item.quantidade);
-            }
+            if (item.produto_id === filtro_produto.value) dados[item.hora] = Number(item.quantidade);
         });
         const nome = props.produtos_disponiveis.find(p => p.produto_id === filtro_produto.value)?.nome_produto || 'Produto';
-        return {
-            labels: etiquetas,
-            datasets: [{ label: `Unidades de ${nome}`, backgroundColor: '#f97316', borderRadius: 4, data: dados }]
-        };
+        return { labels: etiquetas, datasets: [{ label: `Unidades de ${nome}`, backgroundColor: '#f97316', borderRadius: 4, data: dados }] };
     } else {
         props.horarios.forEach(h => dados[h.hora] = h.total_pedidos);
-        return {
-            labels: etiquetas,
-            datasets: [{ label: 'Pedidos Gerais', backgroundColor: '#3b82f6', borderRadius: 4, data: dados }]
-        };
+        return { labels: etiquetas, datasets: [{ label: 'Pedidos Gerais', backgroundColor: '#3b82f6', borderRadius: 4, data: dados }] };
     }
 });
 
-const opcoes_grafico = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1f2937' } },
-    scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
-};
+const opcoes_grafico = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1f2937' } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true } } };
 </script>
 
 <style scoped>
-/* Estilização suave para a barra de rolagem da mini-tabela */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f9fafb;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 </style>

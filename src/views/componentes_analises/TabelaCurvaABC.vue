@@ -28,9 +28,9 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-b-3xl">
+            <div class="overflow-x-auto overflow-y-auto max-h-[400px] rounded-b-3xl custom-scrollbar">
                 <table class="w-full text-left text-sm whitespace-nowrap">
-                    <thead class="bg-white text-gray-400 border-b border-gray-100">
+                    <thead class="bg-white text-gray-400 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
                         <tr>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider">Produto</th>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Unid. Vendidas</th>
@@ -75,3 +75,10 @@ const produtos_filtrados = computed(() => {
     return props.produtos.filter(p => p.produto_id === filtro_produto.value);
 });
 </script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+</style>

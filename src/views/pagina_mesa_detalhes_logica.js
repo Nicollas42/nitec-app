@@ -12,13 +12,12 @@ export function useLogicaMesaDetalhes() {
     const modal_cliente_visivel = ref(false);
     const input_novo_cliente = ref('');
 
-    // 🟢 NOVO: CONTROLE DE CANCELAMENTO / CALOTE
     const modal_cancelamento_visivel = ref(false);
     const cancelando = ref(false);
     const form_cancelamento = reactive({
         comanda_id: null,
-        motivo_cancelamento: 'Cliente saiu sem pagar (Calote)',
-        retornar_ao_estoque: false
+        motivo_cancelamento: 'Erro de Digitação / Lançamento',
+        retornar_ao_estoque: true 
     });
 
     const carregar_dados_completos = async () => {
@@ -78,11 +77,10 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) { alert("Erro ao remover os itens."); }
     };
 
-    // 🟢 NOVAS FUNÇÕES DE CANCELAMENTO
     const abrir_modal_cancelamento = (id_comanda) => {
         form_cancelamento.comanda_id = id_comanda;
-        form_cancelamento.motivo_cancelamento = 'Cliente saiu sem pagar (Calote)';
-        form_cancelamento.retornar_ao_estoque = false;
+        form_cancelamento.motivo_cancelamento = 'Erro de Digitação / Lançamento';
+        form_cancelamento.retornar_ao_estoque = true;
         modal_cancelamento_visivel.value = true;
     };
 
@@ -94,10 +92,7 @@ export function useLogicaMesaDetalhes() {
                 retornar_ao_estoque: form_cancelamento.retornar_ao_estoque
             });
             modal_cancelamento_visivel.value = false;
-            
-            // 🟢 Redireciona para o Menu de Mesas
             voltar_mapa(); 
-
             loja_produtos.buscar_produtos(true); 
         } catch (erro) {
             alert(erro.response?.data?.mensagem || "Erro ao cancelar comanda.");
@@ -114,10 +109,9 @@ export function useLogicaMesaDetalhes() {
     return {
         dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
-        fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
+        fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
         remover_item_consumido, fechar_conta_comanda,
-        // 🟢 Exportando as variáveis do cancelamento
         modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
-        confirmar_cancelamento, cancelando
+        confirmar_cancelamento, cancelando 
     };
 }

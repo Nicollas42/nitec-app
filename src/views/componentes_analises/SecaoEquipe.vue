@@ -57,10 +57,5 @@
 </template>
 
 <script setup>
-defineProps({
-    equipe: {
-        type: Array,
-        default: () => []
-    }
-});
+defineProps({ equipe: { type: Array, default: () => [] } });
 </script>

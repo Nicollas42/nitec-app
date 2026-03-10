@@ -53,7 +53,7 @@ export function useLogicaEquipe() {
             telefone: func.telefone || '', 
             password: '', // Senha vem vazia. Se digitar, altera. Se não, mantém a velha.
             tipo_usuario: func.tipo_usuario, 
-            tipo_contrato: func.tipo_contrato, 
+            tipo_contrato: func.tipo_usuario === 'dono' ? 'fixo' : func.tipo_contrato, 
             horas_validade: 8 
         };
         modal_aberto.value = true;

@@ -41,30 +41,18 @@ defineEmits(['alternar']);
 
 const dados_grafico = computed(() => {
     if (!props.dados_dias) return null;
-
-    // Array de dias da semana na ordem do MySQL (1=Dom, 2=Seg, 3=Ter...)
     const nomes_dias = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
     const valores = Array(7).fill(0);
 
     props.dados_dias.forEach(item => {
-        // MySQL devolve 1 a 7, os arrays no JS começam em 0, por isso fazemos -1
         valores[item.dia_semana - 1] = Number(item.faturamento_total);
     });
 
     return {
         labels: nomes_dias,
-        datasets: [{ 
-            label: 'Faturamento (R$)', 
-            backgroundColor: '#10b981', // Verde dinheiro
-            borderRadius: 6, 
-            data: valores 
-        }]
+        datasets: [{ label: 'Faturamento (R$)', backgroundColor: '#10b981', borderRadius: 6, data: valores }]
     };
 });
 
-const opcoes_grafico = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1f2937', callbacks: { label: (ctx) => `R$ ${ctx.raw.toFixed(2)}` } } },
-    scales: { x: { grid: { display: false }, border: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' }, border: { display: false } } }
-};
+const opcoes_grafico = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1f2937', callbacks: { label: (ctx) => `R$ ${ctx.raw.toFixed(2)}` } } }, scales: { x: { grid: { display: false }, border: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' }, border: { display: false } } } };
 </script>

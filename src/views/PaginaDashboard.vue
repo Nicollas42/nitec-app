@@ -72,7 +72,7 @@
             <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" 
                     :class="rota_atual.path.includes('/equipe') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
-                <span>👥</span> Equipa
+                <span>👥</span> Equipe
             </button>
 
             <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" 

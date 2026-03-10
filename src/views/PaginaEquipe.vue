@@ -3,7 +3,7 @@
         
         <header class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
             <div>
-                <h1 class="text-2xl font-black text-gray-800 tracking-tight">Gestão de Equipa</h1>
+                <h1 class="text-2xl font-black text-gray-800 tracking-tight">Gestão de Equipe</h1>
                 <p class="text-xs text-gray-500 mt-1 font-bold">Gira os acessos de funcionários fixos e temporários (freelancers).</p>
             </div>
             
@@ -32,11 +32,12 @@
 
         <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
             <div v-for="func in funcionarios_filtrados" :key="func.id" 
-                class="bg-white rounded-[2rem] p-6 border transition-all flex flex-col relative group"
+                class="rounded-[2rem] p-6 border transition-all flex flex-col relative group"
                 :class="{
-                    'border-gray-200 shadow-sm hover:shadow-md': func.status_conta === 'ativo',
-                    'border-red-100 bg-red-50/40': func.status_conta === 'inativo',
-                    'border-gray-300 bg-gray-100 opacity-70 grayscale hover:grayscale-0': func.status_conta === 'demitido'
+                    'order-first bg-purple-50 border-purple-200 shadow-md': func.tipo_usuario === 'dono',
+                    'bg-white border-gray-200 shadow-sm hover:shadow-md': func.status_conta === 'ativo' && func.tipo_usuario !== 'dono',
+                    'bg-red-50/40 border-red-100': func.status_conta === 'inativo' && func.tipo_usuario !== 'dono',
+                    'bg-gray-100 border-gray-300 opacity-70 grayscale hover:grayscale-0': func.status_conta === 'demitido' && func.tipo_usuario !== 'dono'
                 }">
                 
                 <div class="absolute top-5 right-5 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -56,7 +57,7 @@
 
                 <div class="flex justify-between items-start mb-4 pr-16">
                     <span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md"
-                        :class="func.tipo_usuario === 'dono' ? 'bg-purple-100 text-purple-700' : (func.tipo_usuario === 'caixa' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700')">
+                        :class="func.tipo_usuario === 'dono' ? 'bg-purple-100 text-purple-700' : (func.tipo_usuario === 'gerente' ? 'bg-indigo-100 text-indigo-700' : (func.tipo_usuario === 'caixa' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'))">
                         {{ func.tipo_usuario }}
                     </span>
                     
@@ -144,15 +145,16 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Cargo / Permissão</label>
-                            <select v-model="form.tipo_usuario" class="w-full bg-gray-50 border border-gray-200 text-sm font-bold rounded-xl p-3 outline-none focus:border-blue-500">
+                            <select v-model="form.tipo_usuario" :disabled="form.tipo_usuario === 'dono' && modo_edicao" class="w-full bg-gray-50 border border-gray-200 text-sm font-bold rounded-xl p-3 outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <option value="garcom">Garçom</option>
                                 <option value="caixa">Caixa</option>
+                                <option value="gerente">Gerente</option>
                                 <option value="dono">Dono (Admin)</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Vínculo</label>
-                            <select v-model="form.tipo_contrato" class="w-full bg-gray-50 border border-gray-200 text-sm font-bold rounded-xl p-3 outline-none focus:border-blue-500" :class="form.tipo_contrato === 'temporario' ? 'text-orange-600' : ''">
+                            <select v-model="form.tipo_contrato" :disabled="form.tipo_usuario === 'dono' && modo_edicao" class="w-full bg-gray-50 border border-gray-200 text-sm font-bold rounded-xl p-3 outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" :class="form.tipo_contrato === 'temporario' ? 'text-orange-600' : ''">
                                 <option value="fixo">Fixo</option>
                                 <option value="temporario">Temporário</option>
                             </select>

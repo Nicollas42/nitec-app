@@ -25,6 +25,7 @@
                         <tr>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider">Identificação da Mesa</th>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Contas Fechadas</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center text-orange-400">Tempo Médio</th>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right">Receita Gerada</th>
                             <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-blue-500">Ticket Médio p/ Mesa</th>
                         </tr>
@@ -36,13 +37,18 @@
                                 {{ m.nome_mesa }}
                             </td>
                             <td class="py-4 px-6 text-center font-bold text-gray-500">{{ m.total_atendimentos }}x</td>
+                            
+                            <td class="py-4 px-6 text-center font-bold text-orange-500">
+                                <span class="flex items-center justify-center gap-1"><span>⏳</span> {{ m.tempo_medio_minutos || '--' }} min</span>
+                            </td>
+
                             <td class="py-4 px-6 text-right font-bold text-gray-500">R$ {{ Number(m.receita_gerada).toFixed(2) }}</td>
                             <td class="py-4 px-6 text-right font-black text-blue-600">
                                 R$ {{ m.total_atendimentos > 0 ? (Number(m.receita_gerada) / Number(m.total_atendimentos)).toFixed(2) : '0.00' }}
                             </td>
                         </tr>
                         <tr v-if="!mesas || mesas.length === 0">
-                            <td colspan="4" class="p-8 text-center text-xs text-gray-400 font-medium italic">Nenhuma mesa atendeu clientes neste período.</td>
+                            <td colspan="5" class="p-8 text-center text-xs text-gray-400 font-medium italic">Nenhuma mesa atendeu clientes neste período.</td>
                         </tr>
                     </tbody>
                 </table>

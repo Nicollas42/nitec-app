@@ -126,8 +126,8 @@
                     <div class="flex flex-col gap-1">
                         <label class="text-[10px] font-black uppercase tracking-widest text-gray-400">Motivo do Cancelamento</label>
                         <select v-model="form_cancelamento.motivo_cancelamento" class="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-red-500 text-sm font-bold text-gray-700">
-                            <option value="Cliente saiu sem pagar (Calote)">🏃 Cliente saiu sem pagar (Calote)</option>
                             <option value="Erro de Digitação / Lançamento">⌨️ Erro de Lançamento</option>
+                            <option value="Cliente saiu sem pagar (Calote)">🏃 Cliente saiu sem pagar (Calote)</option>
                             <option value="Cliente desistiu antes de consumir">🚶 Desistiu de consumir</option>
                         </select>
                     </div>

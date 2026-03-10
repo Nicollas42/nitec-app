@@ -26,12 +26,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 
-const props = defineProps({
-    opcoes: { type: Array, required: true },
-    modelValue: { type: [String, Number], default: '' },
-    placeholder: { type: String, default: 'Pesquisar produto...' }
-});
-
+const props = defineProps({ opcoes: { type: Array, required: true }, modelValue: { type: [String, Number], default: '' }, placeholder: { type: String, default: 'Pesquisar produto...' } });
 const emit = defineEmits(['update:modelValue']);
 
 const aberto = ref(false);
@@ -39,21 +34,12 @@ const termo_pesquisa = ref('');
 const container = ref(null);
 
 watch(() => props.modelValue, (novo_valor) => {
-    // 🟢 Regra adicionada: Se o modelValue for limpo por fora, limpa o texto também
-    if (!novo_valor) {
-        termo_pesquisa.value = '';
-        return;
-    }
+    if (!novo_valor) { termo_pesquisa.value = ''; return; }
     const selecionado = props.opcoes.find(op => op.produto_id === novo_valor);
-    if (selecionado && !aberto.value) {
-        termo_pesquisa.value = selecionado.nome_produto;
-    }
+    if (selecionado && !aberto.value) { termo_pesquisa.value = selecionado.nome_produto; }
 }, { immediate: true });
 
-const ao_focar = () => {
-    aberto.value = true;
-    termo_pesquisa.value = ''; 
-};
+const ao_focar = () => { aberto.value = true; termo_pesquisa.value = ''; };
 
 const selecionar = (opcao) => {
     termo_pesquisa.value = opcao.nome_produto;
@@ -63,9 +49,7 @@ const selecionar = (opcao) => {
 
 const opcoes_filtradas = computed(() => {
     if (!termo_pesquisa.value) return props.opcoes;
-    return props.opcoes.filter(op => 
-        op.nome_produto.toLowerCase().includes(termo_pesquisa.value.toLowerCase())
-    );
+    return props.opcoes.filter(op => op.nome_produto.toLowerCase().includes(termo_pesquisa.value.toLowerCase()));
 });
 
 const clicar_fora = (e) => {

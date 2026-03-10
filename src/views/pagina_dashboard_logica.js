@@ -1,7 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router'; 
 import { useAuthStore } from '../stores/auth_store.js';
-import { useToastStore } from '../stores/toast_store.js'; // 🟢 Importando o Pop-up Global
+import { useToastStore } from '../stores/toast_store.js'; 
 import { iniciar_sincronizacao_de_fundo, parar_sincronizacao_de_fundo } from '../servicos/sincronizador_bg.js'; 
 import { db } from '../banco_local/db.js';
 
@@ -9,7 +9,7 @@ export function useLogicaDashboard() {
     const roteador = useRouter();
     const rota_atual = useRoute(); 
     const loja_autenticacao = useAuthStore();
-    const toast_store = useToastStore(); // 🟢 Instanciando o Toast Global
+    const toast_store = useToastStore(); 
 
     const em_modo_suporte = ref(localStorage.getItem('nitec_modo_suporte') === 'ativo');
     const nome_cliente = ref(localStorage.getItem('nitec_nome_cliente') || '');
@@ -19,7 +19,7 @@ export function useLogicaDashboard() {
     let ipcRenderer = null;
     if (isElectron) ipcRenderer = window.require('electron').ipcRenderer;
 
-    const versao_atual = ref(import.meta.env.PACKAGE_VERSION || '1.0.2');
+    const versao_atual = ref(import.meta.env.PACKAGE_VERSION || '1.1.0');
     const modal_visivel = ref(false);
     const estado_atualizacao = ref('parado'); 
     const mensagem_status = ref('Clique abaixo para procurar novas versões.');
@@ -29,6 +29,17 @@ export function useLogicaDashboard() {
     const tem_atualizacao_nova = ref(false);
     const historico_versoes = ref([]);
     const carregando_historico = ref(false);
+
+    // 🟢 Função de segurança: impede que ele ache que a 1.0.7 é mais nova que a 1.1.0
+    const e_versao_mais_recente = (v_nova, v_atual) => {
+        const n = v_nova.split('.').map(Number);
+        const a = v_atual.split('.').map(Number);
+        for (let i = 0; i < 3; i++) {
+            if (n[i] > a[i]) return true;
+            if (n[i] < a[i]) return false;
+        }
+        return false;
+    };
 
     async function limpar_dados_locais_completos() {
         try {
@@ -79,12 +90,18 @@ export function useLogicaDashboard() {
         return asset_exe ? asset_exe.browser_download_url : assets[0].browser_download_url;
     };
 
-    const checar_atualizacoes = () => ipcRenderer?.send('checar-atualizacoes');
+    const checar_atualizacoes = () => {
+        if (ipcRenderer) {
+            estado_atualizacao.value = 'buscando';
+            mensagem_status.value = 'Buscando atualizações no servidor...';
+            ipcRenderer.send('checar-atualizacoes');
+        }
+    };
     
     const baixar_atualizacao = () => {
         if (ipcRenderer) {
             estado_atualizacao.value = 'baixando';
-            mensagem_status.value = 'Baixando atualização... Por favor, aguarde.';
+            mensagem_status.value = 'Iniciando download da atualização... Por favor, aguarde.';
             ipcRenderer.send('baixar-atualizacao');
         }
     };
@@ -127,19 +144,32 @@ export function useLogicaDashboard() {
 
         if (ipcRenderer) {
             ipcRenderer.send('pedir-versao');
+            
+            // 🟢 A MÁGICA ACONTECE AQUI: Assim que a tela carrega, ele pergunta ao servidor no background!
+            ipcRenderer.send('checar-atualizacoes');
+
             ipcRenderer.on('resposta-versao', (event, v) => versao_atual.value = v);
             
             ipcRenderer.on('status-atualizacao', (event, info) => {
-                estado_atualizacao.value = info.status;
-                mensagem_status.value = info.mensagem;
                 status_erro.value = info.status === 'erro';
                 
+                // Validação de segurança restaurada:
                 if (info.status === 'disponivel') {
-                    tem_atualizacao_nova.value = true;
-                    versao_nova.value = info.versao;
+                    if (e_versao_mais_recente(info.versao, versao_atual.value)) {
+                        estado_atualizacao.value = 'disponivel';
+                        mensagem_status.value = info.mensagem;
+                        tem_atualizacao_nova.value = true; // Isso ativa a bolinha vermelha!
+                        versao_nova.value = info.versao;
+                    } else {
+                        estado_atualizacao.value = 'atualizado';
+                        mensagem_status.value = 'Você já está usando a versão mais recente.';
+                        tem_atualizacao_nova.value = false;
+                    }
+                } else {
+                    estado_atualizacao.value = info.status;
+                    mensagem_status.value = info.mensagem;
                 }
 
-                // 🟢 AUTOMAÇÃO RESTAURADA: Usando o status 'pronto' que o seu Electron envia
                 if (info.status === 'pronto') {
                     console.log("Download concluído. Iniciando instalação automática...");
                     toast_store.exibir_toast("Sistema atualizado! Reiniciando em instantes...", "sucesso");
