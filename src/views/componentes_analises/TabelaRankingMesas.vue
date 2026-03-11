@@ -19,15 +19,15 @@
                 </div>
             </div>
 
-            <div class="overflow-x-auto rounded-b-3xl">
+            <div class="max-h-[500px] overflow-y-auto overflow-x-auto custom-scrollbar rounded-b-3xl">
                 <table class="w-full text-left text-sm whitespace-nowrap">
-                    <thead class="bg-white text-gray-400 border-b border-gray-100">
+                    <thead class="bg-white text-gray-400 sticky top-0 z-10 shadow-sm border-b border-gray-100">
                         <tr>
-                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider">Identificação da Mesa</th>
-                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Contas Fechadas</th>
-                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center text-orange-400">Tempo Médio</th>
-                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right">Receita Gerada</th>
-                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-blue-500">Ticket Médio p/ Mesa</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider bg-white">Identificação da Mesa</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center bg-white">Contas Fechadas</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center text-orange-400 bg-white">Tempo Médio</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right bg-white">Receita Gerada</th>
+                            <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-blue-500 bg-white">Ticket Médio p/ Mesa</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
@@ -61,3 +61,11 @@
 defineProps({ visivel: Boolean, mesas: Array });
 defineEmits(['alternar']);
 </script>
+
+<style scoped>
+/* 🟢 Estilização da barra de rolagem para combinar com o dashboard */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+</style>

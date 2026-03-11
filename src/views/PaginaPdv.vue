@@ -50,7 +50,7 @@
             </div>
         </section>
 
-        <section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[55vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
+<section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[55vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
             
             <div class="bg-gray-50/80 backdrop-blur-md border-b border-gray-100 p-4 text-center shrink-0 rounded-t-3xl md:rounded-none">
                 <h2 class="text-xs font-black text-gray-600 uppercase tracking-widest">
@@ -59,28 +59,61 @@
                 <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-2 md:hidden"></div>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-1">
-                <div v-if="carrinho_venda.length === 0" class="flex flex-col items-center justify-center h-full text-gray-300">
+            <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-1 custom-scrollbar">
+                
+                <div v-if="carrinho_venda.length === 0 && (!itens_ja_lancados || itens_ja_lancados.length === 0)" class="flex flex-col items-center justify-center h-full text-gray-300">
                     <span class="text-4xl mb-2 opacity-60">🛒</span>
                     <p class="text-[10px] font-bold uppercase tracking-widest">Carrinho Vazio</p>
                 </div>
                 
-                <div v-for="(item, indice) in carrinho_venda" :key="indice" class="flex justify-between items-center border-b border-gray-50 py-2 group">
-                    <div>
-                        <p class="text-xs font-bold text-gray-800">{{ item.nome_produto }}</p>
-                        <p class="text-[10px] text-gray-500 font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-600">R$ {{ Number(item.preco_venda).toFixed(2) }}</span></p>
-                    </div>
-                    <div class="flex items-center gap-3">
+                <div v-for="item in itens_ja_lancados" :key="'db_'+item.id_item_comanda" 
+                     class="flex flex-col border-b border-gray-50 py-2 group px-2 relative bg-purple-50/20 rounded-xl mb-1">
+                    
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <p class="text-xs font-bold text-gray-800 flex items-center gap-1.5"><span class="text-[10px] text-purple-500" title="Já gravado">☁️</span> {{ item.nome_produto }}</p>
+                            <p class="text-[10px] text-gray-500 font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-600">R$ {{ Number(item.preco_venda).toFixed(2) }}</span></p>
+                        </div>
                         <span class="text-sm font-black text-gray-800">R$ {{ (item.quantidade * item.preco_venda).toFixed(2) }}</span>
-                        <button v-if="!id_comanda_pagamento" @click="remover_do_carrinho(indice)" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors flex items-center justify-center" title="Remover">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </div>
+                    
+                    <div class="flex items-center justify-between mt-1">
+                        <div class="flex items-center bg-white rounded-md border border-gray-200 shadow-sm">
+                            <button @click="alterar_quantidade_db(item.id_item_comanda, 'decrementar')" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-red-500 font-black">-</button>
+                            <span class="w-6 text-center text-xs font-black text-gray-800">{{ item.quantidade }}</span>
+                            <button @click="alterar_quantidade_db(item.id_item_comanda, 'incrementar')" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-blue-500 font-black">+</button>
+                        </div>
+                        <button @click="remover_item_db(item.id_item_comanda)" class="text-gray-300 hover:text-red-500 text-[10px] uppercase font-black tracking-widest px-2 transition-colors">
+                            Remover
                         </button>
                     </div>
                 </div>
+
+                <div v-for="(item, indice) in carrinho_venda" :key="'novo_'+indice" class="flex flex-col border-b border-gray-50 py-2 group px-2 relative bg-green-50/20 rounded-xl mb-1">
+                    
+                    <div class="flex justify-between items-start mb-1">
+                        <div>
+                            <p class="text-xs font-bold text-gray-800 flex items-center gap-1.5"><span class="text-[10px] text-green-500">🆕</span> {{ item.nome_produto }}</p>
+                            <p class="text-[10px] text-gray-500 font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-600">R$ {{ Number(item.preco_venda).toFixed(2) }}</span></p>
+                        </div>
+                        <span class="text-sm font-black text-gray-800">R$ {{ (item.quantidade * item.preco_venda).toFixed(2) }}</span>
+                    </div>
+
+                    <div class="flex items-center justify-between mt-1">
+                        <div class="flex items-center bg-white rounded-md border border-gray-200 shadow-sm">
+                            <button @click="alterar_quantidade_novo(indice, 'decrementar')" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-red-500 font-black">-</button>
+                            <span class="w-6 text-center text-xs font-black text-gray-800">{{ item.quantidade }}</span>
+                            <button @click="alterar_quantidade_novo(indice, 'incrementar')" class="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-blue-500 font-black">+</button>
+                        </div>
+                        <button @click="remover_do_carrinho(indice)" class="text-gray-300 hover:text-red-500 text-[10px] uppercase font-black tracking-widest px-2 transition-colors">
+                            Remover
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
             <div class="p-5 md:p-6 bg-white border-t border-gray-100 shrink-0 pb-safe">
-                
                 <div class="flex justify-between items-center mb-3">
                     <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subtotal:</span>
                     <span class="text-sm font-black text-gray-600">R$ {{ subtotal_comanda.toFixed(2) }}</span>
@@ -100,14 +133,19 @@
                     </span>
                 </div>
                 
-                <button @click="processar_acao_principal" :class="id_comanda_pagamento ? 'bg-green-500 hover:bg-green-600' : 'bg-nitec_blue hover:bg-blue-700'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2">
-                    <template v-if="id_comanda_pagamento"><span>💳</span> Confirmar Pagamento</template>
-                    <template v-else-if="id_comanda_vinculada"><span>📥</span> Lançar Produtos</template>
-                    <template v-else><span>💸</span> Venda Balcão</template>
+                <button @click="processar_acao_principal" :disabled="processando_finalizacao" :class="id_comanda_pagamento ? 'bg-green-500 hover:bg-green-600' : 'bg-nitec_blue hover:bg-blue-700'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                    <template v-if="processando_finalizacao">
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        A PROCESSAR...
+                    </template>
+                    <template v-else>
+                        <template v-if="id_comanda_pagamento"><span>💳</span> Confirmar Pagamento</template>
+                        <template v-else-if="id_comanda_vinculada"><span>📥</span> Atualizar Comanda</template>
+                        <template v-else><span>💸</span> Venda Balcão</template>
+                    </template>
                 </button>
             </div>
-        </section>
-        
+        </section> 
     </div>
 </template>
 
@@ -116,8 +154,9 @@ import { useLogicaPdv } from './pagina_pdv_logica.js';
 const { 
     produtos_vitrine, categorias_unicas, termo_pesquisa, categoria_selecionada, 
     produtos_fixados, alternar_fixacao,
-    carrinho_venda, adicionar_ao_carrinho, remover_do_carrinho, 
-    subtotal_comanda, valor_final_comanda, valor_desconto,
+    carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
+    adicionar_ao_carrinho, remover_do_carrinho, 
+    subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
     id_comanda_vinculada, id_comanda_pagamento, processar_acao_principal, voltar_painel 
 } = useLogicaPdv();
 </script>
@@ -126,4 +165,7 @@ const {
 .pb-safe { padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
 </style>

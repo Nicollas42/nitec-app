@@ -2,22 +2,35 @@
     <div class="tela_gestao_comandas p-6 md:p-8 bg-gray-50 h-full font-sans flex flex-col relative overflow-y-auto">
         
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
-            <div>
-                <h1 class="text-2xl font-black text-gray-800 tracking-tight italic uppercase">Gestão de Comandas</h1>
-                <p class="text-xs text-gray-500 mt-1 font-bold uppercase tracking-widest">Controlo de faturação e sessões de atendimento.</p>
+            <div class="w-full flex justify-between items-center md:w-auto md:block">
+                <div>
+                    <h1 class="text-2xl font-black text-gray-800 tracking-tight italic uppercase">Gestão de Comandas</h1>
+                    <p class="text-xs text-gray-500 mt-1 font-bold uppercase tracking-widest">Controlo de faturação e sessões de atendimento.</p>
+                </div>
+                
+                <button @click="voltar_painel" class="md:hidden px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
+                    Voltar
+                </button>
             </div>
             
-            <div class="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200">
-                <button @click="alterar_exibicao('ordem')" 
-                        :class="tipo_exibicao === 'ordem' ? 'bg-nitec_blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600'"
-                        class="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                    🕒 Ordem de Lançamento
-                </button>
-                <button @click="alterar_exibicao('agrupada')" 
-                        :class="tipo_exibicao === 'agrupada' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'"
-                        class="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
-                    🪑 Agrupadas por Mesa
-                </button>
+            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div class="flex items-center bg-white border border-gray-200 rounded-xl px-4 py-2 w-full md:w-64 focus-within:border-nitec_blue transition-colors shadow-sm">
+                    <span class="text-gray-400 text-xs mr-2">🔍</span>
+                    <input v-model="termo_pesquisa_comanda" type="text" placeholder="Buscar cliente, mesa, total..." class="bg-transparent text-xs font-bold outline-none text-gray-700 w-full placeholder:font-medium">
+                </div>
+
+                <div class="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200 w-full sm:w-auto">
+                    <button @click="alterar_exibicao('ordem')" 
+                            :class="tipo_exibicao === 'ordem' ? 'bg-nitec_blue text-white shadow-md' : 'text-gray-400 hover:text-gray-600'"
+                            class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        🕒 Ordem
+                    </button>
+                    <button @click="alterar_exibicao('agrupada')" 
+                            :class="tipo_exibicao === 'agrupada' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-400 hover:text-gray-600'"
+                            class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                        🪑 Mesas
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -32,7 +45,7 @@
                 </button>
             </div>
 
-            <div class="overflow-x-auto flex-1">
+            <div class="overflow-x-auto flex-1 custom-scrollbar">
                 <table class="w-full text-left whitespace-nowrap text-sm border-separate border-spacing-0">
                     <thead class="bg-gray-50 text-gray-500 sticky top-0 z-10 border-b border-gray-100">
                         <tr>
@@ -51,7 +64,7 @@
                         
                         <tr v-for="(comanda, index) in comandas_filtradas" :key="comanda.id" 
                             class="hover:bg-gray-50 transition-colors group cursor-pointer relative" 
-                            @click="abrir_detalhes(comanda)">
+                            @click="abrir_detalhes(comanda, comanda.status_comanda === 'aberta' ? (comanda.mesa_id ? 'mesa' : 'cobrar') : 'recibo')">
                             
                             <td class="py-4 px-8 relative">
                                 <div v-if="tipo_exibicao === 'agrupada' && index > 0 && comandas_filtradas[index-1]._sessao === comanda._sessao" 
@@ -70,7 +83,19 @@
                                     </div>
                                     <div>
                                         <p class="text-xs font-black text-gray-800 uppercase italic">{{ comanda.buscar_mesa ? comanda.buscar_mesa.nome_mesa : 'Venda Balcão' }}</p>
-                                        <p class="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Aberta em: {{ formatar_data(comanda.data_hora_abertura) }}</p>
+                                        
+                                        <p class="text-[9px] text-gray-400 font-bold uppercase mt-0.5">
+                                            <template v-if="comanda.status_comanda === 'fechada'">
+                                                Fechada em: {{ formatar_data(comanda.data_hora_fechamento) }}
+                                            </template>
+                                            <template v-else-if="comanda.status_comanda === 'cancelada'">
+                                                Cancelada em: {{ formatar_data(comanda.deleted_at || comanda.updated_at) }}
+                                            </template>
+                                            <template v-else>
+                                                Aberta em: {{ formatar_data(comanda.data_hora_abertura) }}
+                                            </template>
+                                        </p>
+                                        
                                     </div>
                                 </div>
                             </td>
@@ -93,8 +118,21 @@
                             <td class="py-4 px-6 text-right font-black text-gray-800">R$ {{ Number(comanda.valor_total).toFixed(2) }}</td>
 
                             <td class="py-4 px-6 text-right">
-                                <button class="text-nitec_blue text-[10px] uppercase font-black tracking-widest hover:underline opacity-40 group-hover:opacity-100 transition-opacity">
-                                    {{ comanda.status_comanda === 'aberta' ? 'Lançar 🚀' : 'Ver Recibo 📄' }}
+                                <div v-if="comanda.status_comanda === 'aberta'" class="flex justify-end gap-3 opacity-40 group-hover:opacity-100 transition-opacity">
+                                    <button v-if="comanda.mesa_id" @click.stop="abrir_detalhes(comanda, 'mesa')" class="text-nitec_blue text-[10px] uppercase font-black tracking-widest hover:underline">
+                                        Mesa 🪑
+                                    </button>
+                                    <template v-else>
+                                        <button @click.stop="abrir_detalhes(comanda, 'lancar')" class="text-nitec_blue text-[10px] uppercase font-black tracking-widest hover:underline">
+                                            Lançar 🚀
+                                        </button>
+                                        <button @click.stop="abrir_detalhes(comanda, 'cobrar')" class="text-green-600 text-[10px] uppercase font-black tracking-widest hover:underline">
+                                            Cobrar 💳
+                                        </button>
+                                    </template>
+                                </div>
+                                <button v-else @click.stop="abrir_detalhes(comanda, 'recibo')" class="text-nitec_blue text-[10px] uppercase font-black tracking-widest hover:underline opacity-40 group-hover:opacity-100 transition-opacity">
+                                    Ver Recibo 📄
                                 </button>
                             </td>
                         </tr>
@@ -115,7 +153,7 @@
                     <button @click="fechar_modal_historico" class="text-gray-300 hover:text-red-500 font-bold text-2xl transition-colors">&times;</button>
                 </header>
                 
-                <div class="p-8 flex-1 overflow-y-auto max-h-[50vh]">
+                <div class="p-8 flex-1 overflow-y-auto max-h-[50vh] custom-scrollbar">
                     <div class="space-y-4">
                         <div v-if="comanda_selecionada.listar_itens.length === 0" class="text-center py-4 text-xs text-gray-400 italic">Nenhum item consumido nesta conta.</div>
                         <div v-for="item in comanda_selecionada.listar_itens" :key="item.id" class="flex justify-between items-center">
@@ -159,6 +197,13 @@
 import { useLogicaComandas } from './pagina_comandas_logica.js';
 const { 
     filtro_status, tipo_exibicao, comandas_filtradas, alterar_filtro, alterar_exibicao, formatar_data,
-    abrir_detalhes, voltar_painel, modal_historico_visivel, comanda_selecionada, fechar_modal_historico, reabrir_comanda, reabrindo
+    abrir_detalhes, voltar_painel, modal_historico_visivel, comanda_selecionada, fechar_modal_historico, reabrir_comanda, reabrindo,termo_pesquisa_comanda
 } = useLogicaComandas();
 </script>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+</style>

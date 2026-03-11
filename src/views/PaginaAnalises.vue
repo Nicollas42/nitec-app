@@ -33,13 +33,22 @@
 
         <div v-else-if="dados_dashboard" class="animate-in fade-in duration-500 pb-20">
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+                
                 <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
                     <div class="flex justify-between items-center mb-3">
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Faturamento Bruto</span>
                         <span class="text-gray-300 group-hover:text-green-500 transition-colors text-base grayscale group-hover:grayscale-0">💰</span>
                     </div>
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.faturamento_bruto }}</h3>
+                    <h3 class="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.faturamento_bruto }}</h3>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vendas Avulsas (Balcão)</span>
+                        <span class="text-gray-300 group-hover:text-orange-500 transition-colors text-base grayscale group-hover:grayscale-0">🛍️</span>
+                    </div>
+                    <h3 class="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.faturamento_balcao }}</h3>
                 </div>
 
                 <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
@@ -47,7 +56,7 @@
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ticket Médio</span>
                         <span class="text-gray-300 group-hover:text-blue-500 transition-colors text-base grayscale group-hover:grayscale-0">🏷️</span>
                     </div>
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.ticket_medio }}</h3>
+                    <h3 class="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">R$ {{ dados_dashboard.indicadores.ticket_medio }}</h3>
                 </div>
 
                 <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
@@ -55,16 +64,17 @@
                         <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Comandas</span>
                         <span class="text-gray-300 group-hover:text-purple-500 transition-colors text-base grayscale group-hover:grayscale-0">🧾</span>
                     </div>
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.total_pedidos }}</h3>
+                    <h3 class="text-2xl lg:text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.total_pedidos }}</h3>
                 </div>
 
-                <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
+                <div class="bg-red-50 p-6 rounded-3xl border border-red-100 shadow-sm hover:shadow-md transition-all group flex flex-col">
                     <div class="flex justify-between items-center mb-3">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Permanência Média</span>
-                        <span class="text-gray-300 group-hover:text-orange-500 transition-colors text-base grayscale group-hover:grayscale-0">⏳</span>
+                        <span class="text-[10px] font-bold text-red-500 uppercase tracking-widest">Descontos (Perda)</span>
+                        <span class="text-red-300 group-hover:text-red-600 transition-colors text-base grayscale group-hover:grayscale-0">🎁</span>
                     </div>
-                    <h3 class="text-3xl font-black text-gray-800 tracking-tighter">{{ dados_dashboard.indicadores.tempo_permanencia }}</h3>
+                    <h3 class="text-2xl lg:text-3xl font-black text-red-700 tracking-tighter">R$ {{ dados_dashboard.indicadores.total_descontos }}</h3>
                 </div>
+
             </div>
 
             <nav class="flex gap-1 mb-8 bg-gray-200/50 p-1.5 rounded-2xl w-fit overflow-x-auto max-w-full shadow-inner">
@@ -83,16 +93,18 @@
                     
                     <SecaoVendasPorDia :visivel="visibilidade.vendas_dia" @alternar="alternar_visibilidade('vendas_dia')" :dados_dias="dados_dashboard.vendas_por_dia" />
                     
-                    <TabelaCategorias 
-                        :visivel="visibilidade.categorias" 
-                        @alternar="alternar_visibilidade('categorias')" 
-                        :categorias="dados_dashboard.vendas_por_categoria" 
-                    />
+                    <TabelaCategorias :visivel="visibilidade.categorias" @alternar="alternar_visibilidade('categorias')" :categorias="dados_dashboard.vendas_por_categoria" />
 
                     <SecaoMapaCalor :visivel="visibilidade.mapa_calor" @alternar="alternar_visibilidade('mapa_calor')" :horarios="dados_dashboard.horarios" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" />
+                    
                     <TabelaRankingMesas :visivel="visibilidade.ranking_mesas" @alternar="alternar_visibilidade('ranking_mesas')" :mesas="dados_dashboard.ranking_mesas" />
-                    <SecaoComparador :visivel="visibilidade.comparador" @alternar="alternar_visibilidade('comparador')" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" v-model:produtosSelecionados="produtos_comparador" />
+                    
                     <TabelaCurvaABC :visivel="visibilidade.curva_abc" @alternar="alternar_visibilidade('curva_abc')" :produtos="dados_dashboard.ranking_produtos" />
+
+                    <SecaoComparador :visivel="visibilidade.comparador" @alternar="alternar_visibilidade('comparador')" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" v-model:produtosSelecionados="produtos_comparador" />
+
+                    <SecaoDescontos :visivel="visibilidade.descontos" @alternar="alternar_visibilidade('descontos')" :dados_descontos="dados_dashboard.descontos_cronologicos" />
+
                 </div>
 
                 <div v-show="aba_ativa === 'estoque S/ giro'">
@@ -182,14 +194,14 @@
 <script setup>
 import { useLogicaAnalises } from './pagina_analises_logica.js';
 
-// 🟢 TODOS AS IMPORTAÇÕES AQUI!
 import SecaoEvolucaoVendas from './componentes_analises/SecaoEvolucaoVendas.vue';
 import SecaoVendasPorDia from './componentes_analises/SecaoVendasPorDia.vue';
 import TabelaCategorias from './componentes_analises/TabelaCategorias.vue';
 import SecaoMapaCalor from './componentes_analises/SecaoMapaCalor.vue';
 import TabelaRankingMesas from './componentes_analises/TabelaRankingMesas.vue';
-import SecaoComparador from './componentes_analises/SecaoComparador.vue';
 import TabelaCurvaABC from './componentes_analises/TabelaCurvaABC.vue';
+import SecaoComparador from './componentes_analises/SecaoComparador.vue';
+import SecaoDescontos from './componentes_analises/SecaoDescontos.vue'; 
 
 import TabelaEncalhados from './componentes_analises/TabelaEncalhados.vue';
 import SecaoEquipe from './componentes_analises/SecaoEquipe.vue';

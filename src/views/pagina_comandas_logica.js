@@ -8,8 +8,9 @@ export function useLogicaComandas() {
     const toast_store = useToastStore();
     const lista_comandas = ref([]);
     const filtro_status = ref('todas'); 
+    const termo_pesquisa_comanda = ref(''); // 🟢 Motor de Pesquisa
     
-    const tipo_exibicao = ref('ordem'); // 'ordem' ou 'agrupada'
+    const tipo_exibicao = ref('ordem'); 
 
     const modal_historico_visivel = ref(false);
     const comanda_selecionada = ref(null);
@@ -22,13 +23,9 @@ export function useLogicaComandas() {
         } catch (erro) { console.error("Erro ao carregar as comandas:", erro); }
     };
 
-    // 🟢 ALGORITMO INTELIGENTE DE SESSÃO (Sem precisar do Banco de Dados)
     const comandas_com_sessao = computed(() => {
         let lista = [...lista_comandas.value];
-        
-        // 1. Organiza do mais antigo para o mais novo
         lista.sort((a, b) => new Date(a.data_hora_abertura) - new Date(b.data_hora_abertura));
-        
         let sessoes_ativas = {}; 
         
         lista.forEach(c => {
@@ -37,12 +34,10 @@ export function useLogicaComandas() {
                 c._sessao_inicio = new Date(c.data_hora_abertura).getTime();
             } else {
                 if (c.tipo_conta === 'geral') {
-                    // Nova sessão da mesa iniciada!
                     sessoes_ativas[c.mesa_id] = c;
                     c._sessao = 'sessao_' + c.id;
                     c._sessao_inicio = new Date(c.data_hora_abertura).getTime();
                 } else {
-                    // É individual: atrela à ÚLTIMA sessão que foi aberta nesta mesa
                     if (sessoes_ativas[c.mesa_id]) {
                         c._sessao = 'sessao_' + sessoes_ativas[c.mesa_id].id;
                         c._sessao_inicio = new Date(sessoes_ativas[c.mesa_id].data_hora_abertura).getTime();
@@ -59,20 +54,48 @@ export function useLogicaComandas() {
     const comandas_filtradas = computed(() => {
         let filtradas = comandas_com_sessao.value;
         
+        // 1. Filtrar Aba
         if (filtro_status.value !== 'todas') {
             filtradas = filtradas.filter(c => c.status_comanda === filtro_status.value);
         }
 
+        // 2. 🟢 Filtrar Pesquisa Livre
+        if (termo_pesquisa_comanda.value) {
+            const termo = termo_pesquisa_comanda.value.toLowerCase();
+            filtradas = filtradas.filter(c => {
+                const cliente = (c.buscar_cliente?.nome_cliente || 'conta geral').toLowerCase();
+                const mesa = (c.buscar_mesa?.nome_mesa || 'venda balcão').toLowerCase();
+                const atendente = (c.buscar_usuario?.name || '').toLowerCase();
+                const total = String(c.valor_total);
+                return cliente.includes(termo) || mesa.includes(termo) || atendente.includes(termo) || total.includes(termo);
+            });
+        }
+
+        // 3. 🟢 Ordenação Cronológica Lógica
         if (tipo_exibicao.value === 'agrupada') {
-            // Ordena 1º: Sessões mais novas no topo. 2º: Ordem dentro da mesma sessão.
             return filtradas.sort((a, b) => {
                 if (a._sessao !== b._sessao) return b._sessao_inicio - a._sessao_inicio; 
                 return new Date(a.data_hora_abertura) - new Date(b.data_hora_abertura); 
             });
+        } else {
+            return filtradas.sort((a, b) => {
+                if (filtro_status.value === 'aberta') {
+                    // Abertas: As mais recentes no topo
+                    return new Date(b.data_hora_abertura) - new Date(a.data_hora_abertura);
+                } else if (filtro_status.value === 'fechada') {
+                    // Fechadas: As que acabaram de ser pagas no topo
+                    return new Date(b.data_hora_fechamento || 0) - new Date(a.data_hora_fechamento || 0);
+                } else if (filtro_status.value === 'cancelada') {
+                    // Canceladas: Pela atualização
+                    return new Date(b.updated_at || b.data_hora_abertura) - new Date(a.updated_at || a.data_hora_abertura);
+                } else {
+                    // Todas: Mistura tudo, colocando as que sofreram ações recentemente no topo!
+                    const dataA = new Date(a.data_hora_fechamento || a.updated_at || a.data_hora_abertura);
+                    const dataB = new Date(b.data_hora_fechamento || b.updated_at || b.data_hora_abertura);
+                    return dataB - dataA;
+                }
+            });
         }
-
-        // Ordem cronológica pura
-        return filtradas.sort((a, b) => b.id - a.id);
     });
 
     const formatar_data = (dataStr) => {
@@ -81,10 +104,13 @@ export function useLogicaComandas() {
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const abrir_detalhes = async (comanda) => {
+    const abrir_detalhes = async (comanda, acao) => {
         if (comanda.status_comanda === 'aberta') {
             if (comanda.mesa_id) roteador.push(`/mesa/${comanda.mesa_id}/detalhes`);
-            else alert(`Acessando a comanda avulsa/balcão #${comanda.id}...`);
+            else {
+                if (acao === 'lancar') roteador.push(`/pdv-caixa?comanda=${comanda.id}`);
+                else roteador.push(`/pdv-caixa?pagamento=${comanda.id}`);
+            }
         } else {
             try {
                 const res = await api_cliente.get(`/buscar-comanda/${comanda.id}`);
@@ -95,12 +121,17 @@ export function useLogicaComandas() {
     };
 
     const reabrir_comanda = async () => {
-        if (!confirm("Deseja realmente reabrir esta comanda? A mesa ficará ocupada novamente.")) return;
         reabrindo.value = true;
         try {
             await api_cliente.post(`/reabrir-comanda/${comanda_selecionada.value.id}`);
             toast_store.exibir_toast("Comanda reaberta com sucesso!", "sucesso");
+            const id_mesa = comanda_selecionada.value.mesa_id;
+            const id_comanda = comanda_selecionada.value.id;
             modal_historico_visivel.value = false;
+            
+            if (id_mesa) roteador.push(`/mesa/${id_mesa}/detalhes`);
+            else roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
+            
             carregar_comandas();
         } catch (e) { toast_store.exibir_toast(e.response?.data?.mensagem || "Erro ao reabrir comanda.", "erro"); } 
         finally { reabrindo.value = false; }
@@ -110,7 +141,7 @@ export function useLogicaComandas() {
     onActivated(() => carregar_comandas()); 
 
     return {
-        filtro_status, tipo_exibicao, comandas_filtradas, 
+        filtro_status, tipo_exibicao, comandas_filtradas, termo_pesquisa_comanda, // 🟢 Exportado
         alterar_filtro: (n) => filtro_status.value = n,
         alterar_exibicao: (n) => tipo_exibicao.value = n,
         formatar_data, abrir_detalhes, voltar_painel: () => roteador.push('/painel-central'),

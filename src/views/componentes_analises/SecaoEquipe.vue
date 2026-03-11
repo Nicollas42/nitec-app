@@ -7,7 +7,7 @@
                 <div class="relative group">
                     <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
-                        <p>Mede a produtividade de cada funcionário. Compare quem atende mais mesas, gera mais receita e vende mais itens.</p>
+                        <p>Mede a produtividade de cada funcionário. Compare quem atende mais mesas, gera mais receita e quem está a conceder mais descontos.</p>
                         <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
                     </div>
                 </div>
@@ -27,10 +27,10 @@
                     <tr>
                         <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider">Membro da Equipa</th>
                         <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Atendimentos</th>
-                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Ticket Médio</th>
                         <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-center">Volume Físico</th>
                         <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-left">Produto Campeão</th>
                         <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-green-600">Performance Real</th>
+                        <th class="py-4 px-6 font-bold uppercase text-[9px] tracking-wider text-right text-red-500">Descontos Dados</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
@@ -61,10 +61,6 @@
                                 <span class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">~{{ garcom.tempo_medio_minutos }} min/mesa</span>
                             </div>
                         </td>
-
-                        <td class="py-4 px-6 text-center font-bold text-gray-600">
-                            R$ {{ garcom.total_mesas > 0 ? (Number(garcom.total_vendas) / Number(garcom.total_mesas)).toFixed(2) : '0.00' }}
-                        </td>
                         
                         <td class="py-4 px-6 text-center">
                             <div class="flex flex-col">
@@ -86,6 +82,13 @@
                                 <span class="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Lucro: R$ {{ Number(garcom.lucro_gerado).toFixed(2) }}</span>
                             </div>
                         </td>
+
+                        <td class="py-4 px-6 text-right">
+                            <span class="font-black text-red-500 bg-red-50 px-3 py-1 rounded-lg border border-red-100">
+                                - R$ {{ Number(garcom.descontos_concedidos).toFixed(2) }}
+                            </span>
+                        </td>
+
                     </tr>
                     
                     <tr v-if="!equipe_filtrada || equipe_filtrada.length === 0">
@@ -110,7 +113,7 @@ const equipe_filtrada = computed(() => {
         if (filtro_status.value === 'ativos') {
             return membro.status_conta === 'ativo';
         }
-        return true; // Se for 'todos', mostra tudo
+        return true; 
     });
 });
 </script>

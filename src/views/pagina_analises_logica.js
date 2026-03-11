@@ -16,7 +16,8 @@ export function useLogicaAnalises() {
         ranking_mesas: true, 
         curva_abc: true, 
         evolucao_vendas: true,
-        categorias: true
+        categorias: true,
+        descontos: true
     });
 
     const alternar_visibilidade = (painel) => visibilidade.value[painel] = !visibilidade.value[painel];
