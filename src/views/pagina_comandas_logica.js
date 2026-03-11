@@ -2,13 +2,14 @@ import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js';
+import { db } from '../banco_local/db.js'; // 🟢 NOVO
 
 export function useLogicaComandas() {
     const roteador = useRouter();
     const toast_store = useToastStore();
     const lista_comandas = ref([]);
     const filtro_status = ref('todas'); 
-    const termo_pesquisa_comanda = ref(''); // 🟢 Motor de Pesquisa
+    const termo_pesquisa_comanda = ref(''); 
     
     const tipo_exibicao = ref('ordem'); 
 
@@ -16,11 +17,21 @@ export function useLogicaComandas() {
     const comanda_selecionada = ref(null);
     const reabrindo = ref(false);
 
+    const gerarUUID = () => {
+        return typeof crypto !== 'undefined' && crypto.randomUUID 
+            ? crypto.randomUUID() 
+            : Date.now().toString(36) + Math.random().toString(36).substring(2);
+    };
+
     const carregar_comandas = async () => {
         try {
             const resposta = await api_cliente.get('/listar-comandas');
             lista_comandas.value = resposta.data.comandas;
-        } catch (erro) { console.error("Erro ao carregar as comandas:", erro); }
+        } catch (erro) { 
+            if (!erro.response) { // 🛑 IGNORA ERRO SE FOR OFFLINE
+                toast_store.exibir_toast("⚠️ Offline: Comandas podem estar desatualizadas.", "aviso");
+            } else console.error(erro); 
+        }
     };
 
     const comandas_com_sessao = computed(() => {
@@ -53,13 +64,7 @@ export function useLogicaComandas() {
 
     const comandas_filtradas = computed(() => {
         let filtradas = comandas_com_sessao.value;
-        
-        // 1. Filtrar Aba
-        if (filtro_status.value !== 'todas') {
-            filtradas = filtradas.filter(c => c.status_comanda === filtro_status.value);
-        }
-
-        // 2. 🟢 Filtrar Pesquisa Livre
+        if (filtro_status.value !== 'todas') filtradas = filtradas.filter(c => c.status_comanda === filtro_status.value);
         if (termo_pesquisa_comanda.value) {
             const termo = termo_pesquisa_comanda.value.toLowerCase();
             filtradas = filtradas.filter(c => {
@@ -70,8 +75,6 @@ export function useLogicaComandas() {
                 return cliente.includes(termo) || mesa.includes(termo) || atendente.includes(termo) || total.includes(termo);
             });
         }
-
-        // 3. 🟢 Ordenação Cronológica Lógica
         if (tipo_exibicao.value === 'agrupada') {
             return filtradas.sort((a, b) => {
                 if (a._sessao !== b._sessao) return b._sessao_inicio - a._sessao_inicio; 
@@ -79,17 +82,10 @@ export function useLogicaComandas() {
             });
         } else {
             return filtradas.sort((a, b) => {
-                if (filtro_status.value === 'aberta') {
-                    // Abertas: As mais recentes no topo
-                    return new Date(b.data_hora_abertura) - new Date(a.data_hora_abertura);
-                } else if (filtro_status.value === 'fechada') {
-                    // Fechadas: As que acabaram de ser pagas no topo
-                    return new Date(b.data_hora_fechamento || 0) - new Date(a.data_hora_fechamento || 0);
-                } else if (filtro_status.value === 'cancelada') {
-                    // Canceladas: Pela atualização
-                    return new Date(b.updated_at || b.data_hora_abertura) - new Date(a.updated_at || a.data_hora_abertura);
-                } else {
-                    // Todas: Mistura tudo, colocando as que sofreram ações recentemente no topo!
+                if (filtro_status.value === 'aberta') return new Date(b.data_hora_abertura) - new Date(a.data_hora_abertura);
+                else if (filtro_status.value === 'fechada') return new Date(b.data_hora_fechamento || 0) - new Date(a.data_hora_fechamento || 0);
+                else if (filtro_status.value === 'cancelada') return new Date(b.updated_at || b.data_hora_abertura) - new Date(a.updated_at || a.data_hora_abertura);
+                else {
                     const dataA = new Date(a.data_hora_fechamento || a.updated_at || a.data_hora_abertura);
                     const dataB = new Date(b.data_hora_fechamento || b.updated_at || b.data_hora_abertura);
                     return dataB - dataA;
@@ -116,32 +112,44 @@ export function useLogicaComandas() {
                 const res = await api_cliente.get(`/buscar-comanda/${comanda.id}`);
                 comanda_selecionada.value = res.data.dados;
                 modal_historico_visivel.value = true;
-            } catch (e) { toast_store.exibir_toast("Erro ao buscar detalhes do recibo.", "erro"); }
+            } catch (e) { 
+                if (!e.response) toast_store.exibir_toast("⚠️ Offline: Não é possível ver o recibo agora.", "aviso");
+                else toast_store.exibir_toast("Erro ao buscar detalhes do recibo.", "erro"); 
+            }
         }
     };
 
     const reabrir_comanda = async () => {
         reabrindo.value = true;
+        const payload = { uuid_operacao: gerarUUID() };
+        const id_mesa = comanda_selecionada.value.mesa_id;
+        const id_comanda = comanda_selecionada.value.id;
+
         try {
-            await api_cliente.post(`/reabrir-comanda/${comanda_selecionada.value.id}`);
+            await api_cliente.post(`/reabrir-comanda/${id_comanda}`, payload);
             toast_store.exibir_toast("Comanda reaberta com sucesso!", "sucesso");
-            const id_mesa = comanda_selecionada.value.mesa_id;
-            const id_comanda = comanda_selecionada.value.id;
             modal_historico_visivel.value = false;
             
             if (id_mesa) roteador.push(`/mesa/${id_mesa}/detalhes`);
             else roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
             
             carregar_comandas();
-        } catch (e) { toast_store.exibir_toast(e.response?.data?.mensagem || "Erro ao reabrir comanda.", "erro"); } 
-        finally { reabrindo.value = false; }
+        } catch (e) { 
+            if (!e.response) { // 🛑 SALVA OFFLINE SE CAIR
+                await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: `/reabrir-comanda/${id_comanda}`, metodo: 'POST', payload_venda: payload });
+                toast_store.exibir_toast("⚠️ Offline: Reabertura salva no PC!", "aviso");
+                modal_historico_visivel.value = false;
+                if (id_mesa) roteador.push(`/mapa-mesas`);
+                else roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
+            } else toast_store.exibir_toast(e.response?.data?.mensagem || "Erro ao reabrir comanda.", "erro"); 
+        } finally { reabrindo.value = false; }
     };
 
     onMounted(() => carregar_comandas());
     onActivated(() => carregar_comandas()); 
 
     return {
-        filtro_status, tipo_exibicao, comandas_filtradas, termo_pesquisa_comanda, // 🟢 Exportado
+        filtro_status, tipo_exibicao, comandas_filtradas, termo_pesquisa_comanda, 
         alterar_filtro: (n) => filtro_status.value = n,
         alterar_exibicao: (n) => tipo_exibicao.value = n,
         formatar_data, abrir_detalhes, voltar_painel: () => roteador.push('/painel-central'),
