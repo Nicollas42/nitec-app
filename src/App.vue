@@ -5,30 +5,9 @@
 <script setup>
 import { onMounted } from 'vue';
 import { db } from './banco_local/db.js';
-import api_cliente from './servicos/api_cliente.js';
 import { useRouter } from 'vue-router';
 
 const roteador = useRouter();
-
-// --- FASE 4: O CARTEIRO (Background Sync) ---
-const sincronizar_vendas_pendentes = async () => {
-    if (!navigator.onLine) return;
-    try {
-        const vendas_presas = await db.vendas_pendentes.toArray();
-        if (vendas_presas.length === 0) return; 
-
-        for (const venda of vendas_presas) {
-            try {
-                await api_cliente.post(venda.url_destino, venda.payload_venda);
-                await db.vendas_pendentes.delete(venda.id_local);
-            } catch (erro_req) {
-                console.error(`Falha ao sincronizar pedido #${venda.id_local}:`, erro_req);
-            }
-        }
-    } catch (erro_geral) {
-        console.error("Erro crítico no ciclo de sincronização:", erro_geral);
-    }
-};
 
 onMounted(async () => {
     // 🟢 1. TRAVA ANTI-ZUMBI: Executa antes de qualquer outra coisa
@@ -70,12 +49,6 @@ onMounted(async () => {
             return; 
         }
     }
-
-    // 2. Inicialização normal do sistema
-    sincronizar_vendas_pendentes();
-    setInterval(sincronizar_vendas_pendentes, 30000);
-
-    window.addEventListener('online', () => sincronizar_vendas_pendentes());
 });
 
 // --- VACINAS DO PWA (Foco de Inputs) ---

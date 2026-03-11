@@ -26,7 +26,6 @@ export function useLogicaPdv() {
     const categoria_selecionada = ref('todas');
     const produtos_fixados = ref(JSON.parse(localStorage.getItem('nitec_pdv_fixados') || '[]'));
 
-    // 🟢 GERADOR DE CÓDIGO ÚNICO (Impede Vendas Duplicadas)
     const gerarUUID = () => {
         return typeof crypto !== 'undefined' && crypto.randomUUID 
             ? crypto.randomUUID() 
@@ -74,7 +73,7 @@ export function useLogicaPdv() {
                 preco_venda: i.preco_unitario
             }));
         } catch(e) { 
-            if (!e.response) toast_global.exibir_toast("Sem internet para carregar os itens.", "erro");
+            if (!e.response || e.response.status >= 500) toast_global.exibir_toast("Servidor offline: Não é possível carregar itens.", "erro");
             else console.error(e); 
         }
     };
@@ -99,7 +98,6 @@ export function useLogicaPdv() {
             else if (acao === 'decrementar' && item.quantidade > 1) item.quantidade--;
             else if (acao === 'decrementar' && item.quantidade === 1) return remover_item_db(id_item_comanda);
         }
-        // Assina a operação com UUID
         acoes_pendentes_db.value.push({ tipo: 'alterar', id: id_item_comanda, acao, uuid_operacao: gerarUUID() });
     };
 
@@ -142,7 +140,8 @@ export function useLogicaPdv() {
                     await api_cliente.delete(`/remover-item-comanda/${tarefa.id}`, { data: { uuid_operacao: tarefa.uuid_operacao } });
                 }
             } catch (e) {
-                if (!e.response) {
+                // 🟢 Proteção contra queda de net E quedas de servidor (500+)
+                if (!e.response || e.response.status >= 500) {
                     const url = tarefa.tipo === 'alterar' ? `/alterar-quantidade-item/${tarefa.id}` : `/remover-item-comanda/${tarefa.id}`;
                     const metodo = tarefa.tipo === 'alterar' ? 'POST' : 'DELETE';
                     const payload = tarefa.tipo === 'alterar' ? { acao: tarefa.acao, uuid_operacao: tarefa.uuid_operacao } : { uuid_operacao: tarefa.uuid_operacao };
@@ -152,7 +151,7 @@ export function useLogicaPdv() {
                         data_venda: new Date().toISOString(),
                         valor_total: 0, url_destino: url, metodo, payload_venda: payload
                     });
-                } else throw e; 
+                } else throw e; // Erros 400 (validação/negócio) continuam a travar como devem
             }
         }
         acoes_pendentes_db.value = []; 
@@ -186,12 +185,13 @@ export function useLogicaPdv() {
                 roteador.push('/mapa-mesas');
                 toast_global.exibir_toast(res.data.mensagem || "Processado com sucesso!", "sucesso"); 
             } catch (e) { 
-                if (!e.response) { 
+                // 🟢 Proteção expandida para falha de servidor
+                if (!e.response || e.response.status >= 500) { 
                     const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: gerarUUID() };
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento });
-                    toast_global.exibir_toast("⚠️ Pagamento salvo no Modo Offline!", "erro");
+                    toast_global.exibir_toast("⚠️ Servidor indisponível: Pagamento salvo no PC!", "aviso");
                     roteador.push('/mapa-mesas');
-                } else toast_global.exibir_toast("Erro ao processar pagamento.", "erro"); 
+                } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao processar pagamento.", "erro"); 
             } finally { processando_finalizacao.value = false; }
             return;
         }
@@ -211,12 +211,12 @@ export function useLogicaPdv() {
                 loja_produtos.buscar_produtos(true);
                 roteador.go(-1);
             } catch (e) { 
-                if (!e.response) { 
+                if (!e.response || e.response.status >= 500) { 
                     const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/adicionar-itens-comanda/${id_comanda_vinculada.value}`, metodo: 'POST', payload_venda: payload });
-                    toast_global.exibir_toast("⚠️ Offline: Lançamento salvo no PC!", "erro");
+                    toast_global.exibir_toast("⚠️ Servidor indisponível: Lançamento salvo no PC!", "aviso");
                     roteador.go(-1);
-                } else toast_global.exibir_toast("Erro ao atualizar a comanda.", "erro"); 
+                } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
             } finally { processando_finalizacao.value = false; }
         
         // 🟢 3. VENDA BALCÃO AVULSA
@@ -230,12 +230,12 @@ export function useLogicaPdv() {
                 valor_desconto.value = '';
                 loja_produtos.buscar_produtos(true); 
             } catch (e) { 
-                if (!e.response) { 
+                if (!e.response || e.response.status >= 500) { 
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: '/venda-balcao', metodo: 'POST', payload_venda: payload });
-                    toast_global.exibir_toast("⚠️ Offline: Venda Balcão salva no PC!", "erro");
+                    toast_global.exibir_toast("⚠️ Servidor indisponível: Venda Balcão salva no PC!", "aviso");
                     carrinho_venda.value = [];
                     valor_desconto.value = '';
-                } else toast_global.exibir_toast("Erro ao processar venda balcão.", "erro"); 
+                } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao processar venda balcão.", "erro"); 
             } finally { processando_finalizacao.value = false; }
         }
     };
