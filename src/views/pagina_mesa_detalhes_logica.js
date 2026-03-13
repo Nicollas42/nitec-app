@@ -2,13 +2,15 @@ import { ref, reactive, onMounted, onActivated, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
-import { db } from '../banco_local/db.js'; // 🟢 IMPORTADO DEXIE
-import { useToastStore } from '../stores/toast_store.js'; // 🟢 IMPORTADO TOAST
+import { useMesasStore } from '../stores/mesas_store.js'; // 🟢 NOVO: Loja de mesas
+import { db } from '../banco_local/db.js'; 
+import { useToastStore } from '../stores/toast_store.js'; 
 
 export function useLogicaMesaDetalhes() {
     const rota_atual = useRoute();
     const roteador = useRouter();
     const loja_produtos = useProdutosStore();
+    const loja_mesas = useMesasStore(); // 🟢 Instanciado
     const toast_global = useToastStore();
     
     const dados_mesa = ref(null);
@@ -23,7 +25,6 @@ export function useLogicaMesaDetalhes() {
         retornar_ao_estoque: true 
     });
 
-    // 🟢 GERADOR DE UUID PARA A MESA TAMBÉM
     const gerarUUID = () => {
         return typeof crypto !== 'undefined' && crypto.randomUUID 
             ? crypto.randomUUID() 
@@ -40,12 +41,30 @@ export function useLogicaMesaDetalhes() {
             const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             dados_mesa.value = resposta.data.dados;
         } catch (erro) {
-            if (!erro.response) {
-                toast_global.exibir_toast("⚠️ Offline: Não é possível ver os detalhes da mesa sem internet.", "aviso");
+            if (!erro.response || erro.response.status >= 500) {
+                toast_global.exibir_toast("⚠️ Offline: Sessão temporária gerada. Lançamentos serão enfileirados.", "aviso");
+                
+                // 🟢 MAGIA OFFLINE: Constrói uma mesa virtual para a tela não ficar em branco!
+                const mesa_em_cache = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico)) || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
+                
+                dados_mesa.value = {
+                    mesa: mesa_em_cache,
+                    comandas: [
+                        {
+                            id: `off_${id_dinamico}`, // ID Fantasma ("off_5")
+                            nome_cliente: 'Novos Lançamentos (Offline)',
+                            tipo_conta: 'geral',
+                            status_comanda: 'aberta',
+                            valor_total: 0,
+                            itens: [],
+                            is_offline: true
+                        }
+                    ]
+                };
             } else {
                 toast_global.exibir_toast("Erro ao carregar informações da mesa.", "erro");
+                voltar_mapa();
             }
-            voltar_mapa();
         }
     };
 
@@ -67,7 +86,7 @@ export function useLogicaMesaDetalhes() {
             fechar_modal_cliente();
             carregar_dados_completos();
         } catch (erro) { 
-            if (!erro.response) { // 🛑 SALVA OFFLINE SE CAIR
+            if (!erro.response || erro.response.status >= 500) { 
                 await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: '/abrir-comanda', metodo: 'POST', payload_venda: payload });
                 toast_global.exibir_toast("⚠️ Offline: Criação de conta enviada para a fila!", "aviso");
                 fechar_modal_cliente();
@@ -83,7 +102,7 @@ export function useLogicaMesaDetalhes() {
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
         } catch (erro) { 
-            if (!erro.response) {
+            if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: `/alterar-quantidade-item/${id_item}`, metodo: 'POST', payload_venda: payload });
                 toast_global.exibir_toast("⚠️ Offline: Alteração guardada no PC!", "aviso");
                 voltar_mapa();
@@ -99,7 +118,7 @@ export function useLogicaMesaDetalhes() {
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
         } catch (erro) { 
-            if (!erro.response) {
+            if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: `/remover-item-comanda/${id_item_comanda}`, metodo: 'DELETE', payload_venda: payload });
                 toast_global.exibir_toast("⚠️ Offline: Remoção enviada para a fila!", "aviso");
                 voltar_mapa();
@@ -123,7 +142,7 @@ export function useLogicaMesaDetalhes() {
             voltar_mapa(); 
             loja_produtos.buscar_produtos(true); 
         } catch (erro) {
-            if (!erro.response) {
+            if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: `/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, metodo: 'POST', payload_venda: payload });
                 toast_global.exibir_toast("⚠️ Offline: Cancelamento salvo no PC!", "aviso");
                 modal_cancelamento_visivel.value = false;

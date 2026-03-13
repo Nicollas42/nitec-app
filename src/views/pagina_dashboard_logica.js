@@ -21,6 +21,9 @@ export function useLogicaDashboard() {
 
     const versao_atual = ref(import.meta.env.PACKAGE_VERSION || '1.1.0');
     const modal_visivel = ref(false);
+    const modal_qr_visivel = ref(false);
+    const abrir_modal_qr = () => modal_qr_visivel.value = true;
+    const fechar_modal_qr = () => modal_qr_visivel.value = false;
     const estado_atualizacao = ref('parado'); 
     const mensagem_status = ref('Clique abaixo para procurar novas versões.');
     const progresso = ref(0);
@@ -142,6 +145,13 @@ export function useLogicaDashboard() {
         window.addEventListener('online', () => esta_offline.value = false);
         window.addEventListener('offline', () => esta_offline.value = true);
 
+        window.addEventListener('online', () => {
+            esta_offline.value = false;
+            fechar_modal_qr(); // Fecha o QR automaticamente porque já não é preciso!
+        });
+        window.addEventListener('offline', () => esta_offline.value = true);
+
+
         if (ipcRenderer) {
             ipcRenderer.send('pedir-versao');
             
@@ -206,6 +216,6 @@ export function useLogicaDashboard() {
         abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
         checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
         obter_link_executavel,
-        esta_offline, rota_atual, ir_para: (url) => roteador.push(url)
+        esta_offline, rota_atual, ir_para: (url) => roteador.push(url), modal_qr_visivel, abrir_modal_qr, fechar_modal_qr
     };
 }

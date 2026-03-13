@@ -14,11 +14,10 @@
         </div>
 
         <header class="barra_topo bg-nitec_dark text-white p-4 lg:p-5 flex justify-between items-center shadow-lg z-40">
-            <div class="logo_secao">
+            <div class="logo_secao flex items-center">
                 <h1 class="texto_logo text-xl lg:text-2xl font-black tracking-tighter uppercase text-nitec_blue cursor-pointer" @click="ir_para('/painel-central')">NitecSystem</h1>
                 
-                <div class="flex items-center gap-2 mt-1">
-                    <span v-if="!esta_offline" class="flex h-2.5 w-2.5 relative">
+                <div class="flex items-center gap-2 mt-1 ml-4"> <span v-if="!esta_offline" class="flex h-2.5 w-2.5 relative">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                     </span>
@@ -29,6 +28,10 @@
                     <p :class="esta_offline ? 'text-red-400 animate-pulse' : 'text-green-400'" class="status_sistema text-[10px] font-bold uppercase tracking-wider">
                         {{ esta_offline ? 'Modo Offline (Gravando no PC)' : 'Sistema Online' }}
                     </p>
+
+                    <button v-if="esta_offline" @click="abrir_modal_qr" class="ml-3 bg-red-500/20 text-red-400 border border-red-500/50 text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest shadow-sm hover:bg-red-500 hover:text-white transition-all active:scale-95">
+                        📲 Sincronizar (QR)
+                    </button>
                 </div>
             </div>
             
@@ -153,6 +156,15 @@
         <footer class="rodape_infos bg-white border-t border-gray-200 p-2 text-center z-30 shrink-0">
             <p class="text-[10px] text-gray-400 uppercase font-bold">Nitec Tecnologia &copy; 2026</p>
         </footer>
+        
+
+        <div v-if="modal_qr_visivel" class="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex justify-center items-center p-4 transition-opacity">
+            <div class="bg-transparent w-full max-w-sm relative">
+                <button @click="fechar_modal_qr" class="absolute -top-12 right-0 text-white hover:text-red-400 font-black text-4xl transition-colors drop-shadow-md">&times;</button>
+                
+                <GeradorQrOffline />
+            </div>
+        </div>
 
         <div v-if="modal_visivel" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
@@ -228,6 +240,7 @@
 import { useAuthStore } from '../stores/auth_store.js'; 
 import { useLogicaDashboard } from './pagina_dashboard_logica.js';
 import { useToastStore } from '../stores/toast_store.js'; 
+import GeradorQrOffline from './componentes_mesa_caixa/GeradorQrOffline.vue';
 
 const toast_store = useToastStore(); 
 const auth_store = useAuthStore(); 
@@ -238,6 +251,6 @@ const {
     abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
     baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
     obter_link_executavel, // 🟢 Certificando de que está exposto
-    esta_offline, rota_atual
+    esta_offline, rota_atual, modal_qr_visivel, abrir_modal_qr, fechar_modal_qr
 } = useLogicaDashboard();
 </script>
