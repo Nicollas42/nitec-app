@@ -14,6 +14,7 @@ export function useLogicaMesaDetalhes() {
     const toast_global = useToastStore();
     
     const dados_mesa = ref(null);
+    const item_processando = ref(null); // 🟢 Exportado — o template usa para desabilitar botões durante req
     const modal_cliente_visivel = ref(false);
     const input_novo_cliente = ref('');
 
@@ -47,14 +48,14 @@ export function useLogicaMesaDetalhes() {
                 const mesa_em_cache = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico)) 
                     || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
                 
-                // 🟢 Lê o snapshot do Dexie para mostrar itens já lançados offline (incluindo os de outros dispositivos via QR Sync)
+                // Lê o snapshot do Dexie — inclui itens de TODOS os dispositivos que sincronizaram via QR
                 const comanda_id_offline = `off_${id_dinamico}`;
                 const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
-                const itens_locais = estado_local?.itens || [];
+                const itens_brutos = estado_local?.itens || [];
                 
-                // Agrupa itens pelo nome do produto (mesclando quantidades iguais)
+                // Agrupa por produto (soma quantidades do mesmo produto_id)
                 const itens_agrupados = [];
-                for (const item of itens_locais) {
+                for (const item of itens_brutos) {
                     const existente = itens_agrupados.find(i => i.produto_id === item.produto_id);
                     if (existente) {
                         existente.quantidade += item.quantidade;
@@ -67,22 +68,28 @@ export function useLogicaMesaDetalhes() {
                     (acc, i) => acc + (i.preco_unitario * i.quantidade), 0
                 );
 
+                // 🟢 CORREÇÃO: estrutura idêntica ao retorno da API — o template espera exatamente estes campos
                 dados_mesa.value = {
-                    mesa: mesa_em_cache,
-                    comandas: [
+                    nome_mesa: mesa_em_cache.nome_mesa,
+                    status_mesa: 'ocupada',
+                    listar_comandas: [
                         {
                             id: comanda_id_offline,
-                            nome_cliente: estado_local?.nome_cliente || 'Lançamentos Offline',
                             tipo_conta: 'geral',
                             status_comanda: 'aberta',
                             valor_total: valor_total_local,
-                            // 🟢 itens agora vêm do Dexie — inclui itens de TODOS os dispositivos que sincronizaram via QR
-                            itens: itens_agrupados.map(i => ({
-                                id: null, // sem ID real ainda
+                            // Campo que o template usa: comanda.buscar_cliente?.nome_cliente
+                            buscar_cliente: {
+                                nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline'
+                            },
+                            // Campo que o template itera: comanda.listar_itens
+                            listar_itens: itens_agrupados.map(i => ({
+                                id: `offline_item_${i.produto_id}`,
                                 produto_id: i.produto_id,
-                                buscar_produto: { nome_produto: i.nome_produto },
                                 quantidade: i.quantidade,
                                 preco_unitario: i.preco_unitario,
+                                // Campo que o template acessa: item.buscar_produto.nome_produto
+                                buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
                                 is_offline: true
                             })),
                             is_offline: true
@@ -108,7 +115,13 @@ export function useLogicaMesaDetalhes() {
 
     const confirmar_novo_cliente = async () => {
         if (!input_novo_cliente.value) return toast_global.exibir_toast("Digite o nome do cliente.", "erro");
-        const payload = { mesa_id: rota_atual.params.id_mesa, nome_cliente: input_novo_cliente.value, tipo_conta: 'individual', uuid_operacao: gerarUUID() };
+        const uuid = gerarUUID();
+        const payload = { 
+            mesa_id: rota_atual.params.id_mesa, 
+            nome_cliente: input_novo_cliente.value, 
+            tipo_conta: 'individual', 
+            uuid_operacao: uuid 
+        };
         try {
             await api_cliente.post('/abrir-comanda', payload);
             fechar_modal_cliente();
@@ -122,7 +135,7 @@ export function useLogicaMesaDetalhes() {
                     url_destino: '/abrir-comanda', 
                     metodo: 'POST', 
                     payload_venda: payload,
-                    uuid_operacao: payload.uuid_operacao
+                    uuid_operacao: uuid
                 });
                 toast_global.exibir_toast("⚠️ Offline: Criação de conta enviada para a fila!", "aviso");
                 fechar_modal_cliente();
@@ -132,6 +145,12 @@ export function useLogicaMesaDetalhes() {
     };
 
     const alterar_quantidade = async (id_item, acao) => {
+        // Bloqueia itens offline — não têm ID real no servidor
+        if (String(id_item).startsWith('offline_item_')) {
+            return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de alterar.", "aviso");
+        }
+
+        item_processando.value = id_item;
         const uuid = gerarUUID();
         const payload = { acao, uuid_operacao: uuid };
         try {
@@ -152,11 +171,20 @@ export function useLogicaMesaDetalhes() {
                 toast_global.exibir_toast("⚠️ Offline: Alteração guardada no PC!", "aviso");
                 voltar_mapa();
             } else toast_global.exibir_toast("Erro ao atualizar quantidade.", "erro"); 
+        } finally {
+            item_processando.value = null;
         }
     };
 
     const remover_item_consumido = async (id_item_comanda) => {
+        // Bloqueia itens offline
+        if (String(id_item_comanda).startsWith('offline_item_')) {
+            return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de remover.", "aviso");
+        }
+
         if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
+        
+        item_processando.value = id_item_comanda;
         const uuid = gerarUUID();
         const payload = { uuid_operacao: uuid };
         try {
@@ -177,6 +205,8 @@ export function useLogicaMesaDetalhes() {
                 toast_global.exibir_toast("⚠️ Offline: Remoção enviada para a fila!", "aviso");
                 voltar_mapa();
             } else toast_global.exibir_toast("Erro ao remover os itens.", "erro"); 
+        } finally {
+            item_processando.value = null;
         }
     };
 
@@ -190,7 +220,11 @@ export function useLogicaMesaDetalhes() {
     const confirmar_cancelamento = async () => {
         cancelando.value = true;
         const uuid = gerarUUID();
-        const payload = { motivo_cancelamento: form_cancelamento.motivo_cancelamento, retornar_ao_estoque: form_cancelamento.retornar_ao_estoque, uuid_operacao: uuid };
+        const payload = { 
+            motivo_cancelamento: form_cancelamento.motivo_cancelamento, 
+            retornar_ao_estoque: form_cancelamento.retornar_ao_estoque, 
+            uuid_operacao: uuid 
+        };
         try {
             await api_cliente.post(`/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, payload);
             modal_cancelamento_visivel.value = false;
@@ -225,6 +259,7 @@ export function useLogicaMesaDetalhes() {
         fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
         remover_item_consumido, fechar_conta_comanda,
         modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
-        confirmar_cancelamento, cancelando 
+        confirmar_cancelamento, cancelando,
+        item_processando, // 🟢 Agora exportado — o template usa para grayscale/pointer-events
     };
 }

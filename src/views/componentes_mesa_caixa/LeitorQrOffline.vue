@@ -12,15 +12,28 @@
 
         <!-- Câmera -->
         <div class="relative bg-black aspect-square overflow-hidden">
+
+            <!-- 🟢 v5: usa camera="rear" em vez de :constraints -->
             <QrcodeStream
                 v-if="camera_ativa && !resultado"
+                camera="rear"
                 @detect="ao_detectar_qr"
                 @error="ao_dar_erro"
+                @camera-on="ao_camera_ligar"
                 class="w-full h-full object-cover"
             />
+
+            <!-- Aguardando câmera ligar -->
+            <div v-if="camera_ativa && !camera_ligada && !resultado" class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-3">
+                <svg class="animate-spin h-8 w-8 text-white/50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-white/50 font-bold text-xs uppercase tracking-widest">A iniciar câmera...</p>
+            </div>
             
-            <!-- Mira animada -->
-            <div v-if="camera_ativa && !processando && !resultado" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <!-- Mira animada — só aparece quando câmera está ligada -->
+            <div v-if="camera_ativa && camera_ligada && !processando && !resultado" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div class="w-52 h-52 relative">
                     <div class="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-lg"></div>
                     <div class="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-lg"></div>
@@ -28,6 +41,7 @@
                     <div class="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-lg"></div>
                     <div class="absolute left-0 right-0 h-0.5 bg-nitec_blue/80 shadow-[0_0_8px_2px_rgba(59,130,246,0.6)] scanner-line"></div>
                 </div>
+                <p class="absolute bottom-4 text-white/60 text-xs font-bold">Aponte para o QR Code</p>
             </div>
 
             <!-- Processando -->
@@ -59,10 +73,11 @@
                 </button>
             </div>
 
-            <!-- Câmera inativa -->
-            <div v-if="!camera_ativa && !resultado" class="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center gap-3">
+            <!-- Câmera inativa por erro -->
+            <div v-if="!camera_ativa && !resultado" class="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center gap-3 p-6">
                 <span class="text-5xl opacity-30">📷</span>
-                <p class="text-gray-500 font-bold text-sm text-center px-4">{{ erro_camera }}</p>
+                <p class="text-gray-400 font-bold text-sm text-center">{{ erro_camera }}</p>
+                <p class="text-gray-600 text-xs text-center font-bold mt-1">Verifique se o browser tem permissão para usar a câmera nas configurações do dispositivo.</p>
             </div>
         </div>
 
@@ -78,18 +93,24 @@
 import { ref } from 'vue';
 import { QrcodeStream } from 'vue-qrcode-reader';
 import { db } from '../../banco_local/db.js';
-import { useToastStore } from '../../stores/toast_store.js';
+import { useMesasStore } from '../../stores/mesas_store.js';
 
 const emit = defineEmits(['fechar', 'sucesso']);
 
-const toast_global = useToastStore();
+const loja_mesas = useMesasStore();
 const camera_ativa = ref(true);
+const camera_ligada = ref(false);
 const processando = ref(false);
 const resultado = ref(null);
 const erro_camera = ref('');
 
-// 🔑 Protocolo P2P: 1 = POST, 2 = DELETE (DEVE ser idêntico ao GeradorQrOffline)
+// 🔑 Protocolo P2P: 1 = POST, 2 = DELETE — deve ser idêntico ao GeradorQrOffline
 const ID_PARA_METODO = { 1: 'POST', 2: 'DELETE' };
+
+/** Câmera traseira iniciou — remove o spinner e mostra a mira */
+const ao_camera_ligar = () => {
+    camera_ligada.value = true;
+};
 
 const ao_detectar_qr = async (codigos) => {
     if (processando.value || resultado.value || !codigos?.length) return;
@@ -99,14 +120,18 @@ const ao_detectar_qr = async (codigos) => {
         const pacote = JSON.parse(codigos[0].rawValue);
 
         // Validação: versão e tenant
-        if (!pacote.v || ![1, 2].includes(pacote.v)) throw new Error("Formato de QR Code não reconhecido.");
+        if (!pacote.v || ![1, 2].includes(pacote.v)) {
+            throw new Error("Formato de QR Code não reconhecido.");
+        }
         const tenant_local = localStorage.getItem('nitec_tenant_id');
-        if (pacote.t !== tenant_local) throw new Error("QR Code de outro estabelecimento. Recusado por segurança.");
+        if (pacote.t !== tenant_local) {
+            throw new Error("QR Code de outro estabelecimento. Recusado por segurança.");
+        }
 
         let itens_novos = 0;
         let acoes_novas = 0;
 
-        // ── PROTOCOLO v2: snap + acoes ─────────────────────────────────────
+        // ── PROTOCOLO v2: snap + acoes ──────────────────────────────────────
         if (pacote.v === 2 && Array.isArray(pacote.snap)) {
             for (const entry of pacote.snap) {
                 const estado_existente = await db.estado_comandas_local.get(entry.comanda_id);
@@ -139,7 +164,16 @@ const ao_detectar_qr = async (codigos) => {
                         itens_novos += itens_a_adicionar.length;
                     }
                 }
+
+                // Atualiza o status da mesa no Dexie local
+                // Sem isso, o receptor vê a mesa como "livre" e o click abre modal de nova comanda
+                if (entry.mesa_id) {
+                    await db.mesas.update(Number(entry.mesa_id), { status_mesa: 'ocupada' });
+                }
             }
+
+            // Força atualização do store de mesas para a tela refletir imediatamente
+            await loja_mesas.buscar_mesas(true);
         }
 
         // ── PROTOCOLO v1 e v2: importar acoes para vendas_pendentes ────────
@@ -151,7 +185,7 @@ const ao_detectar_qr = async (codigos) => {
             const [url, metodo_id, payload] = acao;
             const uuid = payload?.uuid_operacao;
 
-            // Pula se já temos esta ação (deduplicação local antes de enviar ao servidor)
+            // Pula se já temos esta ação — deduplicação local
             if (uuid && uuids_locais.has(uuid)) continue;
 
             await db.vendas_pendentes.add({
@@ -163,7 +197,7 @@ const ao_detectar_qr = async (codigos) => {
                 payload_venda: payload || {},
                 uuid_operacao: uuid || null
             });
-            if (uuid) uuids_locais.add(uuid); // evita duplicar dentro do mesmo QR
+            if (uuid) uuids_locais.add(uuid);
             acoes_novas++;
         }
 
@@ -187,9 +221,16 @@ const ao_detectar_qr = async (codigos) => {
 };
 
 const ao_dar_erro = (e) => {
-    if (e.name === 'NotAllowedError') erro_camera.value = 'Permissão da câmera negada. Verifique as configurações.';
-    else if (e.name === 'NotFoundError') erro_camera.value = 'Nenhuma câmera encontrada neste dispositivo.';
-    else erro_camera.value = 'Câmera não disponível.';
+    console.error("Erro de câmera:", e);
+    if (e.name === 'NotAllowedError') {
+        erro_camera.value = 'Permissão de câmera negada.';
+    } else if (e.name === 'NotFoundError') {
+        erro_camera.value = 'Nenhuma câmera encontrada neste dispositivo.';
+    } else if (e.name === 'NotSupportedError') {
+        erro_camera.value = 'Câmera não suportada neste browser.';
+    } else {
+        erro_camera.value = `Erro ao iniciar câmera: ${e.message || e.name || 'desconhecido'}`;
+    }
     camera_ativa.value = false;
 };
 </script>
