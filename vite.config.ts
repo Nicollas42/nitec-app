@@ -3,24 +3,29 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
 
-/**
- * Configuração do Vite para o ecossistema Nitec.
- * Focada em compatibilidade com Electron, PWA e Multi-Tenancy local.
- */
+// 🟢 Lê a versão do package.json em tempo de build
+// Isso injeta import.meta.env.PACKAGE_VERSION no bundle
+// sem isso o Android sempre usa o fallback '1.1.0'
+const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'))
+
 export default defineConfig({
     base: './',
+
+    // 🟢 Injeta a versão como variável de ambiente acessível em todo o app
+    define: {
+        'import.meta.env.PACKAGE_VERSION': JSON.stringify(version),
+    },
 
     plugins: [
         vue(),
         vueDevTools(),
 
-        // 🟢 PWA — gera Service Worker e manifest automaticamente
         VitePWA({
             registerType: 'autoUpdate',
             includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
 
-            // Manifest do app instalável
             manifest: {
                 name: 'NitecSystem',
                 short_name: 'Nitec',
@@ -38,15 +43,10 @@ export default defineConfig({
                 ]
             },
 
-            // Workbox — estratégia de cache
             workbox: {
-                // Faz cache de todos os assets do app (JS, CSS, fontes, imagens)
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-
-                // Estratégia: tenta rede primeiro, cai para cache se offline
                 runtimeCaching: [
                     {
-                        // Cache das chamadas da API VPS
                         urlPattern: /^https:\/\/.*\.nitec\.dev\.br\/api\/.*/i,
                         handler: 'NetworkFirst',
                         options: {
@@ -56,19 +56,15 @@ export default defineConfig({
                         }
                     },
                     {
-                        // Cache do servidor local (nunca cacheia — sempre ao vivo)
                         urlPattern: /^http:\/\/192\.168\.\d+\.\d+:3737\/.*/i,
                         handler: 'NetworkOnly',
                     }
                 ],
-
-                // Script customizado do Service Worker (detecta offline e notifica o app)
                 importScripts: ['sw-offline-detector.js'],
             },
 
-            // Modo desenvolvimento — ativa o SW em dev para testar
             devOptions: {
-                enabled: false, // mude para true se quiser testar o SW em npm run dev
+                enabled: false,
                 type: 'module',
             }
         }),
