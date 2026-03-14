@@ -19,6 +19,10 @@ export function useLogicaDashboard() {
     let ipcRenderer = null;
     if (isElectron) ipcRenderer = window.require('electron').ipcRenderer;
 
+    // 🟢 Detecta se está rodando como APK Android (Capacitor)
+    const isAndroid = !isElectron && typeof window !== 'undefined' && 
+                      (navigator.userAgent.includes('Android') || window?.Capacitor?.isNativePlatform?.());
+
     const versao_atual = ref(import.meta.env.PACKAGE_VERSION || '1.1.0');
     const modal_visivel = ref(false);
     const modal_qr_visivel = ref(false);
@@ -28,12 +32,12 @@ export function useLogicaDashboard() {
     const mensagem_status = ref('Clique abaixo para procurar novas versões.');
     const progresso = ref(0);
     const versao_nova = ref('');
+    const url_apk_nova = ref('');
     const status_erro = ref(false);
     const tem_atualizacao_nova = ref(false);
     const historico_versoes = ref([]);
     const carregando_historico = ref(false);
 
-    // 🟢 Função de segurança: impede que ele ache que a 1.0.7 é mais nova que a 1.1.0
     const e_versao_mais_recente = (v_nova, v_atual) => {
         const n = v_nova.split('.').map(Number);
         const a = v_atual.split('.').map(Number);
@@ -51,7 +55,6 @@ export function useLogicaDashboard() {
                     await tabela.clear();
                 }
             });
-
             const chaves = [
                 'nitec_token_admin', 'nitec_modo_suporte', 'nitec_api_tenant',
                 'nitec_nome_cliente', 'nitec_usuario_admin'
@@ -71,16 +74,82 @@ export function useLogicaDashboard() {
         } catch (erro) { console.error(erro); } finally { carregando_historico.value = false; }
     };
 
+    // ─── Auto-update Android ─────────────────────────────────────────────────
+
+    /**
+     * Verifica se há nova versão disponível para Android no GitHub.
+     * Procura por um asset .apk na release mais recente.
+     */
+    const checar_atualizacoes_android = async () => {
+        estado_atualizacao.value = 'buscando';
+        mensagem_status.value = 'Verificando atualizações...';
+        status_erro.value = false;
+
+        try {
+            const resp = await fetch('https://api.github.com/repos/Nicollas42/nitec-atualizacoes/releases/latest');
+            const release = await resp.json();
+
+            if (!release?.tag_name) {
+                mensagem_status.value = 'Não foi possível verificar atualizações.';
+                estado_atualizacao.value = 'erro';
+                status_erro.value = true;
+                return;
+            }
+
+            // Remove o 'v' da tag (ex: v1.1.5 → 1.1.5)
+            const versao_github = release.tag_name.replace(/^v/, '');
+
+            // Procura o APK nos assets da release
+            const asset_apk = release.assets?.find(a => a.name.endsWith('.apk'));
+
+            if (e_versao_mais_recente(versao_github, versao_atual.value) && asset_apk) {
+                versao_nova.value = versao_github;
+                url_apk_nova.value = asset_apk.browser_download_url;
+                estado_atualizacao.value = 'disponivel';
+                mensagem_status.value = `Versão ${versao_github} disponível!`;
+                tem_atualizacao_nova.value = true;
+            } else {
+                estado_atualizacao.value = 'atualizado';
+                mensagem_status.value = 'Você já está na versão mais recente.';
+                tem_atualizacao_nova.value = false;
+            }
+        } catch (e) {
+            estado_atualizacao.value = 'erro';
+            mensagem_status.value = 'Erro ao verificar atualizações.';
+            status_erro.value = true;
+        }
+    };
+
+    /**
+     * Baixa e instala o APK diretamente no Android.
+     * Abre o link de download no browser externo do celular.
+     * O Android baixa o APK e pede confirmação para instalar.
+     */
+    const baixar_e_instalar_android = () => {
+        if (!url_apk_nova.value) return;
+        // Abre no browser externo — o Android gerencia o download e instalação
+        window.open(url_apk_nova.value, '_system');
+        mensagem_status.value = 'Download iniciado no navegador. Abra o arquivo para instalar.';
+        estado_atualizacao.value = 'baixando';
+    };
+
+    // ─── Controle do modal de atualizações ───────────────────────────────────
+
     const abrir_modal_atualizacoes = () => {
         modal_visivel.value = true;
         progresso.value = 0;
         status_erro.value = false;
         buscar_historico_github();
-        
-        if (!isElectron) {
+
+        if (isAndroid) {
+            // Android — verifica via GitHub API diretamente
+            checar_atualizacoes_android();
+        } else if (!isElectron) {
+            // Browser web
             mensagem_status.value = 'Você está usando a versão Web. O PDV atualiza-se automaticamente ao recarregar.';
             estado_atualizacao.value = 'atualizado';
         } else {
+            // Electron (desktop)
             mensagem_status.value = 'Pronto para verificar atualizações no servidor.';
             estado_atualizacao.value = 'parado';
             checar_atualizacoes();
@@ -102,6 +171,10 @@ export function useLogicaDashboard() {
     };
     
     const baixar_atualizacao = () => {
+        if (isAndroid) {
+            baixar_e_instalar_android();
+            return;
+        }
         if (ipcRenderer) {
             estado_atualizacao.value = 'baixando';
             mensagem_status.value = 'Iniciando download da atualização... Por favor, aguarde.';
@@ -116,14 +189,15 @@ export function useLogicaDashboard() {
         }
     };
 
-    const baixar_versao_antiga = (url) => isElectron ? window.require('electron').shell.openExternal(url) : window.open(url, '_blank');
+    const baixar_versao_antiga = (url) => isElectron 
+        ? window.require('electron').shell.openExternal(url) 
+        : window.open(url, '_blank');
 
     const encerrar_suporte = async () => {
         parar_sincronizacao_de_fundo(); 
         const token_admin = localStorage.getItem('nitec_token_admin');
         const usuario_admin_raw = localStorage.getItem('nitec_usuario_admin');
         await limpar_dados_locais_completos();
-        
         if (token_admin && usuario_admin_raw) {
             localStorage.setItem('nitec_tenant_id', 'master');
             localStorage.setItem('nitec_token', token_admin);
@@ -142,20 +216,11 @@ export function useLogicaDashboard() {
 
     onMounted(() => {
         iniciar_sincronizacao_de_fundo();
-        window.addEventListener('online', () => esta_offline.value = false);
+        window.addEventListener('online',  () => { esta_offline.value = false; fechar_modal_qr(); });
         window.addEventListener('offline', () => esta_offline.value = true);
-
-        window.addEventListener('online', () => {
-            esta_offline.value = false;
-            fechar_modal_qr(); // Fecha o QR automaticamente porque já não é preciso!
-        });
-        window.addEventListener('offline', () => esta_offline.value = true);
-
 
         if (ipcRenderer) {
             ipcRenderer.send('pedir-versao');
-            
-            // 🟢 A MÁGICA ACONTECE AQUI: Assim que a tela carrega, ele pergunta ao servidor no background!
             ipcRenderer.send('checar-atualizacoes');
 
             ipcRenderer.on('resposta-versao', (event, v) => versao_atual.value = v);
@@ -163,12 +228,11 @@ export function useLogicaDashboard() {
             ipcRenderer.on('status-atualizacao', (event, info) => {
                 status_erro.value = info.status === 'erro';
                 
-                // Validação de segurança restaurada:
                 if (info.status === 'disponivel') {
                     if (e_versao_mais_recente(info.versao, versao_atual.value)) {
                         estado_atualizacao.value = 'disponivel';
                         mensagem_status.value = info.mensagem;
-                        tem_atualizacao_nova.value = true; // Isso ativa a bolinha vermelha!
+                        tem_atualizacao_nova.value = true;
                         versao_nova.value = info.versao;
                     } else {
                         estado_atualizacao.value = 'atualizado';
@@ -181,13 +245,8 @@ export function useLogicaDashboard() {
                 }
 
                 if (info.status === 'pronto') {
-                    console.log("Download concluído. Iniciando instalação automática...");
                     toast_store.exibir_toast("Sistema atualizado! Reiniciando em instantes...", "sucesso");
-                    
-                    setTimeout(() => {
-                        estado_atualizacao.value = 'instalando'; 
-                        instalar_atualizacao();
-                    }, 2500);
+                    setTimeout(() => { estado_atualizacao.value = 'instalando'; instalar_atualizacao(); }, 2500);
                 }
             });
 
@@ -197,6 +256,11 @@ export function useLogicaDashboard() {
             });
 
             ipcRenderer.on('mensagem-atualizacao', (event, msg) => mensagem_status.value = msg);
+        }
+
+        // 🟢 No Android, verifica atualizações automaticamente ao abrir
+        if (isAndroid) {
+            setTimeout(() => checar_atualizacoes_android(), 3000);
         }
     });
 
@@ -212,10 +276,13 @@ export function useLogicaDashboard() {
     return { 
         nome_cliente, em_modo_suporte, sair, encerrar_suporte,
         versao_atual, modal_visivel, estado_atualizacao, mensagem_status, 
-        progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
+        progresso, versao_nova, status_erro, tem_atualizacao_nova, 
+        historico_versoes, carregando_historico,
         abrir_modal_atualizacoes, fechar_modal: () => modal_visivel.value = false,
-        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga,
-        obter_link_executavel,
-        esta_offline, rota_atual, ir_para: (url) => roteador.push(url), modal_qr_visivel, abrir_modal_qr, fechar_modal_qr
+        checar_atualizacoes, baixar_atualizacao, instalar_atualizacao, 
+        baixar_versao_antiga, obter_link_executavel,
+        esta_offline, rota_atual, ir_para: (url) => roteador.push(url), 
+        modal_qr_visivel, abrir_modal_qr, fechar_modal_qr,
+        isAndroid,
     };
 }

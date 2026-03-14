@@ -1,6 +1,6 @@
 {
   "name": "nitec_app",
-  "version": "1.1.8",
+  "version": "1.1.7",
   "private": true,
   "type": "module",
   "main": "app_desktop.cjs",
@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "type-check": "vue-tsc --build",
     "electron:start": "electron app_desktop.cjs",
-    "electron:build": "vite build && electron-builder --win"
+    "electron:build": "vite build && electron-builder --win",
+    "android:build": "npx cap sync android && cd android && gradlew assembleRelease",
+    "release": "node release.cjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
