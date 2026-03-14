@@ -169,6 +169,20 @@ const incrementar_versao = () => {
     partes[2]++;
     pkg.version   = partes.join('.');
     fs.writeFileSync(caminho, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+
+    // Atualiza versionName e versionCode no build.gradle do Android
+    const caminho_gradle = path.join(__dirname, 'android', 'app', 'build.gradle');
+    if (fs.existsSync(caminho_gradle)) {
+        let gradle = fs.readFileSync(caminho_gradle, 'utf8');
+        gradle = gradle.replace(/versionCode\s+\d+/, (m) => {
+            const codigo = parseInt(m.replace('versionCode', '').trim());
+            return 'versionCode ' + (codigo + 1);
+        });
+        gradle = gradle.replace(/versionName\s+"[^"]*"/, 'versionName "' + pkg.version + '"');
+        fs.writeFileSync(caminho_gradle, gradle, 'utf8');
+        log('build.gradle atualizado: versionName ' + pkg.version);
+    }
+
     return { versao_antiga: antiga, versao_nova: pkg.version };
 };
 
@@ -204,7 +218,11 @@ const configurar_java = () => {
         executar('git add .');
         executar(`git commit -m "release: ${tag_nova}"`);
         executar('git push');
-        log('Código enviado para o GitHub.');
+        // 🟢 Cria e envia a tag antes do electron-builder rodar
+        // Isso garante que a release seja criada com a tag correta
+        executar(`git tag ${tag_nova}`);
+        executar(`git push origin ${tag_nova}`);
+        log(`Código e tag ${tag_nova} enviados para o GitHub.`);
     } catch {
         aviso('Nada novo para commitar ou push falhou. Continuando...');
     }
