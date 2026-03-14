@@ -227,7 +227,7 @@ const configurar_java = () => {
     configurar_java();
 
     const android_dir  = path.join(__dirname, 'android');
-    const caminho_apk  = path.join(android_dir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release-unsigned.apk');
+    const caminho_apk  = path.join(android_dir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
     let apk_disponivel = false;
 
     if (!fs.existsSync(android_dir)) {
