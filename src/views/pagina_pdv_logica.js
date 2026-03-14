@@ -19,6 +19,7 @@ export function useLogicaPdv() {
     
     const id_comanda_vinculada = ref(null);
     const id_comanda_pagamento = ref(null);
+    const id_mesa_atual = ref(null); // 🟢 Mesa vinculada à comanda (para o QR Sync)
     const valor_desconto = ref('');
     const processando_finalizacao = ref(false); 
 
@@ -66,7 +67,10 @@ export function useLogicaPdv() {
         if (!id) return;
         try {
             const res = await api_cliente.get(`/buscar-comanda/${id}`);
-            itens_ja_lancados.value = res.data.dados.listar_itens.map(i => ({
+            const comanda = res.data.dados;
+            // 🟢 Guarda mesa_id para o QR Sync
+            id_mesa_atual.value = comanda.mesa_id || null;
+            itens_ja_lancados.value = comanda.listar_itens.map(i => ({
                 id_item_comanda: i.id,
                 nome_produto: i.buscar_produto.nome_produto,
                 quantidade: i.quantidade,
@@ -78,13 +82,42 @@ export function useLogicaPdv() {
         }
     };
 
+    // 🟢 Salva snapshot legível no Dexie para o QR Sync
+    const salvar_estado_local = async (comanda_id, novos_itens, uuid_operacao) => {
+        try {
+            const tenant_id = localStorage.getItem('nitec_tenant_id');
+            const estado_existente = await db.estado_comandas_local.get(String(comanda_id));
+            const itens_anteriores = estado_existente?.itens || [];
+
+            // Cada item carrega o uuid_operacao do lote — base da deduplicação no merge
+            const itens_com_uuid = novos_itens.map(i => ({ ...i, uuid_operacao }));
+
+            await db.estado_comandas_local.put({
+                comanda_id: String(comanda_id),
+                mesa_id: id_mesa_atual.value,
+                tenant_id,
+                itens: [...itens_anteriores, ...itens_com_uuid],
+                atualizado_em: new Date().toISOString()
+            });
+        } catch (e) {
+            console.error("Erro ao salvar estado local:", e);
+        }
+    };
+
     watch(() => rota_atual.query, (novaQuery) => {
         id_comanda_vinculada.value = novaQuery.comanda || null;
         id_comanda_pagamento.value = novaQuery.pagamento || null;
+        id_mesa_atual.value = null;
         carrinho_venda.value = [];
         itens_ja_lancados.value = [];
         acoes_pendentes_db.value = []; 
         valor_desconto.value = '';
+
+        // Extrai mesa_id do comanda_id offline (ex: "off_5" → mesa 5)
+        const comanda_id = novaQuery.comanda || novaQuery.pagamento;
+        if (comanda_id && String(comanda_id).startsWith('off_')) {
+            id_mesa_atual.value = String(comanda_id).replace('off_', '');
+        }
 
         if (id_comanda_pagamento.value || id_comanda_vinculada.value) {
             recarregar_dados_comanda();
@@ -140,18 +173,18 @@ export function useLogicaPdv() {
                     await api_cliente.delete(`/remover-item-comanda/${tarefa.id}`, { data: { uuid_operacao: tarefa.uuid_operacao } });
                 }
             } catch (e) {
-                // 🟢 Proteção contra queda de net E quedas de servidor (500+)
                 if (!e.response || e.response.status >= 500) {
                     const url = tarefa.tipo === 'alterar' ? `/alterar-quantidade-item/${tarefa.id}` : `/remover-item-comanda/${tarefa.id}`;
                     const metodo = tarefa.tipo === 'alterar' ? 'POST' : 'DELETE';
                     const payload = tarefa.tipo === 'alterar' ? { acao: tarefa.acao, uuid_operacao: tarefa.uuid_operacao } : { uuid_operacao: tarefa.uuid_operacao };
-                    
                     await db.vendas_pendentes.add({
                         tenant_id: localStorage.getItem('nitec_tenant_id'),
                         data_venda: new Date().toISOString(),
-                        valor_total: 0, url_destino: url, metodo, payload_venda: payload
+                        valor_total: 0, url_destino: url, metodo,
+                        payload_venda: payload,
+                        uuid_operacao: tarefa.uuid_operacao
                     });
-                } else throw e; // Erros 400 (validação/negócio) continuam a travar como devem
+                } else throw e;
             }
         }
         acoes_pendentes_db.value = []; 
@@ -168,7 +201,7 @@ export function useLogicaPdv() {
         const data_atual = new Date().toISOString();
         const tenant_id = localStorage.getItem('nitec_tenant_id');
 
-        // 🟢 1. PAGAMENTO DE CONTA
+        // 1. PAGAMENTO DE CONTA
         if (id_comanda_pagamento.value) {
             try {
                 await sincronizar_pendencias_bd(); 
@@ -176,19 +209,17 @@ export function useLogicaPdv() {
                     const payload_add = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
                     await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_pagamento.value}`, payload_add);
                 }
-                
                 const uuid_pgto = gerarUUID();
                 const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
                 const res = await api_cliente.post(`/fechar-comanda/${id_comanda_pagamento.value}`, payload_pagamento);
-                
                 loja_mesas.buscar_mesas(true); 
                 roteador.push('/mapa-mesas');
                 toast_global.exibir_toast(res.data.mensagem || "Processado com sucesso!", "sucesso"); 
             } catch (e) { 
-                // 🟢 Proteção expandida para falha de servidor
                 if (!e.response || e.response.status >= 500) { 
-                    const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: gerarUUID() };
-                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento });
+                    const uuid_pgto = gerarUUID();
+                    const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
+                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento, uuid_operacao: uuid_pgto });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Pagamento salvo no PC!", "aviso");
                     roteador.push('/mapa-mesas');
                 } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao processar pagamento.", "erro"); 
@@ -196,7 +227,7 @@ export function useLogicaPdv() {
             return;
         }
 
-        // 🟢 2. LANÇAR NA MESA
+        // 2. LANÇAR NA MESA
         if (id_comanda_vinculada.value) {
             try {
                 await sincronizar_pendencias_bd(); 
@@ -212,14 +243,27 @@ export function useLogicaPdv() {
                 roteador.go(-1);
             } catch (e) { 
                 if (!e.response || e.response.status >= 500) { 
-                    const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
-                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/adicionar-itens-comanda/${id_comanda_vinculada.value}`, metodo: 'POST', payload_venda: payload });
+                    const uuid_add = gerarUUID();
+                    const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
+                    
+                    // 🟢 Salva na fila para o servidor
+                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/adicionar-itens-comanda/${id_comanda_vinculada.value}`, metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_add });
+                    
+                    // 🟢 Salva snapshot legível para o QR Sync P2P
+                    const itens_para_estado = carrinho_venda.value.map(i => ({
+                        produto_id: i.id,
+                        nome_produto: i.nome_produto,
+                        quantidade: i.quantidade,
+                        preco_unitario: i.preco_venda,
+                    }));
+                    await salvar_estado_local(id_comanda_vinculada.value, itens_para_estado, uuid_add);
+
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Lançamento salvo no PC!", "aviso");
                     roteador.go(-1);
                 } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
             } finally { processando_finalizacao.value = false; }
         
-        // 🟢 3. VENDA BALCÃO AVULSA
+        // 3. VENDA BALCÃO AVULSA
         } else {
             const uuid_balcao = gerarUUID();
             const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_balcao };
@@ -231,7 +275,7 @@ export function useLogicaPdv() {
                 loja_produtos.buscar_produtos(true); 
             } catch (e) { 
                 if (!e.response || e.response.status >= 500) { 
-                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: '/venda-balcao', metodo: 'POST', payload_venda: payload });
+                    await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: '/venda-balcao', metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_balcao });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Venda Balcão salva no PC!", "aviso");
                     carrinho_venda.value = [];
                     valor_desconto.value = '';
@@ -249,6 +293,6 @@ export function useLogicaPdv() {
         adicionar_ao_carrinho, remover_do_carrinho, alterar_quantidade_novo,
         subtotal_comanda, valor_final_comanda, valor_desconto, 
         id_comanda_vinculada, id_comanda_pagamento, 
-        processar_acao_principal, voltar_painel: () => roteador.push('/painel-central')
+        processar_acao_principal, voltar_painel: () => roteador.push('/painel-central'),
     };
 }

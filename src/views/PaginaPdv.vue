@@ -3,6 +3,7 @@
         
         <section class="w-full md:w-2/3 p-4 md:p-6 flex flex-col h-full md:border-r border-gray-200">
             <header class="flex flex-col gap-4 mb-6 shrink-0">
+
                 <div class="flex justify-between items-center">
                     <h1 class="text-xl md:text-2xl font-black text-gray-800 tracking-tight uppercase italic">
                         {{ id_comanda_pagamento ? '💳 Pagamento de Conta' : (id_comanda_vinculada ? '📥 Lançar na Mesa' : 'Venda Balcão') }}
@@ -50,7 +51,7 @@
             </div>
         </section>
 
-<section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[55vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
+        <section class="w-full md:w-1/3 bg-white flex flex-col z-20 h-[55vh] md:h-full fixed md:relative bottom-0 left-0 right-0 shadow-[0_-15px_40px_rgba(0,0,0,0.1)] md:shadow-none border-t md:border-t-0 border-gray-200 rounded-t-3xl md:rounded-none">
             
             <div class="bg-gray-50/80 backdrop-blur-md border-b border-gray-100 p-4 text-center shrink-0 rounded-t-3xl md:rounded-none">
                 <h2 class="text-xs font-black text-gray-600 uppercase tracking-widest">
@@ -145,19 +146,20 @@
                     </template>
                 </button>
             </div>
-        </section> 
+        </section>
     </div>
 </template>
 
 <script setup>
 import { useLogicaPdv } from './pagina_pdv_logica.js';
+
 const { 
     produtos_vitrine, categorias_unicas, termo_pesquisa, categoria_selecionada, 
     produtos_fixados, alternar_fixacao,
     carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
     adicionar_ao_carrinho, remover_do_carrinho, 
     subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
-    id_comanda_vinculada, id_comanda_pagamento, processar_acao_principal, voltar_painel 
+    id_comanda_vinculada, id_comanda_pagamento, processar_acao_principal, voltar_painel,
 } = useLogicaPdv();
 </script>
 
