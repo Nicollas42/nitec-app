@@ -1,12 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api_cliente from '../servicos/api_cliente.js';
+import api_cliente, { sincronizar_cache_para_local } from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js'; 
 
 export const useMesasStore = defineStore('mesas_store', () => {
     const lista_mesas = ref([]);
 
-    // Auxiliar para gerar UUID e manter consistência com o Middleware de Idempotência
     const gerarUUID = () => {
         return typeof crypto !== 'undefined' && crypto.randomUUID 
             ? crypto.randomUUID() 
@@ -16,14 +15,10 @@ export const useMesasStore = defineStore('mesas_store', () => {
     const buscar_mesas = async (forcar_atualizacao = false) => {
         const usuario_raw = localStorage.getItem('nitec_usuario');
         
-        // 🟢 SEGURANÇA: Proteção contra localStorage corrompido
         if (usuario_raw) {
             let usuario = null;
-            try {
-                usuario = JSON.parse(usuario_raw);
-            } catch (e) {
-                console.error("Erro ao processar dados do utilizador. localStorage corrompido.");
-            }
+            try { usuario = JSON.parse(usuario_raw); } 
+            catch (e) { console.error("localStorage corrompido."); }
             
             if (usuario?.tipo_usuario === 'admin_master') {
                 lista_mesas.value = [];
@@ -37,22 +32,25 @@ export const useMesasStore = defineStore('mesas_store', () => {
             const resposta = await api_cliente.get('/listar-mesas');
             const mesas_oficiais = resposta.data.dados || resposta.data.mesas || [];
             
-            // 🟢 INTEGRAÇÃO OFFLINE: Mapeamento seguro com Optional Chaining
-            const cadastros_pendentes = await db.vendas_pendentes.where('url_destino').equals('/cadastrar-mesa').toArray();
+            const cadastros_pendentes = await db.vendas_pendentes
+                .where('url_destino').equals('/cadastrar-mesa').toArray();
             const mesas_temporarias = cadastros_pendentes
                 .map(cad => cad.payload_venda?.mesa_temp_data)
                 .filter(Boolean);
 
             lista_mesas.value = [...mesas_oficiais, ...mesas_temporarias];
-            
-            // 🟢 OTIMIZAÇÃO: bulkPut é mais eficiente que clear + bulkAdd para sincronização
             await db.mesas.bulkPut(mesas_oficiais);
+
+            // 🟢 Envia cache de mesas para o servidor local silenciosamente
+            // Permite que o servidor local retorne detalhes corretos offline
+            sincronizar_cache_para_local(null, mesas_oficiais).catch(() => {});
             
         } catch (erro) {
             console.warn("🔴 Modo Offline: Carregando mesas do IndexedDB.");
             const mesas_salvas = await db.mesas.toArray();
             
-            const cadastros_pendentes = await db.vendas_pendentes.where('url_destino').equals('/cadastrar-mesa').toArray();
+            const cadastros_pendentes = await db.vendas_pendentes
+                .where('url_destino').equals('/cadastrar-mesa').toArray();
             const mesas_temporarias = cadastros_pendentes
                 .map(cad => cad.payload_venda?.mesa_temp_data)
                 .filter(Boolean);
@@ -64,10 +62,9 @@ export const useMesasStore = defineStore('mesas_store', () => {
     const criar_mesa_offline = async (nome_mesa) => {
         const uuid = gerarUUID();
         
-        // 🟢 MELHORIA: ID baseado em UUID para evitar colisões
         const nova_mesa_temp = {
             id: `temp_${uuid}`, 
-            nome_mesa: nome_mesa,
+            nome_mesa,
             status_mesa: 'livre',
             capacidade_pessoas: 4,
             is_temp: true 
@@ -82,7 +79,7 @@ export const useMesasStore = defineStore('mesas_store', () => {
             url_destino: '/cadastrar-mesa',
             metodo: 'POST',
             payload_venda: { 
-                nome_mesa: nome_mesa, 
+                nome_mesa, 
                 uuid_operacao: uuid,
                 mesa_temp_data: nova_mesa_temp 
             }

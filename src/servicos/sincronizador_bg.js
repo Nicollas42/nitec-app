@@ -1,6 +1,6 @@
 import { useMesasStore } from '../stores/mesas_store.js';
 import { db } from '../banco_local/db.js';
-import api_cliente from '../servicos/api_cliente.js';
+import api_cliente, { sincronizar_servidor_local_com_vps } from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js';
 
 let intervaloId = null;
@@ -20,7 +20,14 @@ export function iniciar_sincronizacao_de_fundo() {
         if (navigator.onLine && !sincronizando) {
             sincronizando = true;
             try {
+                // 1. Envia fila do Dexie (ações offline deste dispositivo) para a VPS
                 await processar_fila_offline();
+
+                // 2. Envia fila do servidor local (ações dos garçons) para a VPS
+                // Só roda no Electron (PC do caixa que hospeda o servidor local)
+                await sincronizar_servidor_local_com_vps();
+
+                // 3. Atualiza o mapa de mesas
                 const loja_mesas = useMesasStore();
                 await loja_mesas.buscar_mesas(true);
             } catch (erro) {
@@ -36,6 +43,7 @@ async function processar_fila_offline() {
     const toast_global = useToastStore();
     let sincronizou_algo = false;
 
+    // Processa vendas pendentes no Dexie
     const vendas = await db.vendas_pendentes.toArray();
     
     if (vendas.length > 0) {
@@ -54,6 +62,7 @@ async function processar_fila_offline() {
         }
     }
 
+    // Processa cadastros pendentes
     const cadastros = await db.cadastros_pendentes.toArray();
     if (cadastros.length > 0) {
         for (const cadastro of cadastros) {
@@ -68,10 +77,9 @@ async function processar_fila_offline() {
     }
 
     if (sincronizou_algo) {
-        // 🟢 Verifica se a fila ficou totalmente vazia após o sync
+        // Se a fila ficou vazia, limpa o snapshot local — VPS tem tudo agora
         const restantes = await db.vendas_pendentes.count();
         if (restantes === 0) {
-            // Limpa o snapshot de estados locais — o servidor agora tem tudo
             await db.estado_comandas_local.clear();
             console.log("🧹 Estado local limpo — tudo sincronizado com o servidor.");
         }

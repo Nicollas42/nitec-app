@@ -1,6 +1,7 @@
 <template>
     <div class="painel_principal flex flex-col h-screen bg-gray-100 font-sans relative overflow-hidden">
-        
+        <BannerServidorLocal />
+
         <div v-if="em_modo_suporte" class="bg-red-600 text-white p-3 flex justify-between items-center shadow-md z-50">
             <div class="flex items-center gap-3">
                 <span class="text-xl">⚠️</span>
@@ -263,6 +264,7 @@ import { useToastStore } from '../stores/toast_store.js';
 import GeradorQrOffline from './componentes_mesa_caixa/GeradorQrOffline.vue';
 import LeitorQrOffline from './componentes_mesa_caixa/LeitorQrOffline.vue';
 import { useRouter } from 'vue-router';
+import BannerServidorLocal from './componentes_mesa_caixa/BannerServidorLocal.vue';
 
 const toast_store = useToastStore(); 
 const auth_store = useAuthStore();

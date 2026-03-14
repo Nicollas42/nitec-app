@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api_cliente from '../servicos/api_cliente.js';
+import api_cliente, { sincronizar_cache_para_local } from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js'; 
 
 export const useProdutosStore = defineStore('produtos_store', () => {
@@ -8,8 +8,7 @@ export const useProdutosStore = defineStore('produtos_store', () => {
     const modo_offline = ref(false); 
 
     const buscar_produtos = async (forcar_atualizacao = false) => {
-        // 🟢 VACINA ANTI-ADMIN: O Admin Master não tem produtos. 
-        // Abortamos a busca antes de gerar um Erro 500 na VPS!
+        // Admin Master não tem produtos
         const usuario_raw = localStorage.getItem('nitec_usuario');
         if (usuario_raw) {
             const usuario = JSON.parse(usuario_raw);
@@ -19,11 +18,7 @@ export const useProdutosStore = defineStore('produtos_store', () => {
             }
         }
 
-        const produtos_atuais = lista_produtos.value || [];
-
-        if (produtos_atuais.length > 0 && !forcar_atualizacao) {
-            return; 
-        }
+        if ((lista_produtos.value || []).length > 0 && !forcar_atualizacao) return; 
 
         try {
             const timestamp = new Date().getTime();
@@ -35,7 +30,11 @@ export const useProdutosStore = defineStore('produtos_store', () => {
             await db.produtos.clear(); 
             await db.produtos.bulkAdd(produtos_recebidos); 
             
-            modo_offline.value = false; 
+            modo_offline.value = false;
+
+            // 🟢 Envia cache de produtos para o servidor local silenciosamente
+            // O servidor local precisa disso para retornar nomes corretos quando a VPS cair
+            sincronizar_cache_para_local(produtos_recebidos, null).catch(() => {});
             
         } catch (erro) {
             console.error("Erro ao carregar catálogo da VPS:", erro);
@@ -56,10 +55,9 @@ export const useProdutosStore = defineStore('produtos_store', () => {
             
             if (produtos_salvos.length > 0) {
                 lista_produtos.value = produtos_salvos;
-                console.log("⚡ Catálogo carregado com sucesso do modo offline!");
+                console.log("⚡ Catálogo carregado do modo offline!");
             } else {
                 lista_produtos.value = []; 
-                // O alerta só vai disparar agora para clientes reais que realmente ficaram sem net
                 alert("Você está offline e infelizmente não há produtos salvos no computador.");
             }
         }
