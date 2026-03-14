@@ -27,7 +27,7 @@
             <!-- Lista de itens -->
             <div v-if="lista_display.length > 0" class="mt-4 w-full text-left">
                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Itens no QR Code:</p>
-                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden max-h-48 overflow-y-auto">
                     <div v-for="(item, i) in lista_display" :key="i"
                          class="flex justify-between items-center px-4 py-2.5 border-b border-gray-100 last:border-0">
                         <div class="flex items-center gap-2 min-w-0">
@@ -39,7 +39,7 @@
                 </div>
             </div>
 
-            <!-- Resumo: ações | itens | tamanho -->
+            <!-- Resumo: ações | itens | tamanho comprimido -->
             <div class="mt-3 flex gap-2">
                 <div class="flex-1 bg-orange-50 rounded-xl p-2.5 border border-orange-100 text-center">
                     <p class="text-xl font-black text-orange-600">{{ total_acoes }}</p>
@@ -73,6 +73,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import QrcodeVue from 'qrcode.vue';
+import { deflate } from 'fflate';
 import { db } from '../../banco_local/db.js';
 
 const emit = defineEmits(['fechar']);
@@ -83,54 +84,21 @@ const total_acoes     = ref(0);
 const lista_display   = ref([]);
 const tamanho_payload = ref(0);
 
-// 🔑 Protocolo P2P v5 + compressão deflate-raw nativa
-// Prefixo "N5:" identifica o payload como Nitec v5 comprimido
-// Sem prefixo = JSON legado (v1-v4) para retrocompatibilidade
-const PREFIXO = 'N5:';
+// Protocolo P2P v6: minificação v5 + compressão deflate + base64
+// Prefixo "N6:" identifica o protocolo para o receptor
+const PREFIXO = 'N6:';
 const METODO_ID = { 'POST': 1, 'DELETE': 2 };
 const URL_CURTA = {
-    '/adicionar-itens-comanda/': 'aic/',
-    '/alterar-quantidade-item/': 'aqi/',
-    '/remover-item-comanda/'   : 'ric/',
-    '/fechar-comanda/'         : 'fc/',
+    '/adicionar-itens-comanda/': 'a/',
+    '/alterar-quantidade-item/': 'q/',
+    '/remover-item-comanda/'   : 'r/',
+    '/fechar-comanda/'         : 'f/',
     '/abrir-comanda'           : 'ac',
     '/venda-balcao'            : 'vb',
 };
 
 /**
- * Comprime string JSON usando deflate-raw nativo do browser/Electron
- * e converte para base64 para caber no QR Code.
- * @param {string} json
- * @returns {Promise<string>} base64 comprimido
- */
-const comprimir = async (json) => {
-    const encoder  = new TextEncoder();
-    const stream   = new CompressionStream('deflate-raw');
-    const writer   = stream.writable.getWriter();
-    const reader   = stream.readable.getReader();
-
-    writer.write(encoder.encode(json));
-    writer.close();
-
-    const chunks = [];
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-    }
-
-    // Junta todos os chunks num único Uint8Array
-    const tamanho    = chunks.reduce((acc, c) => acc + c.length, 0);
-    const comprimido = new Uint8Array(tamanho);
-    let offset = 0;
-    for (const chunk of chunks) { comprimido.set(chunk, offset); offset += chunk.length; }
-
-    // Converte para base64 (string segura para QR)
-    return btoa(String.fromCharCode(...comprimido));
-};
-
-/**
- * Comprime URL da API para versão curta.
+ * Comprime URL para versão mínima.
  * @param {string} url
  * @returns {string}
  */
@@ -141,9 +109,26 @@ const comprimir_url = (url) => {
     return url;
 };
 
+/**
+ * Comprime string JSON usando deflate e converte para base64 URL-safe.
+ * @param {string} json
+ * @returns {Promise<string>}
+ */
+const comprimir = (json) => new Promise((resolve, reject) => {
+    const bytes = new TextEncoder().encode(json);
+    deflate(bytes, { level: 9 }, (err, compressed) => {
+        if (err) return reject(err);
+        // Converte Uint8Array para base64 URL-safe (sem +/= para não inflar o QR)
+        let bin = '';
+        for (const b of compressed) bin += String.fromCharCode(b);
+        const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        resolve(b64);
+    });
+});
+
 const carregar_dados = async () => {
-    carregando.value    = true;
-    qr_texto.value      = '';
+    carregando.value = true;
+    qr_texto.value   = '';
     lista_display.value = [];
 
     try {
@@ -153,15 +138,15 @@ const carregar_dados = async () => {
         total_acoes.value = acoes_brutas.length;
         if (acoes_brutas.length === 0 && estados.length === 0) return;
 
-        // Mapa de produtos para exibição (não vai no QR)
+        // Mapa de produtos para exibição local (não vai no QR)
         const produtos_map = {};
         for (const p of await db.produtos.toArray()) produtos_map[p.id] = p;
 
-        // Lista de exibição agrupada por produto_id
+        // Lista de exibição agrupada por produto
         const display = [];
         for (const estado of estados) {
             for (const item of (estado.itens || [])) {
-                const prod     = produtos_map[item.produto_id];
+                const prod      = produtos_map[item.produto_id];
                 const existente = display.find(d => d.produto_id === item.produto_id);
                 if (existente) {
                     existente.q += item.quantidade;
@@ -177,15 +162,8 @@ const carregar_dados = async () => {
         }
         lista_display.value = display;
 
-        // ── Protocolo v5: payload ultra-comprimido ─────────────────────────
-        //
-        // snap (s): [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
-        //   - comanda_id derivado no receptor como "off_" + mesa_id
-        //   - nome/preço buscados no db.produtos do receptor
-        //
-        // acoes (a): [ [url_curta, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
-        //   - preço buscado no db.produtos do receptor
-        //
+        // Protocolo v6 — mesma estrutura v5, mas será comprimida
+        // snap: [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
         const s = estados.map(e => [
             e.mesa_id,
             (e.itens || []).map(i => [
@@ -195,6 +173,7 @@ const carregar_dados = async () => {
             ])
         ]);
 
+        // acoes: [ [url_curta, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
         const a = acoes_brutas.map(acao => {
             const payload = acao.payload_venda || {};
             const itens   = (payload.itens || []).map(i => [i.produto_id, i.quantidade]);
@@ -203,19 +182,17 @@ const carregar_dados = async () => {
         });
 
         const t = (localStorage.getItem('nitec_tenant_id') || '').slice(0, 8);
+        const pacote_json = JSON.stringify({ v: 6, t, s, a });
 
-        const pacote = { v: 5, t, s, a };
-        const json   = JSON.stringify(pacote);
+        // Comprime com deflate nível 9 e converte para base64 URL-safe
+        const payload_comprimido = await comprimir(pacote_json);
 
-        // Comprime e prefixia com "N5:" para o receptor identificar
-        const base64    = await comprimir(json);
-        const resultado = PREFIXO + base64;
-
-        tamanho_payload.value = resultado.length;
-        qr_texto.value        = resultado;
+        tamanho_payload.value = payload_comprimido.length;
+        // Prefixo "N6:" sinaliza ao leitor que é protocolo Nitec v6 comprimido
+        qr_texto.value = PREFIXO + payload_comprimido;
 
     } catch (e) {
-        console.error("Erro ao gerar QR Sync v5:", e);
+        console.error("Erro ao gerar QR Sync v6:", e);
     } finally {
         carregando.value = false;
     }

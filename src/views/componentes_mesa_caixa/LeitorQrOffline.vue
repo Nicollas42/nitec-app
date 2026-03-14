@@ -113,6 +113,7 @@
 <script setup>
 import { ref } from 'vue';
 import { QrcodeStream } from 'vue-qrcode-reader';
+import { inflate } from 'fflate';
 import { db } from '../../banco_local/db.js';
 import { useMesasStore } from '../../stores/mesas_store.js';
 
@@ -125,50 +126,25 @@ const processando   = ref(false);
 const resultado     = ref(null);
 const erro_camera   = ref('');
 
-const PREFIXO        = 'N5:';
+const PREFIXO_V6     = 'N6:';
 const ID_PARA_METODO = { 1: 'POST', 2: 'DELETE' };
 
 const URL_EXPAND = {
+    'a/' : '/adicionar-itens-comanda/',
+    'q/' : '/alterar-quantidade-item/',
+    'r/' : '/remover-item-comanda/',
+    'f/' : '/fechar-comanda/',
+    'ac' : '/abrir-comanda',
+    'vb' : '/venda-balcao',
+    // Retrocompatibilidade com URLs v3/v4/v5
     'aic/': '/adicionar-itens-comanda/',
     'aqi/': '/alterar-quantidade-item/',
     'ric/': '/remover-item-comanda/',
     'fc/' : '/fechar-comanda/',
-    'ac'  : '/abrir-comanda',
-    'vb'  : '/venda-balcao',
 };
 
 /**
- * Descomprime string base64 (gerada pelo GeradorQrOffline) de volta para JSON.
- * Usa DecompressionStream nativo — sem dependências externas.
- * @param {string} base64
- * @returns {Promise<object>}
- */
-const descomprimir = async (base64) => {
-    const binario = atob(base64);
-    const dados   = new Uint8Array(binario.length);
-    for (let i = 0; i < binario.length; i++) dados[i] = binario.charCodeAt(i);
-
-    const stream  = new DecompressionStream('deflate-raw');
-    const writer  = stream.writable.getWriter();
-    const reader  = stream.readable.getReader();
-
-    writer.write(dados);
-    writer.close();
-
-    const chunks = [];
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-    }
-
-    const decoder = new TextDecoder();
-    const texto   = chunks.map(c => decoder.decode(c, { stream: true })).join('') + decoder.decode();
-    return JSON.parse(texto);
-};
-
-/**
- * Expande URL comprimida para o formato da API.
+ * Expande URL comprimida para o formato completo da API.
  * @param {string} url_min
  * @returns {string}
  */
@@ -179,6 +155,24 @@ const expandir_url = (url_min) => {
     return url_min;
 };
 
+/**
+ * Descomprime base64 URL-safe → deflate → string JSON.
+ * @param {string} b64
+ * @returns {Promise<string>}
+ */
+const descomprimir = (b64) => new Promise((resolve, reject) => {
+    // Restaura base64 padrão (URL-safe usa - e _ em vez de + e /)
+    const b64_std = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const bin     = atob(b64_std);
+    const bytes   = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
+    inflate(bytes, (err, decompressed) => {
+        if (err) return reject(err);
+        resolve(new TextDecoder().decode(decompressed));
+    });
+});
+
 const ao_camera_ligar = () => { camera_ligada.value = true; };
 
 const ao_detectar_qr = async (codigos) => {
@@ -188,17 +182,18 @@ const ao_detectar_qr = async (codigos) => {
     try {
         const raw = codigos[0].rawValue;
 
-        // ── Detecta formato: comprimido (N5:...) ou JSON legado ─────────────
+        // ── Detecta protocolo pelo prefixo ou tenta JSON direto ─────────────
         let pacote;
-        if (raw.startsWith(PREFIXO)) {
-            // v5 comprimido: descomprime o base64 depois do prefixo
-            pacote = await descomprimir(raw.slice(PREFIXO.length));
+        if (raw.startsWith(PREFIXO_V6)) {
+            // v6: descomprime o payload
+            const json = await descomprimir(raw.slice(PREFIXO_V6.length));
+            pacote = JSON.parse(json);
         } else {
-            // Legado v1–v4: JSON puro
+            // v1–v5: JSON direto
             pacote = JSON.parse(raw);
         }
 
-        if (!pacote.v || ![1, 2, 3, 4, 5].includes(pacote.v)) {
+        if (!pacote.v || ![1, 2, 3, 4, 5, 6].includes(pacote.v)) {
             throw new Error("Formato de QR Code não reconhecido.");
         }
 
@@ -209,7 +204,7 @@ const ao_detectar_qr = async (codigos) => {
             throw new Error("QR Code de outro estabelecimento. Recusado.");
         }
 
-        // Mapa local de produtos para lookup de nome e preço
+        // Mapa de produtos para lookup de nome e preço
         const produtos_map = {};
         for (const p of await db.produtos.toArray()) produtos_map[p.id] = p;
 
@@ -217,11 +212,13 @@ const ao_detectar_qr = async (codigos) => {
         let acoes_novas = 0;
         const itens_recebidos = [];
 
-        // ── PROTOCOLO v5 ─────────────────────────────────────────────────────
-        if (pacote.v === 5) {
-            // snap: [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
+        // ── PROTOCOLO v5 / v6 ────────────────────────────────────────────────
+        // snap: [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
+        // acoes: [ [url_min, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
+        if (pacote.v === 5 || pacote.v === 6) {
+
             for (const [mesa_id, itens_min] of (pacote.s || [])) {
-                const comanda_id = `off_${mesa_id}`; // derivado — não viaja no QR
+                const comanda_id = `off_${mesa_id}`;
 
                 const itens_exp = (itens_min || []).map(([prod_id, qtd, uuid8]) => {
                     const prod = produtos_map[prod_id] || {};
@@ -234,20 +231,26 @@ const ao_detectar_qr = async (codigos) => {
                     };
                 });
 
-                const estado = await db.estado_comandas_local.get(comanda_id);
-                if (!estado) {
+                const estado_existente = await db.estado_comandas_local.get(comanda_id);
+
+                if (!estado_existente) {
                     await db.estado_comandas_local.put({
-                        comanda_id, mesa_id, tenant_id: tenant_local,
-                        itens: itens_exp, atualizado_em: new Date().toISOString()
+                        comanda_id,
+                        mesa_id,
+                        tenant_id    : tenant_local,
+                        itens        : itens_exp,
+                        atualizado_em: new Date().toISOString()
                     });
                     itens_novos += itens_exp.length;
                 } else {
-                    const uuids_ok = new Set(estado.itens.map(i => i.uuid_operacao).filter(Boolean));
-                    const novos    = itens_exp.filter(i => !i.uuid_operacao || !uuids_ok.has(i.uuid_operacao));
+                    const uuids_ok = new Set(
+                        estado_existente.itens.map(i => i.uuid_operacao).filter(Boolean)
+                    );
+                    const novos = itens_exp.filter(i => !i.uuid_operacao || !uuids_ok.has(i.uuid_operacao));
                     if (novos.length > 0) {
                         await db.estado_comandas_local.put({
-                            ...estado,
-                            itens        : [...estado.itens, ...novos],
+                            ...estado_existente,
+                            itens        : [...estado_existente.itens, ...novos],
                             atualizado_em: new Date().toISOString()
                         });
                         itens_novos += novos.length;
@@ -255,13 +258,15 @@ const ao_detectar_qr = async (codigos) => {
                 }
 
                 itens_exp.forEach(i => itens_recebidos.push({
-                    nome: i.nome_produto, q: i.quantidade, p: i.preco_unitario
+                    nome: i.nome_produto,
+                    q   : i.quantidade,
+                    p   : i.preco_unitario,
                 }));
 
                 if (mesa_id) await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
             }
 
-            // acoes: [ [url_min, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
+            // Ações
             const todas_vendas = await db.vendas_pendentes.toArray();
             const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
 
@@ -285,6 +290,7 @@ const ao_detectar_qr = async (codigos) => {
                         : { uuid_operacao: uuid8 },
                     uuid_operacao: uuid8 || null,
                 });
+
                 if (uuid8) uuids_locais.add(uuid8);
                 acoes_novas++;
             }
@@ -295,26 +301,38 @@ const ao_detectar_qr = async (codigos) => {
         // ── RETROCOMPATIBILIDADE v1–v4 ────────────────────────────────────
         if ([1, 2, 3, 4].includes(pacote.v)) {
             const snaps = pacote.snap || pacote.s || [];
+
             for (const entry of snaps) {
                 let comanda_id, mesa_id, itens_raw;
                 if (Array.isArray(entry)) {
-                    if (entry.length === 2) { [mesa_id, itens_raw] = entry; comanda_id = `off_${mesa_id}`; }
-                    else                    { [comanda_id, mesa_id, itens_raw] = entry; }
+                    [comanda_id, mesa_id, itens_raw] = entry;
                 } else {
                     comanda_id = entry.c ?? entry.comanda_id;
                     mesa_id    = entry.m ?? entry.mesa_id;
                     itens_raw  = entry.i ?? entry.itens ?? [];
                 }
+
                 const itens_exp = (itens_raw || []).map(i => {
                     if (Array.isArray(i)) {
                         const prod = produtos_map[i[0]] || {};
-                        return { produto_id: i[0], nome_produto: prod.nome_produto || `#${i[0]}`, quantidade: i[1], preco_unitario: prod.preco_venda || 0, uuid_operacao: i[2] || null };
+                        return { produto_id: i[0], nome_produto: prod.nome_produto || `#${i[0]}`, quantidade: i[1], preco_unitario: prod.preco_venda || 0, uuid_operacao: i[2] };
                     }
-                    return { produto_id: i.i ?? i.produto_id, nome_produto: i.n ?? i.nome_produto, quantidade: i.q ?? i.quantidade, preco_unitario: i.p ?? i.preco_unitario, uuid_operacao: i.u ?? i.uuid_operacao };
+                    return {
+                        produto_id    : i.i ?? i.produto_id,
+                        nome_produto  : i.n ?? i.nome_produto,
+                        quantidade    : i.q ?? i.quantidade,
+                        preco_unitario: i.p ?? i.preco_unitario,
+                        uuid_operacao : i.u ?? i.uuid_operacao,
+                    };
                 });
+
                 const estado = await db.estado_comandas_local.get(String(comanda_id));
                 if (!estado) {
-                    await db.estado_comandas_local.put({ comanda_id: String(comanda_id), mesa_id, tenant_id: tenant_local, itens: itens_exp, atualizado_em: new Date().toISOString() });
+                    await db.estado_comandas_local.put({
+                        comanda_id: String(comanda_id), mesa_id,
+                        tenant_id: tenant_local, itens: itens_exp,
+                        atualizado_em: new Date().toISOString()
+                    });
                     itens_novos += itens_exp.length;
                 }
                 if (mesa_id) await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
@@ -323,6 +341,7 @@ const ao_detectar_qr = async (codigos) => {
             const acoes_raw = pacote.a || pacote.acoes || pacote.d || [];
             const todas     = await db.vendas_pendentes.toArray();
             const uuids     = new Set(todas.map(v => v.uuid_operacao).filter(Boolean));
+
             for (const acao of acoes_raw) {
                 if (Array.isArray(acao)) {
                     const [url_min, metodo_id, itens_min, uuid8] = acao;
@@ -331,13 +350,22 @@ const ao_detectar_qr = async (codigos) => {
                         ? { produto_id: i[0], quantidade: i[1], preco_unitario: produtos_map[i[0]]?.preco_venda || 0 }
                         : { produto_id: i.i ?? i.produto_id, quantidade: i.q ?? i.quantidade, preco_unitario: i.p ?? i.preco_unitario ?? 0 }
                     );
-                    await db.vendas_pendentes.add({ tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0, url_destino: expandir_url(url_min), metodo: ID_PARA_METODO[metodo_id] || 'POST', payload_venda: itens_p.length ? { itens: itens_p, uuid_operacao: uuid8 } : { uuid_operacao: uuid8 }, uuid_operacao: uuid8 || null });
+                    await db.vendas_pendentes.add({
+                        tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0,
+                        url_destino: expandir_url(url_min), metodo: ID_PARA_METODO[metodo_id] || 'POST',
+                        payload_venda: itens_p.length > 0 ? { itens: itens_p, uuid_operacao: uuid8 } : { uuid_operacao: uuid8 },
+                        uuid_operacao: uuid8 || null,
+                    });
                     if (uuid8) uuids.add(uuid8);
                 } else {
                     const [url, metodo_id, payload] = acao;
                     const uuid = payload?.uuid_operacao;
                     if (uuid && uuids.has(uuid)) continue;
-                    await db.vendas_pendentes.add({ tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0, url_destino: url, metodo: ID_PARA_METODO[metodo_id] || 'POST', payload_venda: payload || {}, uuid_operacao: uuid || null });
+                    await db.vendas_pendentes.add({
+                        tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0,
+                        url_destino: url, metodo: ID_PARA_METODO[metodo_id] || 'POST',
+                        payload_venda: payload || {}, uuid_operacao: uuid || null,
+                    });
                     if (uuid) uuids.add(uuid);
                 }
                 acoes_novas++;
@@ -348,8 +376,11 @@ const ao_detectar_qr = async (codigos) => {
         resultado.value = {
             erro            : false,
             mensagem        : itens_novos + acoes_novas > 0 ? 'Sincronização concluída!' : 'Já estava tudo atualizado.',
-            itens_novos, acoes_novas, itens_recebidos,
+            itens_novos,
+            acoes_novas,
+            itens_recebidos,
         };
+
         emit('sucesso');
 
     } catch (e) {

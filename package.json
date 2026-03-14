@@ -17,6 +17,7 @@
     "chart.js": "^4.5.1",
     "dexie": "^4.3.0",
     "electron-updater": "^6.1.8",
+    "fflate": "^0.8.2",
     "pinia": "^3.0.4",
     "qrcode.vue": "^3.8.0",
     "sweetalert2": "^11.10.0",
