@@ -65,36 +65,25 @@ const vps_estava_online   = ref(true);
 
 let intervalo_ping = null;
 
-// Instância axios exclusiva para ping — sem interceptors, sem fallback local
+// Em desenvolvimento o Laravel roda localmente — ping sempre responde
+// O banner só faz sentido em produção onde a VPS é remota
+const eh_desenvolvimento = import.meta.env.DEV;
+
+// Instância axios sem interceptors — testa APENAS a VPS, nunca redireciona para servidor local
 const axios_ping = axios.create({ timeout: 5000 });
 
-/**
- * Monta a URL do endpoint /ping da VPS.
- * Este endpoint foi adicionado ao tenant.php sem autenticação.
- */
 const obter_url_ping = () => {
     const tenant = localStorage.getItem('nitec_tenant_id');
-    const eh_dev = import.meta.env.DEV;
-    if (!tenant || tenant === 'master') {
-        return eh_dev ? 'http://nitec.localhost:8000/api/ping' : 'https://nitec.dev.br/api/ping';
-    }
-    const sufixo    = eh_dev ? '.nitec.localhost:8000' : '.nitec.dev.br';
-    const protocolo = eh_dev ? 'http' : 'https';
-    return `${protocolo}://${tenant}${sufixo}/api/ping`;
+    if (!tenant || tenant === 'master') return 'https://nitec.dev.br/api/ping';
+    return `https://${tenant}.nitec.dev.br/api/ping`;
 };
 
-/**
- * Testa se a VPS está online via GET /api/ping (sem auth).
- * Usa instância axios sem interceptors — nunca redireciona para servidor local.
- * Retorna true se receber qualquer resposta HTTP.
- * Retorna false apenas em timeout ou erro de rede.
- */
 const testar_vps = async () => {
     try {
         await axios_ping.get(obter_url_ping());
         return true;
     } catch (erro) {
-        if (erro.response) return true; // Recebeu resposta = VPS online
+        if (erro.response) return true; // Recebeu resposta HTTP = VPS online
         return false;                   // Sem resposta = offline
     }
 };
@@ -128,14 +117,12 @@ const ao_detectar_vps_online = () => {
 const iniciar_ping_periodico = () => {
     if (intervalo_ping) return;
 
-    // Ping inicial após 5s
     setTimeout(async () => {
         const online = await testar_vps();
         vps_estava_online.value = online;
         if (!online) ao_detectar_vps_offline();
     }, 5000);
 
-    // Pings a cada 15s
     intervalo_ping = setInterval(async () => {
         const online_agora = await testar_vps();
         if (vps_estava_online.value && !online_agora) {
@@ -148,12 +135,36 @@ const iniciar_ping_periodico = () => {
     }, 15000);
 };
 
+/**
+ * Conecta ao servidor local passando as credenciais na URL.
+ * O roteador do Vue lê os parâmetros e faz login automático,
+ * evitando que o garçom precise fazer login novamente.
+ *
+ * URL gerada: http://192.168.15.6:3737/#/painel-central?token=xxx&usuario=yyy&tenant=zzz
+ */
 const conectar_servidor_local = () => {
-    const url = url_servidor_local.value;
-    if (!url) return;
-    localStorage.setItem('nitec_servidor_local', url);
+    const url_base = url_servidor_local.value;
+    if (!url_base) return;
+
+    // Lê credenciais do localStorage atual
+    const token   = localStorage.getItem('nitec_token')   || '';
+    const usuario = localStorage.getItem('nitec_usuario') || '';
+    const tenant  = localStorage.getItem('nitec_tenant_id') || '';
+
+    localStorage.setItem('nitec_servidor_local', url_base);
     conectado.value = true;
-    setTimeout(() => { window.location.href = url; }, 800);
+
+    // Monta URL com credenciais para login automático no servidor local
+    const params = new URLSearchParams({
+        token,
+        usuario: encodeURIComponent(usuario),
+        tenant,
+    });
+
+    // Hash router: http://192.168.15.6:3737/#/painel-central?token=...
+    const url_destino = `${url_base}/#/painel-central?${params.toString()}`;
+
+    setTimeout(() => { window.location.href = url_destino; }, 800);
 };
 
 const ao_ficar_offline_nativo = () => {
@@ -162,6 +173,11 @@ const ao_ficar_offline_nativo = () => {
 };
 
 onMounted(() => {
+    if (eh_desenvolvimento) {
+        console.log('[BannerServidorLocal] Modo desenvolvimento — ping desativado.');
+        return;
+    }
+
     window.addEventListener('offline', ao_ficar_offline_nativo);
     iniciar_ping_periodico();
 });
