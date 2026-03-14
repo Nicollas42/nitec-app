@@ -1,8 +1,8 @@
 import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRouter } from 'vue-router';
-import api_cliente from '../servicos/api_cliente.js';
+import api_cliente, { sincronizar_cache_para_local } from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js';
-import { db } from '../banco_local/db.js'; // 🟢 NOVO
+import { db } from '../banco_local/db.js';
 
 export function useLogicaComandas() {
     const roteador = useRouter();
@@ -27,8 +27,14 @@ export function useLogicaComandas() {
         try {
             const resposta = await api_cliente.get('/listar-comandas');
             lista_comandas.value = resposta.data.comandas;
+
+            // 🟢 Envia comandas para o servidor local silenciosamente
+            // Isso garante que quando a VPS ficar offline, o servidor local
+            // tenha todas as comandas e itens atualizados para servir ao app
+            sincronizar_cache_para_local(null, null, resposta.data.comandas).catch(() => {});
+
         } catch (erro) { 
-            if (!erro.response) { // 🛑 IGNORA ERRO SE FOR OFFLINE
+            if (!erro.response) {
                 toast_store.exibir_toast("⚠️ Offline: Comandas podem estar desatualizadas.", "aviso");
             } else console.error(erro); 
         }
@@ -135,8 +141,15 @@ export function useLogicaComandas() {
             
             carregar_comandas();
         } catch (e) { 
-            if (!e.response) { // 🛑 SALVA OFFLINE SE CAIR
-                await db.vendas_pendentes.add({ tenant_id: localStorage.getItem('nitec_tenant_id'), data_venda: new Date().toISOString(), valor_total: 0, url_destino: `/reabrir-comanda/${id_comanda}`, metodo: 'POST', payload_venda: payload });
+            if (!e.response) {
+                await db.vendas_pendentes.add({ 
+                    tenant_id: localStorage.getItem('nitec_tenant_id'), 
+                    data_venda: new Date().toISOString(), 
+                    valor_total: 0, 
+                    url_destino: `/reabrir-comanda/${id_comanda}`, 
+                    metodo: 'POST', 
+                    payload_venda: payload 
+                });
                 toast_store.exibir_toast("⚠️ Offline: Reabertura salva no PC!", "aviso");
                 modal_historico_visivel.value = false;
                 if (id_mesa) roteador.push(`/mapa-mesas`);
@@ -153,7 +166,8 @@ export function useLogicaComandas() {
         alterar_filtro: (n) => filtro_status.value = n,
         alterar_exibicao: (n) => tipo_exibicao.value = n,
         formatar_data, abrir_detalhes, voltar_painel: () => roteador.push('/painel-central'),
-        modal_historico_visivel, comanda_selecionada, fechar_modal_historico: () => modal_historico_visivel.value = false, 
+        modal_historico_visivel, comanda_selecionada, 
+        fechar_modal_historico: () => modal_historico_visivel.value = false, 
         reabrir_comanda, reabrindo
     };
 }
