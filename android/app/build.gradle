@@ -11,19 +11,19 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // 🟢 Assinatura — lê credenciais do keystore.properties (não vai para o Git)
+
+    // 🟢 Assinatura — lê credenciais do keystore.properties na raiz do projeto
+    // android/app/ -> ../../ = C:\PDP\nitec_app\
     signingConfigs {
         release {
             def props = new Properties()
-            def props_file = rootProject.file('keystore.properties')
+            def props_file = file("../../keystore.properties")
             if (props_file.exists()) {
                 props.load(new FileInputStream(props_file))
-                storeFile     rootProject.file(props['STORE_FILE'])
+                storeFile     file("../../" + props['STORE_FILE'])
                 storePassword props['STORE_PASSWORD']
                 keyAlias      props['KEY_ALIAS']
                 keyPassword   props['KEY_PASSWORD']
