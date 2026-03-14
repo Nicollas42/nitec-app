@@ -46,3 +46,7 @@ dist_electron/
 *.blockmap
 latest.yml
 .env
+
+
+android/keystore.properties
+android/nitec-release.keystore

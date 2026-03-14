@@ -16,10 +16,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // 🟢 Assinatura — lê credenciais do keystore.properties (não vai para o Git)
+    signingConfigs {
+        release {
+            def props = new Properties()
+            def props_file = rootProject.file('keystore.properties')
+            if (props_file.exists()) {
+                props.load(new FileInputStream(props_file))
+                storeFile     file(props['STORE_FILE'])
+                storePassword props['STORE_PASSWORD']
+                keyAlias      props['KEY_ALIAS']
+                keyPassword   props['KEY_PASSWORD']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
 }
