@@ -289,7 +289,5 @@ const fechar_modal_leitor = () => modal_leitor_visivel.value = false;
 // Após leitura bem-sucedida: fecha o modal e força refresh da view atual
 const ao_sincronizar_sucesso = () => {
     fechar_modal_leitor();
-    // Recarrega a rota atual para que as mesas/comandas reflitam os novos dados
-    roteador.go(0);
 };
 </script>

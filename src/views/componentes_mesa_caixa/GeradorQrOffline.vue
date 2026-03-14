@@ -20,38 +20,37 @@
                 Mostre este código para outro dispositivo ler.
             </p>
 
-            <!-- QR com tamanho maior para facilitar leitura -->
             <div class="bg-white p-3 border-2 border-dashed border-gray-200 rounded-2xl inline-block shadow-sm">
                 <QrcodeVue :value="qr_texto" :size="260" level="L" render-as="svg" />
             </div>
 
-            <!-- Lista de itens que estão sendo enviados -->
-            <div v-if="lista_itens.length > 0" class="mt-4 w-full text-left">
+            <!-- Lista de itens contidos no QR -->
+            <div v-if="lista_display.length > 0" class="mt-4 w-full text-left">
                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Itens no QR Code:</p>
                 <div class="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
-                    <div v-for="(item, i) in lista_itens" :key="i"
+                    <div v-for="(item, i) in lista_display" :key="i"
                          class="flex justify-between items-center px-4 py-2.5 border-b border-gray-100 last:border-0">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] font-black text-orange-400 bg-orange-50 px-1.5 py-0.5 rounded-md">{{ item.q }}x</span>
-                            <span class="text-xs font-bold text-gray-700">{{ item.n }}</span>
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-[10px] font-black text-orange-400 bg-orange-50 px-1.5 py-0.5 rounded-md shrink-0">{{ item.q }}x</span>
+                            <span class="text-xs font-bold text-gray-700 truncate">{{ item.nome }}</span>
                         </div>
-                        <span class="text-xs font-black text-green-600">R$ {{ (item.p * item.q).toFixed(2) }}</span>
+                        <span class="text-xs font-black text-green-600 shrink-0 ml-2">R$ {{ (item.p * item.q).toFixed(2) }}</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Resumo compacto -->
+            <!-- Resumo: ações | itens | tamanho payload -->
             <div class="mt-3 flex gap-2">
                 <div class="flex-1 bg-orange-50 rounded-xl p-2.5 border border-orange-100 text-center">
                     <p class="text-xl font-black text-orange-600">{{ total_acoes }}</p>
                     <p class="text-[9px] text-orange-400 font-bold uppercase tracking-widest">Ações</p>
                 </div>
                 <div class="flex-1 bg-blue-50 rounded-xl p-2.5 border border-blue-100 text-center">
-                    <p class="text-xl font-black text-blue-600">{{ lista_itens.length }}</p>
+                    <p class="text-xl font-black text-blue-600">{{ lista_display.length }}</p>
                     <p class="text-[9px] text-blue-400 font-bold uppercase tracking-widest">Itens</p>
                 </div>
                 <div class="flex-1 bg-gray-50 rounded-xl p-2.5 border border-gray-100 text-center">
-                    <p class="text-xl font-black text-gray-600">{{ tamanho_qr }}</p>
+                    <p class="text-xl font-black text-gray-600">{{ tamanho_payload }}</p>
                     <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Chars</p>
                 </div>
             </div>
@@ -61,11 +60,9 @@
             </button>
         </div>
 
-        <!-- Sem dados pendentes -->
+        <!-- Sem dados -->
         <div v-else class="text-center py-10">
-            <div class="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
-                ✔️
-            </div>
+            <div class="w-16 h-16 bg-green-50 text-green-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">✔️</div>
             <h3 class="text-lg font-black text-gray-800">Nada para Sincronizar</h3>
             <p class="text-xs text-gray-400 mt-2 font-medium">Não há dados offline neste dispositivo.</p>
         </div>
@@ -80,104 +77,117 @@ import { db } from '../../banco_local/db.js';
 
 const emit = defineEmits(['fechar']);
 
-const carregando = ref(true);
-const qr_texto = ref('');
-const total_acoes = ref(0);
-const lista_itens = ref([]);  // Lista legível para exibir no modal
-const tamanho_qr = ref(0);    // Tamanho em caracteres do payload — útil para debug
+const carregando    = ref(true);
+const qr_texto      = ref('');
+const total_acoes   = ref(0);
+const lista_display = ref([]); // só para exibição — nomes vêm do Dexie local, não vão no QR
+const tamanho_payload = ref(0);
 
-// 🔑 Protocolo P2P v3: chaves minificadas para reduzir o QR ao máximo
-// Mapeamento de método: 1=POST, 2=DELETE (idêntico ao LeitorQrOffline)
+// 🔑 Protocolo P2P v5
+//
+// Snap (s): por mesa → [ mesa_id, [ [prod_id, qtd, uuid8], ... ] ]
+//   comanda_id é derivado no receptor como "off_" + mesa_id — não precisa viajar
+//
+// Ações (a): por ação → [ url_curta, metodo_id, [ [prod_id, qtd], ... ], uuid8 ]
+//   nome e preço do produto são buscados no db.produtos do receptor
+//
+// Método: 1=POST, 2=DELETE
+
 const METODO_ID = { 'POST': 1, 'DELETE': 2 };
 
-/**
- * Minifica um item de comanda para o menor formato possível no QR:
- * { produto_id, nome_produto, quantidade, preco_unitario, uuid_operacao }
- * vira → [produto_id, nome_curto, qtd, preco, uuid_curto]
- * 
- * uuid é cortado para 8 chars — suficiente para deduplicação P2P local
- */
-const minificar_item = (item) => ({
-    i: item.produto_id,                              // i = produto_id
-    n: item.nome_produto || `#${item.produto_id}`,   // n = nome
-    q: item.quantidade,                              // q = quantidade
-    p: Number(item.preco_unitario ?? item.preco_venda ?? 0),  // p = preço unitário
-    u: (item.uuid_operacao || '').slice(0, 8)        // u = uuid (primeiros 8 chars)
-});
+const URL_CURTA = {
+    '/adicionar-itens-comanda/': 'aic/',
+    '/alterar-quantidade-item/': 'aqi/',
+    '/remover-item-comanda/'   : 'ric/',
+    '/fechar-comanda/'         : 'fc/',
+    '/abrir-comanda'           : 'ac',
+    '/venda-balcao'            : 'vb',
+};
 
 /**
- * Minifica uma ação da fila vendas_pendentes:
- * { url_destino, metodo, payload_venda: { itens: [...], uuid_operacao } }
- * vira → [url_comprimida, metodo_id, itens_minificados, uuid_curto]
- * 
- * A URL é comprimida removendo prefixos repetitivos comuns.
+ * Comprime URL da API para versão curta.
+ * @param {string} url
+ * @returns {string}
  */
-const minificar_acao = (acao) => {
-    const metodo_id = METODO_ID[acao.metodo?.toUpperCase()] ?? 1;
-    const payload = acao.payload_venda || {};
-
-    // Comprime a URL removendo padrões comuns
-    const url = acao.url_destino
-        .replace('/adicionar-itens-comanda/', 'aic/')
-        .replace('/alterar-quantidade-item/', 'aqi/')
-        .replace('/remover-item-comanda/', 'ric/')
-        .replace('/fechar-comanda/', 'fc/')
-        .replace('/abrir-comanda', 'ac')
-        .replace('/venda-balcao', 'vb');
-
-    // Minifica os itens dentro do payload (se existirem)
-    const itens_min = (payload.itens || []).map(minificar_item);
-    const uuid_curto = (payload.uuid_operacao || '').slice(0, 8);
-
-    return [url, metodo_id, itens_min, uuid_curto];
+const comprimir_url = (url) => {
+    for (const [longa, curta] of Object.entries(URL_CURTA)) {
+        if (url.startsWith(longa)) return curta + url.slice(longa.length);
+    }
+    return url;
 };
 
 const carregar_dados = async () => {
     carregando.value = true;
-    qr_texto.value = '';
-    lista_itens.value = [];
+    qr_texto.value   = '';
+    lista_display.value = [];
+
     try {
         const acoes_brutas = await db.vendas_pendentes.toArray();
-        const estados = await db.estado_comandas_local.toArray();
+        const estados      = await db.estado_comandas_local.toArray();
 
         total_acoes.value = acoes_brutas.length;
 
         if (acoes_brutas.length === 0 && estados.length === 0) return;
 
-        // Monta lista legível de itens para exibir no modal
-        const todos_itens = [];
+        // Mapa de produtos para montar a lista de exibição (não vai no QR)
+        const produtos_map = {};
+        for (const p of await db.produtos.toArray()) produtos_map[p.id] = p;
+
+        // Lista de exibição — agrupada por produto_id
+        const display = [];
         for (const estado of estados) {
             for (const item of (estado.itens || [])) {
-                const existente = todos_itens.find(i => i.i === item.produto_id);
+                const prod     = produtos_map[item.produto_id];
+                const existente = display.find(d => d.produto_id === item.produto_id);
                 if (existente) {
                     existente.q += item.quantidade;
                 } else {
-                    todos_itens.push(minificar_item(item));
+                    display.push({
+                        produto_id: item.produto_id,
+                        nome: prod?.nome_produto || `Produto #${item.produto_id}`,
+                        q   : item.quantidade,
+                        p   : item.preco_unitario ?? prod?.preco_venda ?? 0,
+                    });
                 }
             }
         }
-        lista_itens.value = todos_itens;
+        lista_display.value = display;
 
-        // Protocolo v3 — tudo minificado
-        const pacote = {
-            v: 3,
-            t: (localStorage.getItem('nitec_tenant_id') || '').slice(0, 12), // tenant truncado
-            // snap: estado legível por mesa (apenas o necessário)
-            s: estados.map(e => ({
-                c: e.comanda_id,                // c = comanda_id
-                m: e.mesa_id,                   // m = mesa_id
-                i: (e.itens || []).map(minificar_item)
-            })),
-            // acoes: fila para o servidor (minificada)
-            a: acoes_brutas.map(minificar_acao)
-        };
+        // ── Protocolo v5: payload mínimo ───────────────────────────────────
+        //
+        // snap: [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
+        //   comanda_id removido — o receptor deriva "off_" + mesa_id
+        //
+        const s = estados.map(e => [
+            e.mesa_id,
+            (e.itens || []).map(i => [
+                i.produto_id,
+                i.quantidade,
+                (i.uuid_operacao || '').slice(0, 8)
+            ])
+        ]);
 
-        const json_final = JSON.stringify(pacote);
-        tamanho_qr.value = json_final.length;
-        qr_texto.value = json_final;
+        // acoes: [ [url_curta, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
+        //   preco_unitario removido — o receptor busca no db.produtos local
+        //
+        const a = acoes_brutas.map(acao => {
+            const payload = acao.payload_venda || {};
+            const itens   = (payload.itens || []).map(i => [i.produto_id, i.quantidade]);
+            const uuid8   = (payload.uuid_operacao || '').slice(0, 8);
+            return [comprimir_url(acao.url_destino), METODO_ID[acao.metodo?.toUpperCase()] ?? 1, itens, uuid8];
+        });
+
+        // Tenant truncado a 8 chars
+        const t = (localStorage.getItem('nitec_tenant_id') || '').slice(0, 8);
+
+        const pacote = { v: 5, t, s, a };
+        const json   = JSON.stringify(pacote);
+
+        tamanho_payload.value = json.length;
+        qr_texto.value        = json;
 
     } catch (e) {
-        console.error("Erro ao gerar QR Sync:", e);
+        console.error("Erro ao gerar QR Sync v5:", e);
     } finally {
         carregando.value = false;
     }

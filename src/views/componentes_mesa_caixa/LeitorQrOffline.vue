@@ -1,6 +1,6 @@
 <template>
     <div class="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
-        
+
         <!-- Cabeçalho -->
         <div class="bg-nitec_blue p-5 flex justify-between items-center">
             <div>
@@ -22,8 +22,9 @@
                 class="w-full h-full object-cover"
             />
 
-            <!-- Aguardando câmera ligar -->
-            <div v-if="camera_ativa && !camera_ligada && !resultado" class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-3">
+            <!-- Aguardando câmera -->
+            <div v-if="camera_ativa && !camera_ligada && !resultado"
+                 class="absolute inset-0 bg-black flex flex-col items-center justify-center gap-3">
                 <svg class="animate-spin h-8 w-8 text-white/50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -54,7 +55,8 @@
             </div>
 
             <!-- Resultado -->
-            <div v-if="resultado" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 overflow-y-auto"
+            <div v-if="resultado"
+                 class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 overflow-y-auto"
                  :class="resultado.erro ? 'bg-red-900/95' : 'bg-green-900/95'">
                 <span class="text-4xl shrink-0">{{ resultado.erro ? '❌' : '✅' }}</span>
                 <p class="text-white font-black text-base text-center">{{ resultado.mensagem }}</p>
@@ -62,19 +64,18 @@
                 <!-- Lista de itens recebidos -->
                 <div v-if="!resultado.erro && resultado.itens_recebidos?.length" class="w-full mt-1">
                     <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-2 text-center">Itens recebidos:</p>
-                    <div class="bg-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                    <div class="bg-white/10 rounded-xl overflow-hidden max-h-44 overflow-y-auto">
                         <div v-for="(item, i) in resultado.itens_recebidos" :key="i"
                              class="flex justify-between items-center px-3 py-2 border-b border-white/10 last:border-0">
-                            <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-black text-orange-300 bg-white/10 px-1.5 py-0.5 rounded">{{ item.q }}x</span>
-                                <span class="text-xs font-bold text-white">{{ item.n }}</span>
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-[10px] font-black text-orange-300 bg-white/10 px-1.5 py-0.5 rounded shrink-0">{{ item.q }}x</span>
+                                <span class="text-xs font-bold text-white truncate">{{ item.nome }}</span>
                             </div>
-                            <span class="text-xs font-black text-green-300">R$ {{ (item.p * item.q).toFixed(2) }}</span>
+                            <span class="text-xs font-black text-green-300 shrink-0 ml-2">R$ {{ (item.p * item.q).toFixed(2) }}</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Contadores -->
                 <div v-if="!resultado.erro" class="grid grid-cols-2 gap-2 w-full mt-1">
                     <div class="bg-white/10 rounded-xl p-2.5 text-center">
                         <p class="text-white font-black text-lg">{{ resultado.itens_novos }}</p>
@@ -92,8 +93,9 @@
                 </button>
             </div>
 
-            <!-- Câmera inativa por erro -->
-            <div v-if="!camera_ativa && !resultado" class="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center gap-3 p-6">
+            <!-- Erro de câmera -->
+            <div v-if="!camera_ativa && !resultado"
+                 class="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center gap-3 p-6">
                 <span class="text-5xl opacity-30">📷</span>
                 <p class="text-gray-400 font-bold text-sm text-center">{{ erro_camera }}</p>
                 <p class="text-gray-600 text-xs text-center font-bold mt-1">Verifique se o browser tem permissão para usar a câmera.</p>
@@ -116,48 +118,37 @@ import { useMesasStore } from '../../stores/mesas_store.js';
 
 const emit = defineEmits(['fechar', 'sucesso']);
 
-const loja_mesas = useMesasStore();
+const loja_mesas    = useMesasStore();
 const camera_ativa  = ref(true);
 const camera_ligada = ref(false);
 const processando   = ref(false);
 const resultado     = ref(null);
 const erro_camera   = ref('');
 
-// 🔑 Protocolo P2P: 1=POST, 2=DELETE — idêntico ao GeradorQrOffline
+// 🔑 Protocolo P2P: 1=POST, 2=DELETE
 const ID_PARA_METODO = { 1: 'POST', 2: 'DELETE' };
 
-// Dicionário inverso de URLs comprimidas (v3)
+// Expansão de URLs comprimidas (v3/v4/v5)
 const URL_EXPAND = {
     'aic/': '/adicionar-itens-comanda/',
     'aqi/': '/alterar-quantidade-item/',
     'ric/': '/remover-item-comanda/',
     'fc/' : '/fechar-comanda/',
     'ac'  : '/abrir-comanda',
-    'vb'  : '/venda-balcao'
+    'vb'  : '/venda-balcao',
 };
 
 /**
- * Descomprime uma URL minificada de volta para o formato da API.
+ * Expande URL comprimida para o formato da API.
+ * @param {string} url_min
+ * @returns {string}
  */
 const expandir_url = (url_min) => {
     for (const [curta, completa] of Object.entries(URL_EXPAND)) {
-        if (url_min.startsWith(curta)) {
-            return completa + url_min.slice(curta.length);
-        }
+        if (url_min.startsWith(curta)) return completa + url_min.slice(curta.length);
     }
-    return url_min; // já estava no formato completo (v1/v2)
+    return url_min;
 };
-
-/**
- * Expande um item minificado {i,n,q,p,u} de volta para o formato completo.
- */
-const expandir_item = (item_min) => ({
-    produto_id    : item_min.i,
-    nome_produto  : item_min.n,
-    quantidade    : item_min.q,
-    preco_unitario: item_min.p,
-    uuid_operacao : item_min.u || null
-});
 
 const ao_camera_ligar = () => { camera_ligada.value = true; };
 
@@ -168,45 +159,59 @@ const ao_detectar_qr = async (codigos) => {
     try {
         const pacote = JSON.parse(codigos[0].rawValue);
 
-        // Aceita v1, v2 e v3
-        if (!pacote.v || ![1, 2, 3].includes(pacote.v)) {
+        if (!pacote.v || ![1, 2, 3, 4, 5].includes(pacote.v)) {
             throw new Error("Formato de QR Code não reconhecido.");
         }
 
-        // Validação de tenant (v3 trunca para 12 chars, compara parcialmente)
-        const tenant_local = (localStorage.getItem('nitec_tenant_id') || '');
+        // Validação de tenant (truncado a 8 chars no v5)
+        const tenant_local = localStorage.getItem('nitec_tenant_id') || '';
         const tenant_qr    = pacote.t || '';
-        if (!tenant_local.startsWith(tenant_qr) && !tenant_qr.startsWith(tenant_local.slice(0, 12))) {
-            throw new Error("QR Code de outro estabelecimento. Recusado por segurança.");
+        if (tenant_local.slice(0, 8) !== tenant_qr.slice(0, 8)) {
+            throw new Error("QR Code de outro estabelecimento. Recusado.");
         }
 
-        let itens_novos    = 0;
-        let acoes_novas    = 0;
+        // Mapa local de produtos — usado para lookup de nome e preço sem enviar no QR
+        const produtos_map = {};
+        for (const p of await db.produtos.toArray()) produtos_map[p.id] = p;
+
+        let itens_novos = 0;
+        let acoes_novas = 0;
         const itens_recebidos = [];
 
-        // ── PROTOCOLO v3: s (snap minificado) + a (acoes minificadas) ───────
-        if (pacote.v === 3) {
-            const snaps = pacote.s || [];
+        // ── PROTOCOLO v5 ─────────────────────────────────────────────────────
+        // snap: [ [mesa_id, [ [prod_id, qtd, uuid8], ... ]], ... ]
+        // acoes: [ [url_min, metodo_id, [ [prod_id, qtd], ... ], uuid8], ... ]
+        if (pacote.v === 5) {
 
-            for (const entry of snaps) {
-                const comanda_id = entry.c;
-                const mesa_id    = entry.m;
-                const itens_min  = entry.i || [];
-                const itens_exp  = itens_min.map(expandir_item);
+            for (const [mesa_id, itens_min] of (pacote.s || [])) {
+                // comanda_id é sempre "off_" + mesa_id — derivado, não viaja no QR
+                const comanda_id = `off_${mesa_id}`;
 
-                const estado_existente = await db.estado_comandas_local.get(String(comanda_id));
+                // Expande cada item usando o db.produtos local
+                const itens_exp = (itens_min || []).map(([prod_id, qtd, uuid8]) => {
+                    const prod = produtos_map[prod_id] || {};
+                    return {
+                        produto_id    : prod_id,
+                        nome_produto  : prod.nome_produto  || `Produto #${prod_id}`,
+                        quantidade    : qtd,
+                        preco_unitario: prod.preco_venda   || 0,
+                        uuid_operacao : uuid8              || null,
+                    };
+                });
+
+                const estado_existente = await db.estado_comandas_local.get(comanda_id);
 
                 if (!estado_existente) {
                     await db.estado_comandas_local.put({
-                        comanda_id: String(comanda_id),
+                        comanda_id,
                         mesa_id,
-                        tenant_id: tenant_local,
-                        itens: itens_exp,
+                        tenant_id    : tenant_local,
+                        itens        : itens_exp,
                         atualizado_em: new Date().toISOString()
                     });
                     itens_novos += itens_exp.length;
                 } else {
-                    // Merge por uuid_operacao (8 chars) — deduplicação
+                    // Merge por uuid8 — nunca duplica o mesmo lote
                     const uuids_ok = new Set(
                         estado_existente.itens.map(i => i.uuid_operacao).filter(Boolean)
                     );
@@ -214,101 +219,140 @@ const ao_detectar_qr = async (codigos) => {
                     if (novos.length > 0) {
                         await db.estado_comandas_local.put({
                             ...estado_existente,
-                            itens: [...estado_existente.itens, ...novos],
+                            itens        : [...estado_existente.itens, ...novos],
                             atualizado_em: new Date().toISOString()
                         });
                         itens_novos += novos.length;
                     }
                 }
 
-                // Popula a lista visível de itens recebidos
-                itens_exp.forEach(i => itens_recebidos.push({ n: i.nome_produto, q: i.quantidade, p: i.preco_unitario }));
+                // Lista visível com nomes do Dexie local
+                itens_exp.forEach(i => itens_recebidos.push({
+                    nome: i.nome_produto,
+                    q   : i.quantidade,
+                    p   : i.preco_unitario,
+                }));
 
                 // Marca mesa como ocupada no Dexie local
-                if (mesa_id) {
-                    await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
-                }
+                if (mesa_id) await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
             }
 
-            // Processa ações minificadas
-            const acoes_min = pacote.a || [];
+            // Processa ações
             const todas_vendas = await db.vendas_pendentes.toArray();
             const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
 
-            for (const acao_min of acoes_min) {
-                const [url_min, metodo_id, itens_min, uuid_curto] = acao_min;
-                const url    = expandir_url(url_min);
-                const metodo = ID_PARA_METODO[metodo_id] || 'POST';
+            for (const [url_min, metodo_id, itens_min, uuid8] of (pacote.a || [])) {
+                if (uuid8 && uuids_locais.has(uuid8)) continue;
 
-                // Deduplicação por uuid (8 chars)
-                if (uuid_curto && uuids_locais.has(uuid_curto)) continue;
-
-                // Reconstrói payload completo
-                const itens_exp = (itens_min || []).map(expandir_item);
-                const payload   = itens_exp.length > 0
-                    ? { itens: itens_exp.map(i => ({ produto_id: i.produto_id, quantidade: i.quantidade, preco_unitario: i.preco_unitario })), uuid_operacao: uuid_curto }
-                    : { uuid_operacao: uuid_curto };
+                const itens_payload = (itens_min || []).map(([prod_id, qtd]) => ({
+                    produto_id    : prod_id,
+                    quantidade    : qtd,
+                    preco_unitario: produtos_map[prod_id]?.preco_venda || 0,
+                }));
 
                 await db.vendas_pendentes.add({
                     tenant_id    : tenant_local,
                     data_venda   : new Date().toISOString(),
                     valor_total  : 0,
-                    url_destino  : url,
-                    metodo,
-                    payload_venda: payload,
-                    uuid_operacao: uuid_curto || null
+                    url_destino  : expandir_url(url_min),
+                    metodo       : ID_PARA_METODO[metodo_id] || 'POST',
+                    payload_venda: itens_payload.length > 0
+                        ? { itens: itens_payload, uuid_operacao: uuid8 }
+                        : { uuid_operacao: uuid8 },
+                    uuid_operacao: uuid8 || null,
                 });
 
-                if (uuid_curto) uuids_locais.add(uuid_curto);
+                if (uuid8) uuids_locais.add(uuid8);
                 acoes_novas++;
             }
 
             await loja_mesas.buscar_mesas(true);
         }
 
-        // ── PROTOCOLO v1 e v2 (retrocompatibilidade) ────────────────────────
-        if (pacote.v === 1 || pacote.v === 2) {
-            // snap v2
-            const snaps_v2 = pacote.snap || [];
-            for (const entry of snaps_v2) {
-                const estado_existente = await db.estado_comandas_local.get(entry.comanda_id);
-                if (!estado_existente) {
+        // ── RETROCOMPATIBILIDADE v1–v4 ────────────────────────────────────
+        if ([1, 2, 3, 4].includes(pacote.v)) {
+            const snaps = pacote.snap || pacote.s || [];
+
+            for (const entry of snaps) {
+                // v4: [comanda_id, mesa_id, itens] — v3: {c,m,i} — v2: {comanda_id,mesa_id,itens}
+                let comanda_id, mesa_id, itens_raw;
+                if (Array.isArray(entry)) {
+                    [comanda_id, mesa_id, itens_raw] = entry;           // v4
+                } else {
+                    comanda_id = entry.c ?? entry.comanda_id;
+                    mesa_id    = entry.m ?? entry.mesa_id;
+                    itens_raw  = entry.i ?? entry.itens ?? [];
+                }
+
+                const itens_exp = (itens_raw || []).map(i => {
+                    if (Array.isArray(i)) {
+                        // v4: [prod_id, qtd, uuid8]
+                        const prod = produtos_map[i[0]] || {};
+                        return { produto_id: i[0], nome_produto: prod.nome_produto || `#${i[0]}`, quantidade: i[1], preco_unitario: prod.preco_venda || 0, uuid_operacao: i[2] };
+                    }
+                    // v3: {i,n,q,p,u}  — v2: objeto completo
+                    return {
+                        produto_id    : i.i ?? i.produto_id,
+                        nome_produto  : i.n ?? i.nome_produto,
+                        quantidade    : i.q ?? i.quantidade,
+                        preco_unitario: i.p ?? i.preco_unitario,
+                        uuid_operacao : i.u ?? i.uuid_operacao,
+                    };
+                });
+
+                const estado = await db.estado_comandas_local.get(String(comanda_id));
+                if (!estado) {
                     await db.estado_comandas_local.put({
-                        comanda_id: entry.comanda_id, mesa_id: entry.mesa_id,
-                        tenant_id: tenant_local, itens: entry.itens || [],
+                        comanda_id: String(comanda_id), mesa_id,
+                        tenant_id: tenant_local, itens: itens_exp,
                         atualizado_em: new Date().toISOString()
                     });
-                    itens_novos += entry.itens?.length || 0;
+                    itens_novos += itens_exp.length;
                 }
-                if (entry.mesa_id) await db.mesas.update(Number(entry.mesa_id), { status_mesa: 'ocupada' });
+                if (mesa_id) await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
             }
 
-            // acoes v1/v2
-            const acoes_v = pacote.acoes || pacote.d || [];
-            const todas_vendas = await db.vendas_pendentes.toArray();
-            const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
-            for (const acao of acoes_v) {
-                const [url, metodo_id, payload] = acao;
-                const uuid = payload?.uuid_operacao;
-                if (uuid && uuids_locais.has(uuid)) continue;
-                await db.vendas_pendentes.add({
-                    tenant_id: tenant_local, data_venda: new Date().toISOString(),
-                    valor_total: 0, url_destino: url,
-                    metodo: ID_PARA_METODO[metodo_id] || 'POST',
-                    payload_venda: payload || {}, uuid_operacao: uuid || null
-                });
-                if (uuid) uuids_locais.add(uuid);
+            const acoes_raw = pacote.a || pacote.acoes || pacote.d || [];
+            const todas     = await db.vendas_pendentes.toArray();
+            const uuids     = new Set(todas.map(v => v.uuid_operacao).filter(Boolean));
+
+            for (const acao of acoes_raw) {
+                if (Array.isArray(acao)) {
+                    const [url_min, metodo_id, itens_min, uuid8] = acao;
+                    if (uuid8 && uuids.has(uuid8)) continue;
+                    const itens_p = (itens_min || []).map(i => Array.isArray(i)
+                        ? { produto_id: i[0], quantidade: i[1], preco_unitario: produtos_map[i[0]]?.preco_venda || 0 }
+                        : { produto_id: i.i ?? i.produto_id, quantidade: i.q ?? i.quantidade, preco_unitario: i.p ?? i.preco_unitario ?? 0 }
+                    );
+                    await db.vendas_pendentes.add({
+                        tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0,
+                        url_destino: expandir_url(url_min), metodo: ID_PARA_METODO[metodo_id] || 'POST',
+                        payload_venda: itens_p.length > 0 ? { itens: itens_p, uuid_operacao: uuid8 } : { uuid_operacao: uuid8 },
+                        uuid_operacao: uuid8 || null,
+                    });
+                    if (uuid8) uuids.add(uuid8);
+                } else {
+                    const [url, metodo_id, payload] = acao;
+                    const uuid = payload?.uuid_operacao;
+                    if (uuid && uuids.has(uuid)) continue;
+                    await db.vendas_pendentes.add({
+                        tenant_id: tenant_local, data_venda: new Date().toISOString(), valor_total: 0,
+                        url_destino: url, metodo: ID_PARA_METODO[metodo_id] || 'POST',
+                        payload_venda: payload || {}, uuid_operacao: uuid || null,
+                    });
+                    if (uuid) uuids.add(uuid);
+                }
                 acoes_novas++;
             }
             await loja_mesas.buscar_mesas(true);
         }
 
         resultado.value = {
-            erro: false,
-            mensagem: itens_novos + acoes_novas > 0 ? 'Sincronização concluída!' : 'Já estava tudo atualizado.',
+            erro            : false,
+            mensagem        : itens_novos + acoes_novas > 0 ? 'Sincronização concluída!' : 'Já estava tudo atualizado.',
             itens_novos,
             acoes_novas,
-            itens_recebidos
+            itens_recebidos,
         };
 
         emit('sucesso');
