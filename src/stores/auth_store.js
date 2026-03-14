@@ -1,7 +1,6 @@
-// C:\PDP\NITEC_APP\src\stores\auth_store.js
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api_cliente, { configurar_url_base } from '../servicos/api_cliente.js';
+import api_cliente, { configurar_url_base, sincronizar_cache_para_local } from '../servicos/api_cliente.js';
 
 export const useAuthStore = defineStore('auth_store', () => {
     const usuario_logado = ref(JSON.parse(localStorage.getItem('nitec_usuario')) || null);
@@ -9,7 +8,6 @@ export const useAuthStore = defineStore('auth_store', () => {
 
     const realizar_login = async (loja, email, senha) => {
         try {
-            // Se for master, bate no Admin. Se for cliente, bate no Tenant.
             const rota_login = (loja === 'master') ? '/admin/login' : '/realizar-login';
 
             const resposta = await api_cliente.post(rota_login, {
@@ -17,7 +15,6 @@ export const useAuthStore = defineStore('auth_store', () => {
                 password: senha
             });
 
-            // Salva o token e os dados
             const token = resposta.data.token;
             const usuario = resposta.data.usuario;
 
@@ -26,6 +23,13 @@ export const useAuthStore = defineStore('auth_store', () => {
 
             localStorage.setItem('nitec_token', token);
             localStorage.setItem('nitec_usuario', JSON.stringify(usuario));
+
+            // 🟢 Sincronização completa com o servidor local após login bem-sucedido
+            // Garante que o servidor local tenha TODOS os dados da VPS
+            // independente de quais telas o usuário vai navegar
+            if (loja !== 'master') {
+                sincronizar_snapshot_completo().catch(() => {});
+            }
 
             return resposta.data;
         } catch (erro) {
@@ -40,16 +44,46 @@ export const useAuthStore = defineStore('auth_store', () => {
 
         localStorage.removeItem('nitec_token');
         localStorage.removeItem('nitec_usuario');
-
-        // Limpa obrigatoriamente rastros de suporte para evitar 401
         localStorage.removeItem('nitec_api_tenant');
         localStorage.removeItem('nitec_modo_suporte');
         localStorage.removeItem('nitec_nome_cliente');
         localStorage.removeItem('nitec_token_admin');
         localStorage.removeItem('nitec_usuario_admin');
-        
-        // NOTA: Não removemos as chaves 'nitec_saved_' nem 'nitec_tenant_id'
     };
 
     return { usuario_logado, token_acesso, realizar_login, encerrar_sessao };
 });
+
+/**
+ * Busca todos os dados da VPS e envia para o servidor local em background.
+ * Chamado logo após o login bem-sucedido.
+ * Roda em segundo plano — não bloqueia o login nem a navegação.
+ */
+const sincronizar_snapshot_completo = async () => {
+    try {
+        // Busca os 3 recursos em paralelo para ser mais rápido
+        const [resp_produtos, resp_mesas, resp_comandas] = await Promise.allSettled([
+            api_cliente.get('/listar-produtos'),
+            api_cliente.get('/listar-mesas'),
+            api_cliente.get('/listar-comandas'),
+        ]);
+
+        const produtos = resp_produtos.status === 'fulfilled'
+            ? (resp_produtos.value.data.produtos || [])
+            : null;
+
+        const mesas = resp_mesas.status === 'fulfilled'
+            ? (resp_mesas.value.data.dados || resp_mesas.value.data.mesas || [])
+            : null;
+
+        const comandas = resp_comandas.status === 'fulfilled'
+            ? (resp_comandas.value.data.comandas || [])
+            : null;
+
+        await sincronizar_cache_para_local(produtos, mesas, comandas);
+
+        console.log('[Auth] Snapshot completo enviado para o servidor local.');
+    } catch (e) {
+        console.warn('[Auth] Falha ao sincronizar snapshot:', e.message);
+    }
+};
