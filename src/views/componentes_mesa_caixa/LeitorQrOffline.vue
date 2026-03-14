@@ -13,7 +13,6 @@
         <!-- Câmera -->
         <div class="relative bg-black aspect-square overflow-hidden">
 
-            <!-- 🟢 v5: usa camera="rear" em vez de :constraints -->
             <QrcodeStream
                 v-if="camera_ativa && !resultado"
                 camera="rear"
@@ -31,9 +30,10 @@
                 </svg>
                 <p class="text-white/50 font-bold text-xs uppercase tracking-widest">A iniciar câmera...</p>
             </div>
-            
-            <!-- Mira animada — só aparece quando câmera está ligada -->
-            <div v-if="camera_ativa && camera_ligada && !processando && !resultado" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+
+            <!-- Mira animada -->
+            <div v-if="camera_ativa && camera_ligada && !processando && !resultado"
+                 class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <div class="w-52 h-52 relative">
                     <div class="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-lg"></div>
                     <div class="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-lg"></div>
@@ -53,22 +53,41 @@
                 <p class="text-white font-bold text-sm">Mesclando dados...</p>
             </div>
 
-            <!-- Resultado do merge -->
-            <div v-if="resultado" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6"
-                 :class="resultado.erro ? 'bg-red-900/90' : 'bg-green-900/90'">
-                <span class="text-5xl">{{ resultado.erro ? '❌' : '✅' }}</span>
+            <!-- Resultado -->
+            <div v-if="resultado" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 overflow-y-auto"
+                 :class="resultado.erro ? 'bg-red-900/95' : 'bg-green-900/95'">
+                <span class="text-4xl shrink-0">{{ resultado.erro ? '❌' : '✅' }}</span>
                 <p class="text-white font-black text-base text-center">{{ resultado.mensagem }}</p>
-                <div v-if="!resultado.erro" class="grid grid-cols-2 gap-3 w-full mt-2">
-                    <div class="bg-white/10 rounded-xl p-3 text-center">
-                        <p class="text-white font-black text-xl">{{ resultado.itens_novos }}</p>
-                        <p class="text-white/70 text-[10px] font-bold uppercase">Itens recebidos</p>
-                    </div>
-                    <div class="bg-white/10 rounded-xl p-3 text-center">
-                        <p class="text-white font-black text-xl">{{ resultado.acoes_novas }}</p>
-                        <p class="text-white/70 text-[10px] font-bold uppercase">Ações importadas</p>
+
+                <!-- Lista de itens recebidos -->
+                <div v-if="!resultado.erro && resultado.itens_recebidos?.length" class="w-full mt-1">
+                    <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-2 text-center">Itens recebidos:</p>
+                    <div class="bg-white/10 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                        <div v-for="(item, i) in resultado.itens_recebidos" :key="i"
+                             class="flex justify-between items-center px-3 py-2 border-b border-white/10 last:border-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-black text-orange-300 bg-white/10 px-1.5 py-0.5 rounded">{{ item.q }}x</span>
+                                <span class="text-xs font-bold text-white">{{ item.n }}</span>
+                            </div>
+                            <span class="text-xs font-black text-green-300">R$ {{ (item.p * item.q).toFixed(2) }}</span>
+                        </div>
                     </div>
                 </div>
-                <button @click="$emit('fechar')" class="mt-3 bg-white/20 hover:bg-white/30 text-white font-black text-sm px-6 py-2 rounded-xl transition-all">
+
+                <!-- Contadores -->
+                <div v-if="!resultado.erro" class="grid grid-cols-2 gap-2 w-full mt-1">
+                    <div class="bg-white/10 rounded-xl p-2.5 text-center">
+                        <p class="text-white font-black text-lg">{{ resultado.itens_novos }}</p>
+                        <p class="text-white/60 text-[9px] font-bold uppercase">Itens novos</p>
+                    </div>
+                    <div class="bg-white/10 rounded-xl p-2.5 text-center">
+                        <p class="text-white font-black text-lg">{{ resultado.acoes_novas }}</p>
+                        <p class="text-white/60 text-[9px] font-bold uppercase">Ações importadas</p>
+                    </div>
+                </div>
+
+                <button @click="$emit('fechar')"
+                        class="mt-2 bg-white/20 hover:bg-white/30 text-white font-black text-sm px-6 py-2 rounded-xl transition-all shrink-0">
                     Fechar
                 </button>
             </div>
@@ -77,7 +96,7 @@
             <div v-if="!camera_ativa && !resultado" class="absolute inset-0 bg-gray-900 flex flex-col items-center justify-center gap-3 p-6">
                 <span class="text-5xl opacity-30">📷</span>
                 <p class="text-gray-400 font-bold text-sm text-center">{{ erro_camera }}</p>
-                <p class="text-gray-600 text-xs text-center font-bold mt-1">Verifique se o browser tem permissão para usar a câmera nas configurações do dispositivo.</p>
+                <p class="text-gray-600 text-xs text-center font-bold mt-1">Verifique se o browser tem permissão para usar a câmera.</p>
             </div>
         </div>
 
@@ -98,19 +117,49 @@ import { useMesasStore } from '../../stores/mesas_store.js';
 const emit = defineEmits(['fechar', 'sucesso']);
 
 const loja_mesas = useMesasStore();
-const camera_ativa = ref(true);
+const camera_ativa  = ref(true);
 const camera_ligada = ref(false);
-const processando = ref(false);
-const resultado = ref(null);
-const erro_camera = ref('');
+const processando   = ref(false);
+const resultado     = ref(null);
+const erro_camera   = ref('');
 
-// 🔑 Protocolo P2P: 1 = POST, 2 = DELETE — deve ser idêntico ao GeradorQrOffline
+// 🔑 Protocolo P2P: 1=POST, 2=DELETE — idêntico ao GeradorQrOffline
 const ID_PARA_METODO = { 1: 'POST', 2: 'DELETE' };
 
-/** Câmera traseira iniciou — remove o spinner e mostra a mira */
-const ao_camera_ligar = () => {
-    camera_ligada.value = true;
+// Dicionário inverso de URLs comprimidas (v3)
+const URL_EXPAND = {
+    'aic/': '/adicionar-itens-comanda/',
+    'aqi/': '/alterar-quantidade-item/',
+    'ric/': '/remover-item-comanda/',
+    'fc/' : '/fechar-comanda/',
+    'ac'  : '/abrir-comanda',
+    'vb'  : '/venda-balcao'
 };
+
+/**
+ * Descomprime uma URL minificada de volta para o formato da API.
+ */
+const expandir_url = (url_min) => {
+    for (const [curta, completa] of Object.entries(URL_EXPAND)) {
+        if (url_min.startsWith(curta)) {
+            return completa + url_min.slice(curta.length);
+        }
+    }
+    return url_min; // já estava no formato completo (v1/v2)
+};
+
+/**
+ * Expande um item minificado {i,n,q,p,u} de volta para o formato completo.
+ */
+const expandir_item = (item_min) => ({
+    produto_id    : item_min.i,
+    nome_produto  : item_min.n,
+    quantidade    : item_min.q,
+    preco_unitario: item_min.p,
+    uuid_operacao : item_min.u || null
+});
+
+const ao_camera_ligar = () => { camera_ligada.value = true; };
 
 const ao_detectar_qr = async (codigos) => {
     if (processando.value || resultado.value || !codigos?.length) return;
@@ -119,95 +168,147 @@ const ao_detectar_qr = async (codigos) => {
     try {
         const pacote = JSON.parse(codigos[0].rawValue);
 
-        // Validação: versão e tenant
-        if (!pacote.v || ![1, 2].includes(pacote.v)) {
+        // Aceita v1, v2 e v3
+        if (!pacote.v || ![1, 2, 3].includes(pacote.v)) {
             throw new Error("Formato de QR Code não reconhecido.");
         }
-        const tenant_local = localStorage.getItem('nitec_tenant_id');
-        if (pacote.t !== tenant_local) {
+
+        // Validação de tenant (v3 trunca para 12 chars, compara parcialmente)
+        const tenant_local = (localStorage.getItem('nitec_tenant_id') || '');
+        const tenant_qr    = pacote.t || '';
+        if (!tenant_local.startsWith(tenant_qr) && !tenant_qr.startsWith(tenant_local.slice(0, 12))) {
             throw new Error("QR Code de outro estabelecimento. Recusado por segurança.");
         }
 
-        let itens_novos = 0;
-        let acoes_novas = 0;
+        let itens_novos    = 0;
+        let acoes_novas    = 0;
+        const itens_recebidos = [];
 
-        // ── PROTOCOLO v2: snap + acoes ──────────────────────────────────────
-        if (pacote.v === 2 && Array.isArray(pacote.snap)) {
-            for (const entry of pacote.snap) {
-                const estado_existente = await db.estado_comandas_local.get(entry.comanda_id);
+        // ── PROTOCOLO v3: s (snap minificado) + a (acoes minificadas) ───────
+        if (pacote.v === 3) {
+            const snaps = pacote.s || [];
+
+            for (const entry of snaps) {
+                const comanda_id = entry.c;
+                const mesa_id    = entry.m;
+                const itens_min  = entry.i || [];
+                const itens_exp  = itens_min.map(expandir_item);
+
+                const estado_existente = await db.estado_comandas_local.get(String(comanda_id));
 
                 if (!estado_existente) {
-                    // Comanda nova — insere direto
                     await db.estado_comandas_local.put({
-                        comanda_id: entry.comanda_id,
-                        mesa_id: entry.mesa_id,
-                        tenant_id: pacote.t,
-                        nome_cliente: entry.nome_cliente,
-                        itens: entry.itens || [],
+                        comanda_id: String(comanda_id),
+                        mesa_id,
+                        tenant_id: tenant_local,
+                        itens: itens_exp,
                         atualizado_em: new Date().toISOString()
                     });
-                    itens_novos += entry.itens?.length || 0;
+                    itens_novos += itens_exp.length;
                 } else {
-                    // Comanda existente — merge por uuid_operacao (deduplicação por lote)
-                    const uuids_existentes = new Set(
+                    // Merge por uuid_operacao (8 chars) — deduplicação
+                    const uuids_ok = new Set(
                         estado_existente.itens.map(i => i.uuid_operacao).filter(Boolean)
                     );
-                    const itens_a_adicionar = (entry.itens || []).filter(
-                        i => !uuids_existentes.has(i.uuid_operacao)
-                    );
-                    if (itens_a_adicionar.length > 0) {
+                    const novos = itens_exp.filter(i => !i.uuid_operacao || !uuids_ok.has(i.uuid_operacao));
+                    if (novos.length > 0) {
                         await db.estado_comandas_local.put({
                             ...estado_existente,
-                            itens: [...estado_existente.itens, ...itens_a_adicionar],
+                            itens: [...estado_existente.itens, ...novos],
                             atualizado_em: new Date().toISOString()
                         });
-                        itens_novos += itens_a_adicionar.length;
+                        itens_novos += novos.length;
                     }
                 }
 
-                // Atualiza o status da mesa no Dexie local
-                // Sem isso, o receptor vê a mesa como "livre" e o click abre modal de nova comanda
-                if (entry.mesa_id) {
-                    await db.mesas.update(Number(entry.mesa_id), { status_mesa: 'ocupada' });
+                // Popula a lista visível de itens recebidos
+                itens_exp.forEach(i => itens_recebidos.push({ n: i.nome_produto, q: i.quantidade, p: i.preco_unitario }));
+
+                // Marca mesa como ocupada no Dexie local
+                if (mesa_id) {
+                    await db.mesas.update(Number(mesa_id), { status_mesa: 'ocupada' });
                 }
             }
 
-            // Força atualização do store de mesas para a tela refletir imediatamente
+            // Processa ações minificadas
+            const acoes_min = pacote.a || [];
+            const todas_vendas = await db.vendas_pendentes.toArray();
+            const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
+
+            for (const acao_min of acoes_min) {
+                const [url_min, metodo_id, itens_min, uuid_curto] = acao_min;
+                const url    = expandir_url(url_min);
+                const metodo = ID_PARA_METODO[metodo_id] || 'POST';
+
+                // Deduplicação por uuid (8 chars)
+                if (uuid_curto && uuids_locais.has(uuid_curto)) continue;
+
+                // Reconstrói payload completo
+                const itens_exp = (itens_min || []).map(expandir_item);
+                const payload   = itens_exp.length > 0
+                    ? { itens: itens_exp.map(i => ({ produto_id: i.produto_id, quantidade: i.quantidade, preco_unitario: i.preco_unitario })), uuid_operacao: uuid_curto }
+                    : { uuid_operacao: uuid_curto };
+
+                await db.vendas_pendentes.add({
+                    tenant_id    : tenant_local,
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : url,
+                    metodo,
+                    payload_venda: payload,
+                    uuid_operacao: uuid_curto || null
+                });
+
+                if (uuid_curto) uuids_locais.add(uuid_curto);
+                acoes_novas++;
+            }
+
             await loja_mesas.buscar_mesas(true);
         }
 
-        // ── PROTOCOLO v1 e v2: importar acoes para vendas_pendentes ────────
-        const acoes = pacote.acoes || pacote.d || []; // 'd' = campo legado v1
-        const todas_vendas = await db.vendas_pendentes.toArray();
-        const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
+        // ── PROTOCOLO v1 e v2 (retrocompatibilidade) ────────────────────────
+        if (pacote.v === 1 || pacote.v === 2) {
+            // snap v2
+            const snaps_v2 = pacote.snap || [];
+            for (const entry of snaps_v2) {
+                const estado_existente = await db.estado_comandas_local.get(entry.comanda_id);
+                if (!estado_existente) {
+                    await db.estado_comandas_local.put({
+                        comanda_id: entry.comanda_id, mesa_id: entry.mesa_id,
+                        tenant_id: tenant_local, itens: entry.itens || [],
+                        atualizado_em: new Date().toISOString()
+                    });
+                    itens_novos += entry.itens?.length || 0;
+                }
+                if (entry.mesa_id) await db.mesas.update(Number(entry.mesa_id), { status_mesa: 'ocupada' });
+            }
 
-        for (const acao of acoes) {
-            const [url, metodo_id, payload] = acao;
-            const uuid = payload?.uuid_operacao;
-
-            // Pula se já temos esta ação — deduplicação local
-            if (uuid && uuids_locais.has(uuid)) continue;
-
-            await db.vendas_pendentes.add({
-                tenant_id: pacote.t,
-                data_venda: new Date().toISOString(),
-                valor_total: 0,
-                url_destino: url,
-                metodo: ID_PARA_METODO[metodo_id] || 'POST',
-                payload_venda: payload || {},
-                uuid_operacao: uuid || null
-            });
-            if (uuid) uuids_locais.add(uuid);
-            acoes_novas++;
+            // acoes v1/v2
+            const acoes_v = pacote.acoes || pacote.d || [];
+            const todas_vendas = await db.vendas_pendentes.toArray();
+            const uuids_locais = new Set(todas_vendas.map(v => v.uuid_operacao).filter(Boolean));
+            for (const acao of acoes_v) {
+                const [url, metodo_id, payload] = acao;
+                const uuid = payload?.uuid_operacao;
+                if (uuid && uuids_locais.has(uuid)) continue;
+                await db.vendas_pendentes.add({
+                    tenant_id: tenant_local, data_venda: new Date().toISOString(),
+                    valor_total: 0, url_destino: url,
+                    metodo: ID_PARA_METODO[metodo_id] || 'POST',
+                    payload_venda: payload || {}, uuid_operacao: uuid || null
+                });
+                if (uuid) uuids_locais.add(uuid);
+                acoes_novas++;
+            }
+            await loja_mesas.buscar_mesas(true);
         }
 
         resultado.value = {
             erro: false,
-            mensagem: itens_novos + acoes_novas > 0
-                ? 'Sincronização concluída!'
-                : 'Já estava tudo atualizado.',
+            mensagem: itens_novos + acoes_novas > 0 ? 'Sincronização concluída!' : 'Já estava tudo atualizado.',
             itens_novos,
-            acoes_novas
+            acoes_novas,
+            itens_recebidos
         };
 
         emit('sucesso');
@@ -222,15 +323,9 @@ const ao_detectar_qr = async (codigos) => {
 
 const ao_dar_erro = (e) => {
     console.error("Erro de câmera:", e);
-    if (e.name === 'NotAllowedError') {
-        erro_camera.value = 'Permissão de câmera negada.';
-    } else if (e.name === 'NotFoundError') {
-        erro_camera.value = 'Nenhuma câmera encontrada neste dispositivo.';
-    } else if (e.name === 'NotSupportedError') {
-        erro_camera.value = 'Câmera não suportada neste browser.';
-    } else {
-        erro_camera.value = `Erro ao iniciar câmera: ${e.message || e.name || 'desconhecido'}`;
-    }
+    erro_camera.value = e.name === 'NotAllowedError' ? 'Permissão de câmera negada.'
+        : e.name === 'NotFoundError' ? 'Nenhuma câmera encontrada.'
+        : `Erro: ${e.message || e.name}`;
     camera_ativa.value = false;
 };
 </script>
