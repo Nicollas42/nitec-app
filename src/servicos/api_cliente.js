@@ -53,14 +53,11 @@ api_cliente.interceptors.response.use((response) => {
         config_original._tentou_local = true;
 
         let url_local = obter_servidor_cacheado();
-
         if (!url_local) {
-            console.log('[api_cliente] VPS indisponível. Descobrindo servidor local...');
             url_local = await descobrir_servidor_local();
         }
 
         if (url_local) {
-            console.log(`[api_cliente] Redirecionando para servidor local: ${url_local}`);
             try {
                 const api_local = axios.create({
                     baseURL: url_local,
@@ -84,18 +81,16 @@ api_cliente.interceptors.response.use((response) => {
 
 export default api_cliente;
 
-// ─── Utilitário: obtém URL do servidor local (cache ou IPC) ──────────────────
+// ─── Utilitário: obtém URL do servidor local ─────────────────────────────────
 
 /**
- * Retorna a URL do servidor local.
- * Tenta o cache primeiro, depois IPC do Electron (não faz fetch, funciona offline).
+ * Retorna URL do servidor local via cache ou IPC do Electron.
  * @returns {Promise<string|null>}
  */
 const obter_url_servidor_local = async () => {
     const cacheado = obter_servidor_cacheado();
     if (cacheado) return cacheado;
 
-    // IPC do Electron — não faz fetch, nunca bloqueado por falta de internet
     if (window?.require) {
         try {
             const { ipcRenderer } = window.require('electron');
@@ -106,7 +101,6 @@ const obter_url_servidor_local = async () => {
             }
         } catch { /* não está no Electron */ }
     }
-
     return null;
 };
 
@@ -135,16 +129,43 @@ export const sincronizar_servidor_local_com_vps = async () => {
 };
 
 /**
- * Envia cache de produtos e mesas para o servidor local.
- * Chamado pelos stores após busca bem-sucedida na VPS.
- * 🟢 Corrigido: tenta IPC quando não há cache ainda (primeiro uso).
+ * Envia snapshot completo para o servidor local.
+ * Inclui produtos, mesas, comandas e itens — tudo que o app precisa
+ * para funcionar normalmente quando a VPS ficar offline.
+ *
+ * Chamado pelos stores após cada busca bem-sucedida na VPS.
+ *
+ * @param {Array|null} produtos
+ * @param {Array|null} mesas
+ * @param {Array|null} comandas  Lista de comandas com listar_itens embutidos
  */
-export const sincronizar_cache_para_local = async (produtos, mesas) => {
+export const sincronizar_cache_para_local = async (produtos, mesas, comandas = null) => {
     const url_local = await obter_url_servidor_local();
     if (!url_local) return;
 
     try {
-        await axios.post(`${url_local}/api/sync-produtos`, { produtos, mesas }, { timeout: 3000 });
-        console.log('[Cache→Local] Produtos e mesas enviados para o servidor local.');
-    } catch { /* silencioso */ }
+        // Desmembra comandas e itens em listas separadas para o servidor local
+        let itens = null;
+        let comandas_sem_itens = null;
+
+        if (comandas && Array.isArray(comandas)) {
+            itens = [];
+            comandas_sem_itens = comandas.map(c => {
+                const { listar_itens, ...comanda_base } = c;
+                if (listar_itens) {
+                    listar_itens.forEach(item => itens.push({ ...item, comanda_id: c.id }));
+                }
+                return comanda_base;
+            });
+        }
+
+        await axios.post(`${url_local}/api/sync-produtos`, {
+            produtos,
+            mesas,
+            comandas : comandas_sem_itens,
+            itens,
+        }, { timeout: 5000 });
+
+        console.log('[Cache→Local] Snapshot completo enviado para o servidor local.');
+    } catch { /* silencioso — servidor local pode não estar disponível */ }
 };

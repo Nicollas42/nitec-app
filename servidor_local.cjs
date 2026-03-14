@@ -293,11 +293,14 @@ const configurar_rotas = (app_express) => {
     });
 
     // ── Cache de produtos, mesas e usuários (recebe do cliente Vue) ───────────
-    app_express.post('/api/sync-produtos', (req, res) => {
-        const { produtos, mesas, usuarios } = req.body;
+    // Recebe snapshot completo da VPS — produtos, mesas, comandas e itens
+    app_express.post("/api/sync-produtos", (req, res) => {
+        const { produtos, mesas, usuarios, comandas, itens } = req.body;
         if (produtos) salvar_json('produtos_cache.json', produtos);
         if (mesas)    salvar_json('mesas.json', mesas);
         if (usuarios) salvar_json('usuarios_cache.json', usuarios);
+        if (comandas) salvar_json('comandas.json', comandas);
+        if (itens)    salvar_json('itens.json', itens);
         res.json({ ok: true });
     });
 
