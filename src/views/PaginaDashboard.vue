@@ -154,6 +154,22 @@
                 <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" class="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 flex flex-col items-center col-span-2">
                     <span class="text-4xl mb-2">⚙️</span><h3 class="font-black text-purple-800 uppercase text-sm">Gestão SaaS</h3>
                 </button>
+
+                <!-- 🟢 Botão de Atualizações no menu mobile -->
+                <button @click="abrir_modal_atualizacoes"
+                        class="bg-white border-gray-200 p-5 rounded-2xl shadow-sm border flex items-center gap-3 col-span-2 relative">
+                    <span v-if="tem_atualizacao_nova" class="absolute top-3 right-3 h-2.5 w-2.5 bg-red-500 rounded-full animate-ping"></span>
+                    <span v-if="tem_atualizacao_nova" class="absolute top-3 right-3 h-2.5 w-2.5 bg-red-500 rounded-full"></span>
+                    <span class="text-3xl">🔄</span>
+                    <div class="text-left">
+                        <h3 class="font-black uppercase text-sm" :class="tem_atualizacao_nova ? 'text-red-600' : 'text-gray-700'">
+                            {{ tem_atualizacao_nova ? `Atualização disponível v${versao_nova}` : 'Atualizações' }}
+                        </h3>
+                        <p class="text-[10px] font-bold mt-0.5" :class="tem_atualizacao_nova ? 'text-red-400' : 'text-gray-400'">
+                            {{ tem_atualizacao_nova ? 'Toque para baixar e instalar' : `Versão atual: ${versao_atual}` }}
+                        </p>
+                    </div>
+                </button>
             </div>
 
             <div class="flex-1 w-full h-full relative">
@@ -276,7 +292,7 @@ const {
     progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
     abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
     baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga, obter_link_executavel,
-    esta_offline, rota_atual,
+    esta_offline, rota_atual, isAndroid,
 } = useLogicaDashboard();
 
 // 🟢 Estado local dos dois modais QR (simétricos e independentes)
