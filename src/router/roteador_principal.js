@@ -51,7 +51,6 @@ const rotas_do_aplicativo = [
                 component: () => import('../views/PaginaProdutos.vue'),
                 meta: { papeis_permitidos: ['admin_master', 'dono'] } 
             },
-            // 🟢 NOVA ROTA: GESTÃO DE EQUIPA
             {
                 path: '/equipe',
                 name: 'gestao_equipe',
@@ -88,12 +87,36 @@ const roteador_principal = createRouter({
 roteador_principal.beforeEach((to, from) => {
     const loja_auth = useAuthStore();
     
-    const token_suporte = to.query.token;
-    if (token_suporte && to.path !== '/redefinir-senha') {
-        localStorage.setItem('nitec_token', token_suporte);
-        loja_auth.token_acesso = token_suporte;
+    const token_url   = to.query.token;
+    const usuario_url = to.query.usuario;
+    const tenant_url  = to.query.tenant;
+
+    if (token_url && to.path !== '/redefinir-senha') {
+        // Salva o token
+        localStorage.setItem('nitec_token', token_url);
+        loja_auth.token_acesso = token_url;
+
+        // 🟢 Salva dados do usuário vindos da URL (login automático no servidor local)
+        if (usuario_url) {
+            try {
+                const usuario_obj = JSON.parse(decodeURIComponent(usuario_url));
+                localStorage.setItem('nitec_usuario', JSON.stringify(usuario_obj));
+                loja_auth.usuario_logado = usuario_obj;
+            } catch (e) {
+                console.warn('[Router] Erro ao parsear usuario_url:', e.message);
+            }
+        }
+
+        // 🟢 Salva tenant vindo da URL
+        if (tenant_url) {
+            localStorage.setItem('nitec_tenant_id', tenant_url);
+        }
+
+        // Remove parâmetros sensíveis da URL após salvar
         const query_limpa = { ...to.query };
         delete query_limpa.token;
+        delete query_limpa.usuario;
+        delete query_limpa.tenant;
         return { path: to.path, query: query_limpa };
     }
 
