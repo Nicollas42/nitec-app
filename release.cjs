@@ -132,7 +132,11 @@ const upload_asset_github = (upload_url, caminho_arquivo, nome_arquivo) => {
  */
 const buscar_release_por_tag = async (tag) => {
     try {
-        const release = await github_api('GET', `/repos/${GH_OWNER}/${GH_REPO}/releases/tags/${tag}`);
+        // Busca em /releases para encontrar também as releases em Draft
+        // O endpoint /releases/tags/{tag} ignora drafts
+        const lista = await github_api('GET', `/repos/${GH_OWNER}/${GH_REPO}/releases?per_page=10`);
+        if (!Array.isArray(lista)) return null;
+        const release = lista.find(r => r.tag_name === tag);
         return release?.id ? release : null;
     } catch {
         return null;
