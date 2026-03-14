@@ -1,6 +1,6 @@
 {
   "name": "nitec_app",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "private": true,
   "type": "module",
   "main": "app_desktop.cjs",
@@ -55,12 +55,21 @@
   "build": {
     "appId": "br.dev.nitec.pdv",
     "productName": "NitecSystem",
+    "asar": false,
     "directories": {
       "output": "dist_electron"
     },
     "files": [
       "dist/**/*",
-      "app_desktop.cjs"
+      "app_desktop.cjs",
+      "servidor_local.cjs",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!node_modules/@capacitor/**/*",
+      "!node_modules/electron/**/*",
+      "!node_modules/electron-builder/**/*",
+      "!node_modules/vite/**/*",
+      "!node_modules/typescript/**/*"
     ],
     "win": {
       "target": [
