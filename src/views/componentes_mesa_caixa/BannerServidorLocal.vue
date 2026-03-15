@@ -8,16 +8,45 @@
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-full">
 
-            <div v-if="visivel"
+            <!-- ── Banner do PC (Electron) — é o servidor, informa o IP ── -->
+            <div v-if="visivel && eh_electron_ref"
+                 class="fixed top-0 left-0 right-0 z-[9999] bg-green-600 text-white px-4 py-3 shadow-lg">
+                <div class="max-w-3xl mx-auto flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl shrink-0">🖥️</span>
+                        <div>
+                            <p class="font-black text-sm uppercase tracking-wide">Modo Offline — Servidor Local Ativo</p>
+                            <p class="text-green-100 text-xs font-bold mt-0.5">
+                                Garçons devem acessar o app — a rede local está funcionando normalmente
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="bg-white/20 text-white font-black text-xs px-3 py-2 rounded-lg font-mono">
+                            {{ ip_servidor }}:3737
+                        </span>
+                        <button @click="visivel = false"
+                                class="text-white/70 hover:text-white font-black text-xl leading-none px-2 transition-colors">
+                            ×
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Banner do Celular/PWA — conecta ao servidor local ── -->
+            <div v-else-if="visivel && !eh_electron_ref"
                  class="fixed top-0 left-0 right-0 z-[9999] bg-orange-500 text-white px-4 py-3 shadow-lg">
                 <div class="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
 
                     <div class="flex items-center gap-3">
                         <span class="text-2xl shrink-0">📡</span>
                         <div>
-                            <p class="font-black text-sm uppercase tracking-wide">Servidor principal indisponível</p>
+                            <p class="font-black text-sm uppercase tracking-wide">
+                                {{ conectado ? 'Modo Offline Ativo' : 'Servidor principal indisponível' }}
+                            </p>
                             <p class="text-orange-100 text-xs font-bold mt-0.5">
-                                <span v-if="buscando">Procurando servidor local na rede...</span>
+                                <span v-if="buscando">Procurando servidor local na rede Wi-Fi...</span>
+                                <span v-else-if="conectado">Usando servidor local — operação normal</span>
                                 <span v-else-if="servidor_encontrado">Servidor local encontrado: {{ url_servidor_local }}</span>
                                 <span v-else>Servidor local não encontrado na rede.</span>
                             </p>
@@ -30,23 +59,29 @@
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
 
-                        <button v-if="servidor_encontrado && !conectado"
+                        <!-- Botão conectar — só aparece se encontrou e ainda não conectou -->
+                        <button v-if="servidor_encontrado && !conectado && !buscando"
                                 @click="conectar_servidor_local"
-                                class="bg-white text-orange-600 font-black text-xs px-4 py-2 rounded-xl hover:bg-orange-50 transition-all active:scale-95 uppercase tracking-wide shadow-sm">
-                            Conectar
+                                :disabled="conectando"
+                                class="bg-white text-orange-600 font-black text-xs px-4 py-2 rounded-xl hover:bg-orange-50 transition-all active:scale-95 uppercase tracking-wide shadow-sm disabled:opacity-60">
+                            {{ conectando ? 'Conectando...' : 'Conectar' }}
                         </button>
 
-                        <span v-if="conectado" class="bg-green-500 text-white font-black text-xs px-4 py-2 rounded-xl uppercase tracking-wide">
-                            ✅ Conectado!
+                        <!-- Badge verde após conectar — não tem botão de fechar, é informativo -->
+                        <span v-if="conectado"
+                              class="bg-white/20 text-white font-black text-xs px-3 py-2 rounded-lg">
+                            ✅ Offline local
                         </span>
 
-                        <button @click="visivel = false"
+                        <!-- Fechar só quando não conectado -->
+                        <button v-if="!conectado" @click="visivel = false"
                                 class="text-white/70 hover:text-white font-black text-xl leading-none px-2 transition-colors">
                             ×
                         </button>
                     </div>
                 </div>
             </div>
+
         </Transition>
     </Teleport>
 </template>
@@ -54,30 +89,37 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { descobrir_servidor_local } from '../../servicos/descoberta_rede.js';
+import { useProdutosStore } from '../../stores/produtos_store.js';
+import { useMesasStore } from '../../stores/mesas_store.js';
 import axios from 'axios';
 
 const visivel             = ref(false);
 const buscando            = ref(false);
+const conectando          = ref(false);
 const servidor_encontrado = ref(false);
 const url_servidor_local  = ref('');
 const conectado           = ref(false);
 const vps_estava_online   = ref(true);
+const ip_servidor         = ref('');
+const eh_electron_ref     = ref(false);
 
 let intervalo_ping = null;
 
 const eh_desenvolvimento = import.meta.env.DEV;
 
+// ─── Detectores de ambiente ──────────────────────────────────────────────────
+
 /**
- * Verifica se o app já está rodando no servidor local (endereço IP).
- * Quando o garçom se conecta ao servidor local, o hostname passa a ser
- * um IP como 192.168.15.6 — nesse caso o banner não faz sentido.
+ * Verifica se está rodando no Electron (PC do caixa = servidor local).
  */
-const eh_servidor_local = () => {
-    const hostname = window.location.hostname;
-    return /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+const detectar_electron = () => {
+    try {
+        return !!(window?.require && window.require('electron'));
+    } catch { return false; }
 };
 
-// Instância axios sem interceptors — testa APENAS a VPS
+// ─── Ping VPS ────────────────────────────────────────────────────────────────
+
 const axios_ping = axios.create({ timeout: 5000 });
 
 const obter_url_ping = () => {
@@ -96,12 +138,27 @@ const testar_vps = async () => {
     }
 };
 
+// ─── Ao detectar VPS offline ─────────────────────────────────────────────────
+
 const ao_detectar_vps_offline = async () => {
     if (visivel.value) return;
-    visivel.value  = true;
+    visivel.value = true;
+
+    // PC (Electron) — mostra o banner informativo com o IP
+    if (eh_electron_ref.value) {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const info = await ipcRenderer.invoke('obter-servidor-local');
+            ip_servidor.value = info?.ip || '192.168.x.x';
+        } catch {
+            ip_servidor.value = '192.168.x.x';
+        }
+        return; // PC não precisa buscar servidor — ele é o servidor
+    }
+
+    // Celular/PWA — busca o servidor local na rede
     buscando.value = true;
     servidor_encontrado.value = false;
-    conectado.value = false;
 
     try {
         const url = await descobrir_servidor_local();
@@ -117,10 +174,48 @@ const ao_detectar_vps_offline = async () => {
 };
 
 const ao_detectar_vps_online = () => {
-    visivel.value   = false;
+    visivel.value  = false;
     conectado.value = false;
     localStorage.removeItem('nitec_servidor_local');
 };
+
+// ─── Conectar ao servidor local (CELULAR/PWA) ────────────────────────────────
+
+/**
+ * Salva o endereço do servidor local e recarrega os dados.
+ * NÃO navega para outra URL — o api_cliente usa o servidor local automaticamente
+ * via interceptor quando a VPS estiver offline.
+ */
+const conectar_servidor_local = async () => {
+    const url = url_servidor_local.value;
+    if (!url) return;
+
+    conectando.value = true;
+
+    try {
+        // 1. Salva o servidor local para o api_cliente usar automaticamente
+        localStorage.setItem('nitec_servidor_local', url);
+
+        // 2. Recarrega os stores — o api_cliente vai redirecionar para o servidor local
+        const loja_produtos = useProdutosStore();
+        const loja_mesas    = useMesasStore();
+
+        await Promise.allSettled([
+            loja_produtos.buscar_produtos(true),
+            loja_mesas.buscar_mesas(true),
+        ]);
+
+        // 3. Marca como conectado — banner muda para informativo
+        conectado.value = true;
+
+    } catch (e) {
+        console.warn('[Banner] Erro ao conectar:', e.message);
+    } finally {
+        conectando.value = false;
+    }
+};
+
+// ─── Ping periódico ──────────────────────────────────────────────────────────
 
 const iniciar_ping_periodico = () => {
     if (intervalo_ping) return;
@@ -143,38 +238,19 @@ const iniciar_ping_periodico = () => {
     }, 15000);
 };
 
-const conectar_servidor_local = () => {
-    const url_base = url_servidor_local.value;
-    if (!url_base) return;
-
-    const token   = localStorage.getItem('nitec_token')     || '';
-    const usuario = localStorage.getItem('nitec_usuario')   || '';
-    const tenant  = localStorage.getItem('nitec_tenant_id') || '';
-
-    localStorage.setItem('nitec_servidor_local', url_base);
-    conectado.value = true;
-
-    const params = new URLSearchParams({
-        token,
-        usuario: encodeURIComponent(usuario),
-        tenant,
-    });
-
-    const url_destino = `${url_base}/#/painel-central?${params.toString()}`;
-    setTimeout(() => { window.location.href = url_destino; }, 800);
-};
-
 const ao_ficar_offline_nativo = () => {
     vps_estava_online.value = false;
     ao_detectar_vps_offline();
 };
 
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
 onMounted(() => {
-    // 🟢 Não inicia o banner se:
-    // 1. Está em desenvolvimento (Laravel local sempre responde)
-    // 2. Já está rodando no servidor local (hostname é um IP)
-    if (eh_desenvolvimento || eh_servidor_local()) {
-        console.log('[BannerServidorLocal] Desativado —', eh_servidor_local() ? 'já no servidor local.' : 'modo desenvolvimento.');
+    eh_electron_ref.value = detectar_electron();
+
+    // Desenvolvimento — ping desativado (Laravel local sempre responde)
+    if (eh_desenvolvimento) {
+        console.log('[Banner] Modo desenvolvimento — ping desativado.');
         return;
     }
 

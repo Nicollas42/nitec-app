@@ -96,7 +96,23 @@ const configurar_rotas = (app_express) => {
     // ── Comandas ─────────────────────────────────────────────────────────────
 
     app_express.get('/api/listar-comandas', (req, res) => {
-        res.json({ status: true, comandas: ler_json('comandas.json', []) });
+        const comandas = ler_json('comandas.json', []);
+        const mesas    = ler_json('mesas.json', []);
+
+        // Enriquece cada comanda com os campos aninhados que o frontend espera
+        // Comandas sincronizadas da VPS já trazem esses campos — mas as criadas
+        // localmente (offline) precisam ser enriquecidas aqui
+        const comandas_enriquecidas = comandas.map(c => {
+            const mesa = mesas.find(m => m.id === c.mesa_id);
+            return {
+                ...c,
+                buscar_cliente : c.buscar_cliente  || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
+                buscar_mesa    : c.buscar_mesa     || (mesa ? { nome_mesa: mesa.nome_mesa } : null),
+                buscar_usuario : c.buscar_usuario  || null,
+            };
+        });
+
+        res.json({ status: true, comandas: comandas_enriquecidas });
     });
 
     app_express.get('/api/buscar-comanda/:id', (req, res) => {
@@ -123,12 +139,17 @@ const configurar_rotas = (app_express) => {
         const existente = comandas.find(c => c.uuid_abertura === uuid_operacao);
         if (existente) return res.status(201).json({ sucesso: true, mensagem: 'Comanda aberta!', comanda: existente });
 
+        const mesa_info = mesas.find(m => m.id === Number(mesa_id));
         const nova = {
             id: `local_${uuid()}`, mesa_id: Number(mesa_id),
             nome_cliente: nome_cliente || null, tipo_conta: tipo_conta || 'geral',
             status_comanda: 'aberta', valor_total: 0,
             data_hora_abertura: data_hora_abertura || new Date().toISOString(),
-            data_hora_fechamento: null, uuid_abertura: uuid_operacao, origem: 'local'
+            data_hora_fechamento: null, uuid_abertura: uuid_operacao, origem: 'local',
+            // Campos aninhados para compatibilidade com o template Vue
+            buscar_cliente : nome_cliente ? { nome_cliente } : null,
+            buscar_mesa    : mesa_info ? { nome_mesa: mesa_info.nome_mesa } : null,
+            buscar_usuario : null,
         };
 
         comandas.push(nova);
