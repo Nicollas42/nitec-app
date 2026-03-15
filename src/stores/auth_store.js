@@ -38,7 +38,12 @@ export const useAuthStore = defineStore('auth_store', () => {
                 } catch { /* não está no Electron */ }
             }
 
-            // 🟢 Pré-carrega todos os stores persistidos em background
+            // 🟢 Limpa cache antigo (pode não ter listar_itens) e recarrega
+            // Garante que o store offline sempre tenha os itens completos
+            localStorage.removeItem('nitec_comandas_store');
+            localStorage.removeItem('nitec_mesas_store');
+            localStorage.removeItem('nitec_produtos_store');
+
             if (loja !== 'master') {
                 pre_carregar_stores().catch(() => {});
             }

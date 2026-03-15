@@ -68,14 +68,39 @@ export function useLogicaMesaDetalhes() {
         carregando.value = true;
 
         // 🟢 Exibição imediata com dados do cache — sem tela branca
+        // Sempre atualiza o cache na tela (não só quando null)
+        // para garantir que itens adicionados offline apareçam imediatamente
         const dados_cache = montar_dados_do_cache(id_dinamico);
-        if (dados_cache && !dados_mesa.value) {
+        if (dados_cache) {
             dados_mesa.value = dados_cache;
         }
 
         try {
-            const resposta   = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
-            dados_mesa.value = resposta.data.dados;
+            const resposta        = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
+            const dados_servidor = resposta.data.dados;
+
+            // 🟢 Merge inteligente: combina itens do servidor com itens adicionados
+            // localmente no mesmo ciclo offline (ainda não sincronizados)
+            // Evita que a resposta do servidor apague itens que o store já tem
+            if (dados_servidor && dados_cache) {
+                const ids_servidor = new Set(
+                    (dados_servidor.listar_comandas || [])
+                        .flatMap(c => (c.listar_itens || []).map(i => String(i.id)))
+                );
+                // Adiciona itens do cache que o servidor ainda não tem
+                dados_servidor.listar_comandas = (dados_servidor.listar_comandas || []).map(c => {
+                    const comanda_cache = (dados_cache.listar_comandas || []).find(cc => String(cc.id) === String(c.id));
+                    if (!comanda_cache) return c;
+                    const itens_so_no_cache = (comanda_cache.listar_itens || []).filter(i => !ids_servidor.has(String(i.id)));
+                    return {
+                        ...c,
+                        listar_itens: [...(c.listar_itens || []), ...itens_so_no_cache],
+                        valor_total : c.valor_total + itens_so_no_cache.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0)
+                    };
+                });
+            }
+
+            dados_mesa.value = dados_servidor || dados_cache;
 
         } catch (erro) {
             // 🟢 Fallback quando:
