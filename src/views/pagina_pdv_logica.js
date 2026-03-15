@@ -67,40 +67,28 @@ export function useLogicaPdv() {
     const recarregar_dados_comanda = async () => {
         const id = id_comanda_pagamento.value || id_comanda_vinculada.value;
         if (!id) return;
+        
         try {
+            // A API já engloba o fallback para o Servidor Local internamente.
+            // Se devolver sucesso, é porque ou a VPS ou o Localhost atendeu.
             const res = await api_cliente.get(`/buscar-comanda/${id}`);
-            const comanda = res.data.dados;
-            // 🟢 Guarda mesa_id para o QR Sync
-            id_mesa_atual.value = comanda.mesa_id || null;
-            itens_ja_lancados.value = comanda.listar_itens.map(i => ({
+            
+            itens_ja_lancados.value = res.data.dados.listar_itens.map(i => ({
                 id_item_comanda: i.id,
-                nome_produto: i.buscar_produto.nome_produto,
+                nome_produto: i.buscar_produto?.nome_produto || `Produto ${i.produto_id}`, // Proteção extra contra null
                 quantidade: i.quantidade,
                 preco_venda: i.preco_unitario
             }));
-        } catch(e) {
-            const sem_conexao = !e.response || e.response.status >= 500;
-            const usando_local = !!localStorage.getItem('nitec_servidor_local');
 
-            if (sem_conexao || (e.response?.status === 404 && usando_local)) {
-                // 🟢 Fallback offline — busca do store persistido
-                const comanda_cache = loja_comandas.lista_comandas.find(c => String(c.id) === String(id));
-
-                if (comanda_cache) {
-                    id_mesa_atual.value     = comanda_cache.mesa_id || null;
-                    itens_ja_lancados.value = (comanda_cache.listar_itens || []).map(i => ({
-                        id_item_comanda: i.id,
-                        nome_produto   : i.buscar_produto?.nome_produto || i.nome_produto || `Produto #${i.produto_id}`,
-                        quantidade     : i.quantidade,
-                        preco_venda    : i.preco_unitario
-                    }));
-                    toast_global.exibir_toast("⚠️ Offline: exibindo itens salvos.", "aviso");
-                } else {
-                    // Comanda nova (ainda não tem itens) — pode lançar normalmente
-                    itens_ja_lancados.value = [];
-                }
+        } catch(e) { 
+            // 🟢 Só entra aqui se TUDO falhar (Cabo arrancado E fora do PC)
+            console.error("Falha total ao buscar comanda (Nuvem e Local):", e);
+            if (!e.response || e.response.status >= 500) {
+                toast_global.exibir_toast("Modo Sobrevivência: Lançando itens sem visualização da comanda original.", "aviso");
+                // Permite ao garçom lançar novos itens cegamente.
+                itens_ja_lancados.value = [];
             } else {
-                console.error(e);
+                toast_global.exibir_toast("Erro ao carregar itens da mesa.", "erro");
             }
         }
     };

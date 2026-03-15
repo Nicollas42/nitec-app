@@ -68,42 +68,64 @@ export function useLogicaMesaDetalhes() {
         carregando.value = true;
 
         // 🟢 Exibição imediata com dados do cache — sem tela branca
-        const dados_cache = montar_dados_do_cache(id_dinamico);
-        if (dados_cache) {
-            dados_mesa.value = dados_cache;
+        if (typeof montar_dados_do_cache === 'function') {
+            const dados_cache = montar_dados_do_cache(id_dinamico);
+            if (dados_cache) {
+                dados_mesa.value = dados_cache;
+            }
         }
 
         try {
-            const resposta        = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
+            // 1. Tenta a Nuvem (ou o Servidor Local via Interceptor)
+            const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             
-            // 🟢 RASTREADOR 3: O que a API devolveu (da VPS ou do Local)?
-            console.log("[DEBUG TELA] Dados brutos retornados pela API:", resposta.data.dados);
+            console.log("[DEBUG TELA] Dados brutos retornados pela API (Oficiais):", resposta.data.dados);
 
-            const dados_servidor = resposta.data.dados;
+            // 2. Verdade oficial (da VPS ou do Servidor Local)
+            const dados_oficiais = resposta.data.dados;
 
-            // 🟢 Merge inteligente
-            if (dados_servidor && dados_cache) {
-                const ids_servidor = new Set(
-                    (dados_servidor.listar_comandas || [])
-                        .flatMap(c => (c.listar_itens || []).map(i => String(i.id)))
+            // 3. Fusão Cirúrgica (Anti Pisca-Pisca):
+            // Só injeta dados do Dexie se houver itens que o garçom lançou offline e que 
+            // ainda NÃO chegaram nem ao Servidor Local nem à VPS.
+            const comanda_id_offline = `off_${id_dinamico}`;
+            const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
+            
+            if (estado_local && estado_local.itens && estado_local.itens.length > 0) {
+                // Mapeia o que já é oficial
+                const ids_oficiais = new Set(
+                    (dados_oficiais.listar_comandas || [])
+                        .flatMap(c => (c.listar_itens || []).map(i => String(i.uuid_operacao || i.id)))
                 );
-                // Adiciona itens do cache que o servidor ainda não tem
-                dados_servidor.listar_comandas = (dados_servidor.listar_comandas || []).map(c => {
-                    const comanda_cache = (dados_cache.listar_comandas || []).find(cc => String(cc.id) === String(c.id));
-                    if (!comanda_cache) return c;
-                    const itens_so_no_cache = (comanda_cache.listar_itens || []).filter(i => !ids_servidor.has(String(i.id)));
-                    return {
-                        ...c,
-                        listar_itens: [...(c.listar_itens || []), ...itens_so_no_cache],
-                        valor_total : c.valor_total + itens_so_no_cache.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0)
-                    };
+
+                dados_oficiais.listar_comandas = (dados_oficiais.listar_comandas || []).map(c => {
+                    // Filtra apenas os itens fantasmas que a API ainda não conhece
+                    const itens_fantasmas = estado_local.itens.filter(i => !ids_oficiais.has(String(i.uuid_operacao)));
+                    
+                    if (itens_fantasmas.length > 0) {
+                        const itens_formatados = itens_fantasmas.map(i => ({
+                            id: `offline_item_${i.produto_id}_${gerarUUID()}`,
+                            produto_id: i.produto_id,
+                            quantidade: i.quantidade,
+                            preco_unitario: i.preco_unitario,
+                            buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
+                            is_offline: true
+                        }));
+
+                        return {
+                            ...c,
+                            listar_itens: [...(c.listar_itens || []), ...itens_formatados],
+                            valor_total: Number(c.valor_total) + itens_formatados.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0)
+                        };
+                    }
+                    return c; // Se não houver fantasma, retorna a comanda oficial limpa
                 });
             }
 
-            dados_mesa.value = dados_servidor || dados_cache;
+            // Atualiza a tela com a verdade absoluta (já mesclada cirurgicamente se necessário)
+            dados_mesa.value = dados_oficiais;
 
         } catch (erro) {
-            // 🟢 Fallback quando: sem resposta, erro >= 500, ou 404 offline
+            // 4. MODO SOBREVIVÊNCIA TOTAL (VPS e Localhost falharam / Cabo e Wi-Fi desligados)
             const usando_local  = !!localStorage.getItem('nitec_servidor_local');
             const sem_internet  = !navigator.onLine || usando_local;
             const erro_de_rede  = !erro.response || erro.response.status >= 500;
@@ -111,19 +133,20 @@ export function useLogicaMesaDetalhes() {
 
             if (erro_de_rede || nao_encontrou) {
 
-                // Fallback 1 — store persistido
-                const fallback_store = montar_dados_do_cache(id_dinamico);
-                if (fallback_store) {
-                    dados_mesa.value = fallback_store;
-                    return;
+                // Fallback 1 — Store Persistido (Último estado conhecido)
+                if (typeof montar_dados_do_cache === 'function') {
+                    const fallback_store = montar_dados_do_cache(id_dinamico);
+                    if (fallback_store) {
+                        dados_mesa.value = fallback_store;
+                        return;
+                    }
                 }
 
-                // Fallback 2 — Dexie (QR Sync)
-                const mesa_em_cache      = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico))
-                    || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
+                // Fallback 2 — Dexie Puro (Cria a Mesa e Comanda do zero na tela)
+                const mesa_em_cache = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico)) || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
                 const comanda_id_offline = `off_${id_dinamico}`;
-                const estado_local       = await db.estado_comandas_local.get(comanda_id_offline);
-                const itens_brutos       = estado_local?.itens || [];
+                const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
+                const itens_brutos = estado_local?.itens || [];
 
                 const itens_agrupados = [];
                 for (const item of itens_brutos) {
@@ -132,26 +155,24 @@ export function useLogicaMesaDetalhes() {
                     else itens_agrupados.push({ ...item });
                 }
 
-                const valor_total_local = itens_agrupados.reduce(
-                    (acc, i) => acc + (i.preco_unitario * i.quantidade), 0
-                );
+                const valor_total_local = itens_agrupados.reduce((acc, i) => acc + (i.preco_unitario * i.quantidade), 0);
 
                 dados_mesa.value = {
-                    nome_mesa      : mesa_em_cache.nome_mesa,
-                    status_mesa    : 'ocupada',
+                    nome_mesa: mesa_em_cache.nome_mesa,
+                    status_mesa: 'ocupada',
                     listar_comandas: [{
-                        id             : comanda_id_offline,
-                        tipo_conta     : 'geral',
-                        status_comanda : 'aberta',
-                        valor_total    : valor_total_local,
-                        buscar_cliente : { nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline' },
-                        listar_itens   : itens_agrupados.map(i => ({
-                            id            : `offline_item_${i.produto_id}`,
-                            produto_id    : i.produto_id,
-                            quantidade    : i.quantidade,
+                        id: comanda_id_offline,
+                        tipo_conta: 'geral',
+                        status_comanda: 'aberta',
+                        valor_total: valor_total_local,
+                        buscar_cliente: { nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline' },
+                        listar_itens: itens_agrupados.map(i => ({
+                            id: `offline_item_${i.produto_id}`,
+                            produto_id: i.produto_id,
+                            quantidade: i.quantidade,
                             preco_unitario: i.preco_unitario,
                             buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
-                            is_offline    : true
+                            is_offline: true
                         })),
                         is_offline: true
                     }]
