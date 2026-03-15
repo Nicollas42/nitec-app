@@ -61,27 +61,29 @@ const configurar_rotas = (app_express) => {
         const id_mesa  = Number(req.params.id_mesa);
         const mesas    = ler_json('mesas.json', []);
         const comandas = ler_json('comandas.json', []);
-        const itens    = ler_json('itens.json', []);
+        const itens    = ler_json('itens.json', []); // Todos os itens gravados no PC
 
         let mesa = mesas.find(m => m.id === id_mesa);
 
         if (!mesa) {
             const tem_comanda = comandas.some(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta');
-            if (!tem_comanda) {
-                return res.status(404).json({ sucesso: false, mensagem: 'Mesa não encontrada.' });
-            }
+            if (!tem_comanda) return res.status(404).json({ sucesso: false, mensagem: 'Mesa não encontrada.' });
             mesa = { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
         }
+
+        // 🟢 PREPARANDO O PACOTE DE DEBUG
+        const log_debug = {
+            total_itens_no_banco_local: itens.length,
+            itens_brutos_no_banco: itens
+        };
 
         const comandas_da_mesa = comandas
             .filter(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta')
             .map(c => {
                 const itens_desta_comanda = itens.filter(i => String(i.comanda_id) === String(c.id));
                 
-                // 🟢 RASTREADOR 1: Verificando o que o Servidor Local está filtrando
-                console.log(`\n[DEBUG SERVER] Comanda ID: ${c.id}`);
-                console.log(`[DEBUG SERVER] Total de itens no itens.json: ${itens.length}`);
-                console.log(`[DEBUG SERVER] Itens filtrados para esta comanda:`, itens_desta_comanda);
+                // 🟢 INJETANDO NO DEBUG
+                log_debug[`itens_filtrados_cmd_${c.id}`] = itens_desta_comanda;
 
                 return {
                     ...c,
@@ -93,84 +95,13 @@ const configurar_rotas = (app_express) => {
 
         res.json({
             sucesso: true,
+            _debug: log_debug, // 🟢 ENVIANDO PARA O NAVEGADOR
             dados  : {
                 nome_mesa      : mesa.nome_mesa,
                 status_mesa    : mesa.status_mesa,
                 listar_comandas: comandas_da_mesa
             }
         });
-    });
-
-    app_express.get('/api/listar-produtos', (req, res) => {
-        const produtos = ler_json('produtos_cache.json', []);
-        res.json({ sucesso: true, produtos });
-    });
-
-    app_express.get('/api/listar-comandas', (req, res) => {
-        const comandas = ler_json('comandas.json', []);
-        const mesas    = ler_json('mesas.json', []);
-        const itens    = ler_json('itens.json', []);
-
-        const comandas_enriquecidas = comandas.map(c => {
-            const mesa = mesas.find(m => m.id === c.mesa_id);
-            return {
-                ...c,
-                buscar_cliente : c.buscar_cliente  || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
-                buscar_mesa    : c.buscar_mesa     || (mesa ? { nome_mesa: mesa.nome_mesa } : null),
-                buscar_usuario : c.buscar_usuario  || null,
-                listar_itens   : itens
-                    .filter(i => String(i.comanda_id) === String(c.id)) // 🟢 CORREÇÃO 1
-                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })), // 🟢 CORREÇÃO 2
-            };
-        });
-
-        res.json({ status: true, comandas: comandas_enriquecidas });
-    });
-
-    app_express.get('/api/buscar-comanda/:id', (req, res) => {
-        const comandas  = ler_json('comandas.json', []);
-        const itens     = ler_json('itens.json', []);
-        const comanda   = comandas.find(c => String(c.id) === String(req.params.id));
-        if (!comanda) return res.status(404).json({ sucesso: false });
-        res.json({
-            sucesso: true,
-            dados: {
-                ...comanda,
-                listar_itens: itens
-                    .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
-                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })) // 🟢 CORREÇÃO 2
-            }
-        });
-    });
-
-    app_express.post('/api/abrir-comanda', (req, res) => {
-        const { mesa_id, nome_cliente, tipo_conta, data_hora_abertura, uuid_operacao } = req.body;
-        const comandas = ler_json('comandas.json', []);
-        const mesas    = ler_json('mesas.json', []);
-
-        const existente = comandas.find(c => c.uuid_abertura === uuid_operacao);
-        if (existente) return res.status(201).json({ sucesso: true, mensagem: 'Comanda aberta!', comanda: existente });
-
-        const mesa_info = mesas.find(m => m.id === Number(mesa_id));
-        const nova = {
-            id: `local_${uuid()}`, mesa_id: Number(mesa_id),
-            nome_cliente: nome_cliente || null, tipo_conta: tipo_conta || 'geral',
-            status_comanda: 'aberta', valor_total: 0,
-            data_hora_abertura: data_hora_abertura || new Date().toISOString(),
-            data_hora_fechamento: null, uuid_abertura: uuid_operacao, origem: 'local',
-            buscar_cliente : nome_cliente ? { nome_cliente } : null,
-            buscar_mesa    : mesa_info ? { nome_mesa: mesa_info.nome_mesa } : null,
-            buscar_usuario : null,
-        };
-
-        comandas.push(nova);
-        salvar_json('comandas.json', comandas);
-
-        const idx = mesas.findIndex(m => m.id === Number(mesa_id));
-        if (idx >= 0) { mesas[idx].status_mesa = 'ocupada'; salvar_json('mesas.json', mesas); }
-
-        enfileirar_sync('POST', '/abrir-comanda', req.body);
-        res.status(201).json({ sucesso: true, mensagem: 'Comanda aberta!', comanda: nova });
     });
 
     app_express.post('/api/adicionar-itens-comanda/:id', (req, res) => {
@@ -204,7 +135,13 @@ const configurar_rotas = (app_express) => {
         salvar_json('comandas.json', comandas);
 
         enfileirar_sync('POST', `/adicionar-itens-comanda/${req.params.id}`, req.body);
-        res.json({ status: true, mensagem: 'Itens lançados!', comanda });
+        
+        res.json({ 
+            status: true, 
+            mensagem: 'Itens lançados!', 
+            comanda, 
+            _debug: { acao: "Itens adicionados e salvos no itens.json com sucesso", novo_total: todos_itens.length } // 🟢 DEBUG AQUI
+        });
     });
 
     app_express.post('/api/alterar-quantidade-item/:id_item', (req, res) => {

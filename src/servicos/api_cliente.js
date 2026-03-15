@@ -97,7 +97,13 @@ api_cliente.interceptors.response.use((response) => {
                     data  : config_original.data,
                 });
 
-                console.log("4. ✔️ SUCESSO! Servidor local respondeu:", resposta_local.data);
+                console.log("4. ✔️ SUCESSO! Servidor local respondeu.");
+                
+                // 🟢 A MÁGICA: Puxa o log do servidor para o seu navegador!
+                if (resposta_local.data && resposta_local.data._debug) {
+                    console.log(`%c 🧠 [O CÉREBRO DO SERVIDOR LOCAL - ${config_original.url}] `, 'background: #111; color: #00ff00; font-size: 13px; font-weight: bold;', resposta_local.data._debug);
+                }
+
                 console.groupEnd();
                 return resposta_local;
 
@@ -188,6 +194,6 @@ export const sincronizar_cache_para_local = async (produtos, mesas, comandas = n
             itens,
         }, { timeout: 5000 });
 
-        console.log('[Cache→Local] Snapshot completo enviado para o servidor local.');
+        console.log(`[Cache→Local] Snapshot enviado. Quantidade de Itens gravados: ${itens ? itens.length : 'Nenhum/Vazio'}`);
     } catch { /* silencioso */ }
 };
