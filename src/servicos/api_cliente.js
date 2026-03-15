@@ -60,7 +60,7 @@ api_cliente.interceptors.response.use((response) => {
         if (url_local) {
             try {
                 const api_local = axios.create({
-                    baseURL: url_local,
+                    baseURL: `${url_local}/api`,
                     headers: { ...config_original.headers },
                     timeout: 5000,
                 });
