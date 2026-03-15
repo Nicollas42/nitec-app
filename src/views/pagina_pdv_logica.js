@@ -2,6 +2,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router'; 
 import { useProdutosStore } from '../stores/produtos_store.js';
 import { useMesasStore } from '../stores/mesas_store.js';
+import { useComandasStore } from '../stores/comandas_store.js';
 import api_cliente from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js';
 import { useToastStore } from '../stores/toast_store.js';
@@ -10,8 +11,9 @@ export function useLogicaPdv() {
     const roteador = useRouter();
     const rota_atual = useRoute(); 
     const loja_produtos = useProdutosStore();
-    const loja_mesas = useMesasStore();
-    const toast_global = useToastStore();
+    const loja_mesas    = useMesasStore();
+    const loja_comandas = useComandasStore();
+    const toast_global  = useToastStore();
     
     const carrinho_venda = ref([]);
     const itens_ja_lancados = ref([]); 
@@ -76,9 +78,30 @@ export function useLogicaPdv() {
                 quantidade: i.quantidade,
                 preco_venda: i.preco_unitario
             }));
-        } catch(e) { 
-            if (!e.response || e.response.status >= 500) toast_global.exibir_toast("Servidor offline: Não é possível carregar itens.", "erro");
-            else console.error(e); 
+        } catch(e) {
+            const sem_conexao = !e.response || e.response.status >= 500;
+            const usando_local = !!localStorage.getItem('nitec_servidor_local');
+
+            if (sem_conexao || (e.response?.status === 404 && usando_local)) {
+                // 🟢 Fallback offline — busca do store persistido
+                const comanda_cache = loja_comandas.lista_comandas.find(c => String(c.id) === String(id));
+
+                if (comanda_cache) {
+                    id_mesa_atual.value     = comanda_cache.mesa_id || null;
+                    itens_ja_lancados.value = (comanda_cache.listar_itens || []).map(i => ({
+                        id_item_comanda: i.id,
+                        nome_produto   : i.buscar_produto?.nome_produto || i.nome_produto || `Produto #${i.produto_id}`,
+                        quantidade     : i.quantidade,
+                        preco_venda    : i.preco_unitario
+                    }));
+                    toast_global.exibir_toast("⚠️ Offline: exibindo itens salvos.", "aviso");
+                } else {
+                    // Comanda nova (ainda não tem itens) — pode lançar normalmente
+                    itens_ja_lancados.value = [];
+                }
+            } else {
+                console.error(e);
+            }
         }
     };
 

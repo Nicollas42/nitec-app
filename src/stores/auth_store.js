@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import api_cliente, { configurar_url_base, sincronizar_cache_para_local } from '../servicos/api_cliente.js';
+import api_cliente, { sincronizar_cache_para_local } from '../servicos/api_cliente.js';
 
 export const useAuthStore = defineStore('auth_store', () => {
+    // 🟢 Lê direto do localStorage — sem persist plugin
+    // O persist quebrava o modo suporte porque restaurava as credenciais
+    // do admin sobrescrevendo as do cliente ao navegar entre telas
     const usuario_logado = ref(JSON.parse(localStorage.getItem('nitec_usuario')) || null);
     const token_acesso   = ref(localStorage.getItem('nitec_token') || null);
 
@@ -36,7 +39,6 @@ export const useAuthStore = defineStore('auth_store', () => {
             }
 
             // 🟢 Pré-carrega todos os stores persistidos em background
-            // Isso garante que os dados ficam disponíveis offline imediatamente
             if (loja !== 'master') {
                 pre_carregar_stores().catch(() => {});
             }
@@ -60,30 +62,21 @@ export const useAuthStore = defineStore('auth_store', () => {
         localStorage.removeItem('nitec_token_admin');
         localStorage.removeItem('nitec_usuario_admin');
 
-        // 🟢 Limpa também os stores persistidos ao sair
+        // Limpa os stores persistidos ao sair
         localStorage.removeItem('nitec_mesas_store');
         localStorage.removeItem('nitec_produtos_store');
         localStorage.removeItem('nitec_comandas_store');
     };
 
     return { usuario_logado, token_acesso, realizar_login, encerrar_sessao };
-}, {
-    persist: {
-        key    : 'nitec_auth_store',
-        storage: localStorage,
-        pick   : ['usuario_logado', 'token_acesso'],
-    }
 });
 
 /**
  * Pré-carrega todos os stores persistidos logo após o login.
  * Roda em paralelo e em background — não bloqueia a navegação.
- * Os dados ficam no localStorage via pinia-plugin-persistedstate.
- * Na próxima vez que o usuário acessar qualquer tela, os dados já estão lá.
  */
 const pre_carregar_stores = async () => {
     try {
-        // Importação dinâmica para evitar circular dependency
         const { useProdutosStore } = await import('./produtos_store.js');
         const { useMesasStore    } = await import('./mesas_store.js');
         const { useComandasStore } = await import('./comandas_store.js');
@@ -92,7 +85,6 @@ const pre_carregar_stores = async () => {
         const loja_mesas    = useMesasStore();
         const loja_comandas = useComandasStore();
 
-        // Busca tudo em paralelo
         const [r_produtos, r_mesas, r_comandas] = await Promise.allSettled([
             loja_produtos.buscar_produtos(true),
             loja_mesas.buscar_mesas(true),
@@ -105,7 +97,6 @@ const pre_carregar_stores = async () => {
             comandas: r_comandas.status,
         });
 
-        // Envia snapshot completo para o servidor local (PC do dono)
         await sincronizar_cache_para_local(
             loja_produtos.lista_produtos,
             loja_mesas.lista_mesas,

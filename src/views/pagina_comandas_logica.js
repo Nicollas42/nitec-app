@@ -96,33 +96,34 @@ export function useLogicaComandas() {
     };
 
     const abrir_detalhes = async (comanda, acao) => {
+        // Comanda ABERTA — navega direto, sem requisição
         if (comanda.status_comanda === 'aberta') {
-            // Comanda aberta — vai para a tela de detalhes da mesa ou PDV
-            if (comanda.mesa_id) roteador.push(`/mesa/${comanda.mesa_id}/detalhes`);
-            else {
+            if (comanda.mesa_id) {
+                roteador.push(`/mesa/${comanda.mesa_id}/detalhes`);
+            } else {
                 if (acao === 'lancar') roteador.push(`/pdv-caixa?comanda=${comanda.id}`);
                 else roteador.push(`/pdv-caixa?pagamento=${comanda.id}`);
             }
-        } else {
-            // Comanda fechada/cancelada — tenta buscar detalhes
-            // 1ª tentativa: API (VPS ou servidor local)
-            try {
-                const res = await api_cliente.get(`/buscar-comanda/${comanda.id}`);
-                comanda_selecionada.value     = res.data.dados;
+            return;
+        }
+
+        // Comanda FECHADA ou CANCELADA — busca detalhes do histórico
+        try {
+            const res = await api_cliente.get(`/buscar-comanda/${comanda.id}`);
+            comanda_selecionada.value     = res.data.dados;
+            modal_historico_visivel.value = true;
+
+        } catch (e) {
+            // 🟢 Fallback offline — usa dados já persistidos no store
+            // Evita tela branca quando sem internet ou servidor local
+            const comanda_cache = loja_comandas.lista_comandas.find(c => String(c.id) === String(comanda.id));
+
+            if (comanda_cache) {
+                comanda_selecionada.value     = comanda_cache;
                 modal_historico_visivel.value = true;
-            } catch (e) {
-                if (!e.response) {
-                    // 2ª tentativa: usa os dados do store persistido diretamente
-                    // A comanda já está na lista com todos os campos disponíveis
-                    comanda_selecionada.value = {
-                        ...comanda,
-                        listar_itens: comanda.listar_itens || [],
-                    };
-                    modal_historico_visivel.value = true;
-                    toast_store.exibir_toast("⚠️ Offline: exibindo dados salvos.", "aviso");
-                } else {
-                    toast_store.exibir_toast("Erro ao buscar detalhes do recibo.", "erro");
-                }
+                toast_store.exibir_toast("⚠️ Offline: exibindo dados salvos.", "aviso");
+            } else {
+                toast_store.exibir_toast("⚠️ Offline: detalhes não disponíveis.", "aviso");
             }
         }
     };
