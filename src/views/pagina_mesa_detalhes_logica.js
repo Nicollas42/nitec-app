@@ -68,8 +68,6 @@ export function useLogicaMesaDetalhes() {
         carregando.value = true;
 
         // 🟢 Exibição imediata com dados do cache — sem tela branca
-        // Sempre atualiza o cache na tela (não só quando null)
-        // para garantir que itens adicionados offline apareçam imediatamente
         const dados_cache = montar_dados_do_cache(id_dinamico);
         if (dados_cache) {
             dados_mesa.value = dados_cache;
@@ -77,11 +75,13 @@ export function useLogicaMesaDetalhes() {
 
         try {
             const resposta        = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
+            
+            // 🟢 RASTREADOR 3: O que a API devolveu (da VPS ou do Local)?
+            console.log("[DEBUG TELA] Dados brutos retornados pela API:", resposta.data.dados);
+
             const dados_servidor = resposta.data.dados;
 
-            // 🟢 Merge inteligente: combina itens do servidor com itens adicionados
-            // localmente no mesmo ciclo offline (ainda não sincronizados)
-            // Evita que a resposta do servidor apague itens que o store já tem
+            // 🟢 Merge inteligente
             if (dados_servidor && dados_cache) {
                 const ids_servidor = new Set(
                     (dados_servidor.listar_comandas || [])
@@ -103,10 +103,7 @@ export function useLogicaMesaDetalhes() {
             dados_mesa.value = dados_servidor || dados_cache;
 
         } catch (erro) {
-            // 🟢 Fallback quando:
-            // - sem resposta (timeout/rede)
-            // - erro >= 500 (servidor caiu)
-            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            // 🟢 Fallback quando: sem resposta, erro >= 500, ou 404 offline
             const usando_local  = !!localStorage.getItem('nitec_servidor_local');
             const sem_internet  = !navigator.onLine || usando_local;
             const erro_de_rede  = !erro.response || erro.response.status >= 500;

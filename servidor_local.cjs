@@ -75,14 +75,21 @@ const configurar_rotas = (app_express) => {
 
         const comandas_da_mesa = comandas
             .filter(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta')
-            .map(c => ({
-                ...c,
-                buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
-                buscar_mesa   : { nome_mesa: mesa.nome_mesa },
-                listar_itens  : itens
-                    .filter(i => String(i.comanda_id) === String(c.id)) // 🟢 CORREÇÃO 1: Cast para String
-                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })) // 🟢 CORREÇÃO 2: Preserva objeto da VPS
-            }));
+            .map(c => {
+                const itens_desta_comanda = itens.filter(i => String(i.comanda_id) === String(c.id));
+                
+                // 🟢 RASTREADOR 1: Verificando o que o Servidor Local está filtrando
+                console.log(`\n[DEBUG SERVER] Comanda ID: ${c.id}`);
+                console.log(`[DEBUG SERVER] Total de itens no itens.json: ${itens.length}`);
+                console.log(`[DEBUG SERVER] Itens filtrados para esta comanda:`, itens_desta_comanda);
+
+                return {
+                    ...c,
+                    buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
+                    buscar_mesa   : { nome_mesa: mesa.nome_mesa },
+                    listar_itens  : itens_desta_comanda.map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } }))
+                };
+            });
 
         res.json({
             sucesso: true,

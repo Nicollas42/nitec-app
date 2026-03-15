@@ -64,20 +64,26 @@ api_cliente.interceptors.response.use((response) => {
                     headers: { ...config_original.headers },
                     timeout: 5000,
                 });
-                return await api_local.request({
+                
+                const resposta_local = await api_local.request({
                     method: config_original.method,
                     url   : config_original.url,
                     data  : config_original.data,
                 });
+
+                // 🟢 RASTREADOR 2: O que o Axios recebeu do Servidor Local?
+                console.log(`[DEBUG AXIOS] Resposta do Servidor Local para ${config_original.url}:`, resposta_local.data);
+
+                return resposta_local;
+
             } catch (erro_local) {
-                // 🟢 CORREÇÃO 1: Limpa o cache APENAS se for erro de rede/timeout (sem resposta do servidor local)
-                // Se for um erro 404 (ex: mesa não encontrada), NÃO apaga o IP do servidor!
+                // 🟢 CORREÇÃO 1: Limpa o cache APENAS se for erro de rede/timeout
                 if (!erro_local.response) {
                     limpar_cache_servidor();
                 }
                 console.warn('[api_cliente] Servidor local falhou:', erro_local.message);
                 
-                // 🟢 CORREÇÃO 2: Rejeitar o erro local para o Vue saber o que se passou
+                // 🟢 CORREÇÃO 2: Rejeitar o erro local
                 return Promise.reject(erro_local); 
             }
         }
