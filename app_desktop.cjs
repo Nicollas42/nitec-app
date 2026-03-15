@@ -9,6 +9,21 @@ app.disableHardwareAcceleration();
 let janela_pdv;
 let info_servidor_local = null;
 let intervalo_sync_vps  = null;
+let servidor_iniciado   = false;
+
+/**
+ * Verifica se o usuário logado é DONO ou ADMIN_MASTER.
+ * Só o DONO é o servidor principal — outros PCs são clientes.
+ * @returns {boolean}
+ */
+const usuario_e_dono = () => {
+    try {
+        const Storage = require('electron-store') || null;
+        // Lê diretamente do localStorage via webContents seria mais fácil
+        // mas aqui usamos uma flag salva via IPC quando o login acontece
+        return servidor_iniciado; // Controlado pelo IPC 'definir-tipo-usuario'
+    } catch { return false; }
+};
 
 const criar_janela_principal = () => {
     janela_pdv = new BrowserWindow({
@@ -38,19 +53,7 @@ const iniciar_sync_automatico = () => {
 app.whenReady().then(async () => {
 
     // 🟢 Passa o caminho do dist/ para o servidor local servir o app Vue
-    const caminho_dados = app.getPath('userData');
-    const caminho_dist  = app.isPackaged
-        ? path.join(__dirname, 'dist')       // produção: dist/ ao lado do .exe
-        : path.join(__dirname, 'dist');      // dev: mesmo caminho (rode npm run build primeiro)
-
-    try {
-        info_servidor_local = await servidor_local.iniciar(caminho_dados, caminho_dist);
-        console.log(`[App] Servidor local: http://${info_servidor_local.ip}:${info_servidor_local.porta}`);
-        console.log(`[App] App Vue acessível em: http://${info_servidor_local.ip}:${info_servidor_local.porta}`);
-    } catch (e) {
-        console.error('[App] Falha ao iniciar servidor local:', e.message);
-    }
-
+    // Servidor local não inicia aqui — só inicia após login do DONO (via IPC 'notificar-login')
     criar_janela_principal();
     iniciar_sync_automatico();
 
@@ -69,6 +72,33 @@ app.on('window-all-closed', () => {
 });
 
 // ─── IPC: Servidor Local ─────────────────────────────────────────────────────
+
+// 🟢 O Vue notifica quando o usuário faz login — decide se inicia o servidor
+// Só DONO e ADMIN_MASTER sobem o servidor local
+ipcMain.handle('notificar-login', async (event, { tipo_usuario, tenant_id }) => {
+    const e_dono = ['dono', 'admin_master'].includes(tipo_usuario);
+
+    if (e_dono && !info_servidor_local) {
+        // Inicia o servidor se ainda não está rodando
+        try {
+            const caminho_dados = app.getPath('userData');
+            const caminho_dist  = path.join(__dirname, 'dist');
+            info_servidor_local = await servidor_local.iniciar(caminho_dados, caminho_dist, tenant_id);
+            servidor_iniciado = true;
+            console.log(`[App] Servidor local iniciado para tenant: ${tenant_id}`);
+        } catch (e) {
+            console.error('[App] Falha ao iniciar servidor local:', e.message);
+        }
+    } else if (!e_dono && info_servidor_local) {
+        // Para o servidor se um não-dono está logado neste PC
+        servidor_local.parar();
+        info_servidor_local = null;
+        servidor_iniciado = false;
+        console.log('[App] Servidor local parado — usuário não é dono.');
+    }
+
+    return { servidor_ativo: !!info_servidor_local };
+});
 
 ipcMain.handle('obter-servidor-local', () => {
     if (!info_servidor_local) return null;

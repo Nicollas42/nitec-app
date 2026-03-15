@@ -19,6 +19,7 @@ let bonjour       = null;
 let servico_mdns  = null;
 let data_dir      = null;
 let app_dir       = null; // Caminho do dist/ do Vue
+let tenant_id_ativo = null; // Tenant do dono logado — validado no ping
 
 // ─── Utilitários de armazenamento JSON ───────────────────────────────────────
 
@@ -54,8 +55,9 @@ const enfileirar_sync = (metodo, url, payload) => {
 const configurar_rotas = (app_express) => {
 
     // Ping — descoberta de serviço
+    // Retorna o tenant_id para que o celular valide que está no servidor certo
     app_express.get('/api/ping', (req, res) => {
-        res.json({ ok: true, servidor: 'nitec_local', porta: PORTA });
+        res.json({ ok: true, servidor: 'nitec_local', porta: PORTA, tenant: tenant_id_ativo });
     });
 
     // ── Mesas ────────────────────────────────────────────────────────────────
@@ -380,10 +382,11 @@ const obter_ip_local = () => {
 
 // ─── API pública ──────────────────────────────────────────────────────────────
 
-const iniciar = (caminho_dados, caminho_app = null) => {
+const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
     return new Promise((resolve, reject) => {
         data_dir = path.join(caminho_dados, 'nitec_local');
         app_dir  = caminho_app; // Caminho do dist/ do Vue
+        tenant_id_ativo = tenant_id; // Tenant do dono — usado no /api/ping
         garantir_dir(data_dir);
 
         const app_express = express();

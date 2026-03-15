@@ -24,9 +24,19 @@ export const useAuthStore = defineStore('auth_store', () => {
             localStorage.setItem('nitec_token', token);
             localStorage.setItem('nitec_usuario', JSON.stringify(usuario));
 
-            // 🟢 Sincronização completa com o servidor local após login bem-sucedido
-            // Garante que o servidor local tenha TODOS os dados da VPS
-            // independente de quais telas o usuário vai navegar
+            // 🟢 Notifica o Electron sobre o tipo de usuário logado
+            // O Electron decide se inicia ou para o servidor local
+            if (window?.require) {
+                try {
+                    const { ipcRenderer } = window.require('electron');
+                    await ipcRenderer.invoke('notificar-login', {
+                        tipo_usuario: usuario.tipo_usuario,
+                        tenant_id   : loja,
+                    });
+                } catch { /* não está no Electron */ }
+            }
+
+            // 🟢 Sincronização completa com o servidor local após login
             if (loja !== 'master') {
                 sincronizar_snapshot_completo().catch(() => {});
             }

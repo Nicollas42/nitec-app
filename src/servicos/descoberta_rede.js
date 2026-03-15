@@ -43,12 +43,23 @@ const obter_via_ipc = async () => {
  */
 const testar_ping_local = async (url) => {
     try {
-        const ctrl  = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 1500);
-        const resp  = await fetch(`${url}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
+        const ctrl   = new AbortController();
+        const timer  = setTimeout(() => ctrl.abort(), 1500);
+        const resp   = await fetch(`${url}/api/ping`, { signal: ctrl.signal, cache: 'no-store' });
         clearTimeout(timer);
-        const dados = await resp.json();
-        return dados?.servidor === 'nitec_local';
+        const dados  = await resp.json();
+
+        if (dados?.servidor !== 'nitec_local') return false;
+
+        // 🟢 Valida o tenant — garante que é o servidor do estabelecimento correto
+        // Evita que um PC de outro bar na mesma rede seja descoberto
+        const tenant_local   = localStorage.getItem('nitec_tenant_id');
+        const tenant_servidor = dados?.tenant;
+
+        // Se o servidor não informou o tenant ainda (versão antiga), aceita mesmo assim
+        if (!tenant_servidor) return true;
+
+        return tenant_local === tenant_servidor;
     } catch {
         return false;
     }
