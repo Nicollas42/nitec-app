@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_claude-mem_mcp-search__search",
+      "Bash(npm run:*)",
+      "Bash(grep -r export /c/PDP/nitec_app/src/stores/*.js)",
+      "WebFetch(domain:claude.ai)"
+    ]
+  }
+}

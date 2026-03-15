@@ -121,6 +121,7 @@ const configurar_rotas = (app_express) => {
     app_express.get('/api/listar-comandas', (req, res) => {
         const comandas = ler_json('comandas.json', []);
         const mesas    = ler_json('mesas.json', []);
+        const itens    = ler_json('itens.json', []);
 
         // Enriquece cada comanda com os campos aninhados que o frontend espera
         // Comandas sincronizadas da VPS já trazem esses campos — mas as criadas
@@ -132,6 +133,9 @@ const configurar_rotas = (app_express) => {
                 buscar_cliente : c.buscar_cliente  || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
                 buscar_mesa    : c.buscar_mesa     || (mesa ? { nome_mesa: mesa.nome_mesa } : null),
                 buscar_usuario : c.buscar_usuario  || null,
+                listar_itens   : itens
+                    .filter(i => i.comanda_id === c.id)
+                    .map(i => ({ ...i, buscar_produto: { nome_produto: i.nome_produto } })),
             };
         });
 
