@@ -73,19 +73,40 @@ const configurar_rotas = (app_express) => {
         const comandas = ler_json('comandas.json', []);
         const itens    = ler_json('itens.json', []);
 
-        const mesa = mesas.find(m => m.id === id_mesa);
-        if (!mesa) return res.status(404).json({ sucesso: false, mensagem: 'Mesa não encontrada.' });
+        // 🟢 Tenta encontrar a mesa nos JSONs
+        // Se não encontrar, reconstrói um objeto mínimo a partir das comandas
+        // Isso evita 404 quando o sync ainda não enviou mesas.json completo
+        let mesa = mesas.find(m => m.id === id_mesa);
+
+        if (!mesa) {
+            // Verifica se existe alguma comanda aberta para essa mesa
+            const tem_comanda = comandas.some(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta');
+            if (!tem_comanda) {
+                return res.status(404).json({ sucesso: false, mensagem: 'Mesa não encontrada.' });
+            }
+            // Reconstrói mesa mínima a partir das comandas
+            mesa = { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
+        }
 
         const comandas_da_mesa = comandas
             .filter(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta')
             .map(c => ({
                 ...c,
-                listar_itens: itens
+                buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
+                buscar_mesa   : { nome_mesa: mesa.nome_mesa },
+                listar_itens  : itens
                     .filter(i => i.comanda_id === c.id)
                     .map(i => ({ ...i, buscar_produto: { nome_produto: i.nome_produto } }))
             }));
 
-        res.json({ sucesso: true, dados: { nome_mesa: mesa.nome_mesa, status_mesa: mesa.status_mesa, listar_comandas: comandas_da_mesa } });
+        res.json({
+            sucesso: true,
+            dados  : {
+                nome_mesa      : mesa.nome_mesa,
+                status_mesa    : mesa.status_mesa,
+                listar_comandas: comandas_da_mesa
+            }
+        });
     });
 
     // ── Produtos ─────────────────────────────────────────────────────────────

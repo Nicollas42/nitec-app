@@ -78,7 +78,16 @@ export function useLogicaMesaDetalhes() {
             dados_mesa.value = resposta.data.dados;
 
         } catch (erro) {
-            if (!erro.response || erro.response.status >= 500) {
+            // 🟢 Fallback quando:
+            // - sem resposta (timeout/rede)
+            // - erro >= 500 (servidor caiu)
+            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            const nao_encontrou = erro.response?.status === 404 && sem_internet;
+
+            if (erro_de_rede || nao_encontrou) {
 
                 // Fallback 1 — store persistido
                 const fallback_store = montar_dados_do_cache(id_dinamico);
@@ -184,7 +193,16 @@ export function useLogicaMesaDetalhes() {
             fechar_modal_cliente();
             carregar_dados_completos();
         } catch (erro) {
-            if (!erro.response || erro.response.status >= 500) {
+            // 🟢 Fallback quando:
+            // - sem resposta (timeout/rede)
+            // - erro >= 500 (servidor caiu)
+            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            const nao_encontrou = erro.response?.status === 404 && sem_internet;
+
+            if (erro_de_rede || nao_encontrou) {
                 await db.vendas_pendentes.add({
                     tenant_id    : localStorage.getItem('nitec_tenant_id'),
                     data_venda   : new Date().toISOString(),
@@ -213,7 +231,16 @@ export function useLogicaMesaDetalhes() {
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
         } catch (erro) {
-            if (!erro.response || erro.response.status >= 500) {
+            // 🟢 Fallback quando:
+            // - sem resposta (timeout/rede)
+            // - erro >= 500 (servidor caiu)
+            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            const nao_encontrou = erro.response?.status === 404 && sem_internet;
+
+            if (erro_de_rede || nao_encontrou) {
                 await db.vendas_pendentes.add({
                     tenant_id    : localStorage.getItem('nitec_tenant_id'),
                     data_venda   : new Date().toISOString(),
@@ -242,7 +269,16 @@ export function useLogicaMesaDetalhes() {
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
         } catch (erro) {
-            if (!erro.response || erro.response.status >= 500) {
+            // 🟢 Fallback quando:
+            // - sem resposta (timeout/rede)
+            // - erro >= 500 (servidor caiu)
+            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            const nao_encontrou = erro.response?.status === 404 && sem_internet;
+
+            if (erro_de_rede || nao_encontrou) {
                 await db.vendas_pendentes.add({
                     tenant_id    : localStorage.getItem('nitec_tenant_id'),
                     data_venda   : new Date().toISOString(),
@@ -279,7 +315,16 @@ export function useLogicaMesaDetalhes() {
             voltar_mapa();
             loja_produtos.buscar_produtos(true);
         } catch (erro) {
-            if (!erro.response || erro.response.status >= 500) {
+            // 🟢 Fallback quando:
+            // - sem resposta (timeout/rede)
+            // - erro >= 500 (servidor caiu)
+            // - 404 enquanto offline/servidor local (mesa ainda não sincronizou)
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            const nao_encontrou = erro.response?.status === 404 && sem_internet;
+
+            if (erro_de_rede || nao_encontrou) {
                 await db.vendas_pendentes.add({
                     tenant_id    : localStorage.getItem('nitec_tenant_id'),
                     data_venda   : new Date().toISOString(),
