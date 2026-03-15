@@ -258,13 +258,32 @@ const configurar_rotas = (app_express) => {
         res.json({ token: usuario.token_cache || 'local_token', usuario });
     });
 
+    // ── Cache de produtos, mesas e usuários (recebe do cliente Vue) ───────────
     app_express.post("/api/sync-produtos", (req, res) => {
         const { produtos, mesas, usuarios, comandas, itens } = req.body;
+        
         if (produtos) salvar_json('produtos_cache.json', produtos);
         if (mesas)    salvar_json('mesas.json', mesas);
         if (usuarios) salvar_json('usuarios_cache.json', usuarios);
-        if (comandas) salvar_json('comandas.json', comandas);
-        if (itens)    salvar_json('itens.json', itens);
+        
+        // 🟢 FUSÃO INTELIGENTE DE COMANDAS (MERGE)
+        if (comandas && Array.isArray(comandas)) {
+            let cmd_existentes = ler_json('comandas.json', []);
+            const ids_novas = comandas.map(c => String(c.id));
+            // Remove as antigas que têm o mesmo ID para não duplicar
+            cmd_existentes = cmd_existentes.filter(c => !ids_novas.includes(String(c.id)));
+            salvar_json('comandas.json', [...cmd_existentes, ...comandas]);
+        }
+        
+        // 🟢 FUSÃO INTELIGENTE DE ITENS (MERGE)
+        if (itens && Array.isArray(itens) && comandas && Array.isArray(comandas)) {
+            let it_existentes = ler_json('itens.json', []);
+            const ids_comand_novas = comandas.map(c => String(c.id));
+            // Apaga apenas os itens antigos das comandas que estamos a atualizar agora
+            it_existentes = it_existentes.filter(i => !ids_comand_novas.includes(String(i.comanda_id)));
+            salvar_json('itens.json', [...it_existentes, ...itens]);
+        }
+        
         res.json({ ok: true });
     });
 

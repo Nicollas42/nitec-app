@@ -63,6 +63,21 @@ api_cliente.interceptors.response.use((response) => {
     if (typeof response.data === 'string' && response.data.includes('<html')) {
         return Promise.reject(new Error("Erro de Rota: O Laravel devolveu HTML."));
     }
+
+    // 🟢 AUTO-CACHE (Espionagem Positiva)
+    // Se a VPS devolveu os dados com sucesso, fazemos um backup silencioso pro PC!
+    try {
+        if (response.config.method === 'get') {
+            const url = response.config.url;
+            if (url.includes('/listar-comandas') && response.data.comandas) {
+                sincronizar_cache_para_local(null, null, response.data.comandas);
+            } 
+            else if (url.includes('/detalhes-mesa/') && response.data.dados?.listar_comandas) {
+                sincronizar_cache_para_local(null, null, response.data.dados.listar_comandas);
+            }
+        }
+    } catch (e) { /* Silencioso, não trava o sistema se falhar */ }
+
     return response;
 }, async (error) => {
     const sem_resposta    = !error.response || error.response.status >= 500;
