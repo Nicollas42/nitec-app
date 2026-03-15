@@ -4,28 +4,27 @@ import api_cliente, { configurar_url_base, sincronizar_cache_para_local } from '
 
 export const useAuthStore = defineStore('auth_store', () => {
     const usuario_logado = ref(JSON.parse(localStorage.getItem('nitec_usuario')) || null);
-    const token_acesso = ref(localStorage.getItem('nitec_token') || null);
+    const token_acesso   = ref(localStorage.getItem('nitec_token') || null);
 
     const realizar_login = async (loja, email, senha) => {
         try {
             const rota_login = (loja === 'master') ? '/admin/login' : '/realizar-login';
 
             const resposta = await api_cliente.post(rota_login, {
-                email: email,
+                email   : email,
                 password: senha
             });
 
-            const token = resposta.data.token;
+            const token  = resposta.data.token;
             const usuario = resposta.data.usuario;
 
-            token_acesso.value = token;
+            token_acesso.value   = token;
             usuario_logado.value = usuario;
 
-            localStorage.setItem('nitec_token', token);
+            localStorage.setItem('nitec_token',   token);
             localStorage.setItem('nitec_usuario', JSON.stringify(usuario));
 
             // 🟢 Notifica o Electron sobre o tipo de usuário logado
-            // O Electron decide se inicia ou para o servidor local
             if (window?.require) {
                 try {
                     const { ipcRenderer } = window.require('electron');
@@ -36,9 +35,10 @@ export const useAuthStore = defineStore('auth_store', () => {
                 } catch { /* não está no Electron */ }
             }
 
-            // 🟢 Sincronização completa com o servidor local após login
+            // 🟢 Pré-carrega todos os stores persistidos em background
+            // Isso garante que os dados ficam disponíveis offline imediatamente
             if (loja !== 'master') {
-                sincronizar_snapshot_completo().catch(() => {});
+                pre_carregar_stores().catch(() => {});
             }
 
             return resposta.data;
@@ -50,7 +50,7 @@ export const useAuthStore = defineStore('auth_store', () => {
 
     const encerrar_sessao = () => {
         usuario_logado.value = null;
-        token_acesso.value = null;
+        token_acesso.value   = null;
 
         localStorage.removeItem('nitec_token');
         localStorage.removeItem('nitec_usuario');
@@ -59,41 +59,61 @@ export const useAuthStore = defineStore('auth_store', () => {
         localStorage.removeItem('nitec_nome_cliente');
         localStorage.removeItem('nitec_token_admin');
         localStorage.removeItem('nitec_usuario_admin');
+
+        // 🟢 Limpa também os stores persistidos ao sair
+        localStorage.removeItem('nitec_mesas_store');
+        localStorage.removeItem('nitec_produtos_store');
+        localStorage.removeItem('nitec_comandas_store');
     };
 
     return { usuario_logado, token_acesso, realizar_login, encerrar_sessao };
+}, {
+    persist: {
+        key    : 'nitec_auth_store',
+        storage: localStorage,
+        pick   : ['usuario_logado', 'token_acesso'],
+    }
 });
 
 /**
- * Busca todos os dados da VPS e envia para o servidor local em background.
- * Chamado logo após o login bem-sucedido.
- * Roda em segundo plano — não bloqueia o login nem a navegação.
+ * Pré-carrega todos os stores persistidos logo após o login.
+ * Roda em paralelo e em background — não bloqueia a navegação.
+ * Os dados ficam no localStorage via pinia-plugin-persistedstate.
+ * Na próxima vez que o usuário acessar qualquer tela, os dados já estão lá.
  */
-const sincronizar_snapshot_completo = async () => {
+const pre_carregar_stores = async () => {
     try {
-        // Busca os 3 recursos em paralelo para ser mais rápido
-        const [resp_produtos, resp_mesas, resp_comandas] = await Promise.allSettled([
-            api_cliente.get('/listar-produtos'),
-            api_cliente.get('/listar-mesas'),
-            api_cliente.get('/listar-comandas'),
+        // Importação dinâmica para evitar circular dependency
+        const { useProdutosStore } = await import('./produtos_store.js');
+        const { useMesasStore    } = await import('./mesas_store.js');
+        const { useComandasStore } = await import('./comandas_store.js');
+
+        const loja_produtos = useProdutosStore();
+        const loja_mesas    = useMesasStore();
+        const loja_comandas = useComandasStore();
+
+        // Busca tudo em paralelo
+        const [r_produtos, r_mesas, r_comandas] = await Promise.allSettled([
+            loja_produtos.buscar_produtos(true),
+            loja_mesas.buscar_mesas(true),
+            loja_comandas.buscar_comandas(true),
         ]);
 
-        const produtos = resp_produtos.status === 'fulfilled'
-            ? (resp_produtos.value.data.produtos || [])
-            : null;
+        console.log('[Auth] Stores pré-carregados:', {
+            produtos: r_produtos.status,
+            mesas   : r_mesas.status,
+            comandas: r_comandas.status,
+        });
 
-        const mesas = resp_mesas.status === 'fulfilled'
-            ? (resp_mesas.value.data.dados || resp_mesas.value.data.mesas || [])
-            : null;
-
-        const comandas = resp_comandas.status === 'fulfilled'
-            ? (resp_comandas.value.data.comandas || [])
-            : null;
-
-        await sincronizar_cache_para_local(produtos, mesas, comandas);
+        // Envia snapshot completo para o servidor local (PC do dono)
+        await sincronizar_cache_para_local(
+            loja_produtos.lista_produtos,
+            loja_mesas.lista_mesas,
+            loja_comandas.lista_comandas
+        );
 
         console.log('[Auth] Snapshot completo enviado para o servidor local.');
     } catch (e) {
-        console.warn('[Auth] Falha ao sincronizar snapshot:', e.message);
+        console.warn('[Auth] Falha ao pré-carregar stores:', e.message);
     }
 };
