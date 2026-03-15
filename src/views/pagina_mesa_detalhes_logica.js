@@ -3,27 +3,29 @@ import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
 import { useMesasStore } from '../stores/mesas_store.js';
+import { useComandasStore } from '../stores/comandas_store.js';
 import { db } from '../banco_local/db.js'; 
 import { useToastStore } from '../stores/toast_store.js'; 
 
 export function useLogicaMesaDetalhes() {
-    const rota_atual = useRoute();
-    const roteador = useRouter();
+    const rota_atual    = useRoute();
+    const roteador      = useRouter();
     const loja_produtos = useProdutosStore();
-    const loja_mesas = useMesasStore();
-    const toast_global = useToastStore();
+    const loja_mesas    = useMesasStore();
+    const loja_comandas = useComandasStore();
+    const toast_global  = useToastStore();
     
-    const dados_mesa = ref(null);
-    const item_processando = ref(null); // 🟢 Exportado — o template usa para desabilitar botões durante req
-    const modal_cliente_visivel = ref(false);
-    const input_novo_cliente = ref('');
-
+    const dados_mesa                 = ref(null);
+    const carregando                 = ref(false);
+    const item_processando           = ref(null);
+    const modal_cliente_visivel      = ref(false);
+    const input_novo_cliente         = ref('');
     const modal_cancelamento_visivel = ref(false);
-    const cancelando = ref(false);
-    const form_cancelamento = reactive({
-        comanda_id: null,
-        motivo_cancelamento: 'Erro de Digitação / Lançamento',
-        retornar_ao_estoque: true 
+    const cancelando                 = ref(false);
+    const form_cancelamento          = reactive({
+        comanda_id          : null,
+        motivo_cancelamento : 'Erro de Digitação / Lançamento',
+        retornar_ao_estoque : true 
     });
 
     const gerarUUID = () => {
@@ -32,74 +34,110 @@ export function useLogicaMesaDetalhes() {
             : Date.now().toString(36) + Math.random().toString(36).substring(2);
     };
 
+    /**
+     * Monta os dados da mesa a partir dos stores persistidos (sem requisição).
+     * Usado como exibição imediata enquanto a API responde,
+     * e como fallback principal quando offline.
+     */
+    const montar_dados_do_cache = (id_mesa) => {
+        const mesa = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_mesa))
+            || { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
+
+        const comandas_da_mesa = loja_comandas.lista_comandas
+            .filter(c => String(c.mesa_id) === String(id_mesa) && c.status_comanda === 'aberta')
+            .map(c => ({
+                ...c,
+                buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
+                listar_itens  : (c.listar_itens || []).map(i => ({
+                    ...i,
+                    buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto || `Produto #${i.produto_id}` }
+                }))
+            }));
+
+        if (comandas_da_mesa.length === 0) return null;
+
+        return {
+            nome_mesa      : mesa.nome_mesa,
+            status_mesa    : mesa.status_mesa || 'ocupada',
+            listar_comandas: comandas_da_mesa
+        };
+    };
+
     const carregar_dados_completos = async () => {
         const id_dinamico = rota_atual.params.id_mesa;
-        if (!id_dinamico) return; 
+        if (!id_dinamico) return;
 
-        dados_mesa.value = null;
+        carregando.value = true;
+
+        // 🟢 Exibição imediata com dados do cache — sem tela branca
+        const dados_cache = montar_dados_do_cache(id_dinamico);
+        if (dados_cache && !dados_mesa.value) {
+            dados_mesa.value = dados_cache;
+        }
 
         try {
-            const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
+            const resposta   = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             dados_mesa.value = resposta.data.dados;
+
         } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
-                toast_global.exibir_toast("⚠️ Offline: Sessão temporária gerada. Lançamentos serão enfileirados.", "aviso");
-                
-                const mesa_em_cache = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico)) 
+
+                // Fallback 1 — store persistido (mais completo)
+                const fallback_store = montar_dados_do_cache(id_dinamico);
+                if (fallback_store) {
+                    dados_mesa.value = fallback_store;
+                    toast_global.exibir_toast("⚠️ Offline: Exibindo dados salvos.", "aviso");
+                    return;
+                }
+
+                // Fallback 2 — Dexie estado_comandas_local (QR Sync)
+                const mesa_em_cache      = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico))
                     || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
-                
-                // Lê o snapshot do Dexie — inclui itens de TODOS os dispositivos que sincronizaram via QR
                 const comanda_id_offline = `off_${id_dinamico}`;
-                const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
-                const itens_brutos = estado_local?.itens || [];
-                
-                // Agrupa por produto (soma quantidades do mesmo produto_id)
+                const estado_local       = await db.estado_comandas_local.get(comanda_id_offline);
+                const itens_brutos       = estado_local?.itens || [];
+
                 const itens_agrupados = [];
                 for (const item of itens_brutos) {
                     const existente = itens_agrupados.find(i => i.produto_id === item.produto_id);
-                    if (existente) {
-                        existente.quantidade += item.quantidade;
-                    } else {
-                        itens_agrupados.push({ ...item });
-                    }
+                    if (existente) existente.quantidade += item.quantidade;
+                    else itens_agrupados.push({ ...item });
                 }
 
                 const valor_total_local = itens_agrupados.reduce(
                     (acc, i) => acc + (i.preco_unitario * i.quantidade), 0
                 );
 
-                // 🟢 CORREÇÃO: estrutura idêntica ao retorno da API — o template espera exatamente estes campos
                 dados_mesa.value = {
-                    nome_mesa: mesa_em_cache.nome_mesa,
-                    status_mesa: 'ocupada',
-                    listar_comandas: [
-                        {
-                            id: comanda_id_offline,
-                            tipo_conta: 'geral',
-                            status_comanda: 'aberta',
-                            valor_total: valor_total_local,
-                            // Campo que o template usa: comanda.buscar_cliente?.nome_cliente
-                            buscar_cliente: {
-                                nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline'
-                            },
-                            // Campo que o template itera: comanda.listar_itens
-                            listar_itens: itens_agrupados.map(i => ({
-                                id: `offline_item_${i.produto_id}`,
-                                produto_id: i.produto_id,
-                                quantidade: i.quantidade,
-                                preco_unitario: i.preco_unitario,
-                                // Campo que o template acessa: item.buscar_produto.nome_produto
-                                buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
-                                is_offline: true
-                            })),
-                            is_offline: true
-                        }
-                    ]
+                    nome_mesa      : mesa_em_cache.nome_mesa,
+                    status_mesa    : 'ocupada',
+                    listar_comandas: [{
+                        id             : comanda_id_offline,
+                        tipo_conta     : 'geral',
+                        status_comanda : 'aberta',
+                        valor_total    : valor_total_local,
+                        buscar_cliente : { nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline' },
+                        listar_itens   : itens_agrupados.map(i => ({
+                            id            : `offline_item_${i.produto_id}`,
+                            produto_id    : i.produto_id,
+                            quantidade    : i.quantidade,
+                            preco_unitario: i.preco_unitario,
+                            buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
+                            is_offline    : true
+                        })),
+                        is_offline: true
+                    }]
                 };
+
+                toast_global.exibir_toast("⚠️ Offline: Dados do cache local.", "aviso");
+
             } else {
                 toast_global.exibir_toast("Erro ao carregar informações da mesa.", "erro");
-                voltar_mapa();
+                // Só volta se não tem nada para mostrar
+                if (!dados_mesa.value) voltar_mapa();
             }
+        } finally {
+            carregando.value = false;
         }
     };
 
@@ -108,18 +146,17 @@ export function useLogicaMesaDetalhes() {
     });
 
     const abrir_pdv_para_comanda = (id_comanda) => roteador.push(`/pdv-caixa?comanda=${id_comanda}`);
-    const fechar_conta_comanda = (id_comanda) => roteador.push(`/pdv-caixa?pagamento=${id_comanda}`);
-
+    const fechar_conta_comanda   = (id_comanda) => roteador.push(`/pdv-caixa?pagamento=${id_comanda}`);
     const adicionar_novo_cliente = () => { input_novo_cliente.value = ''; modal_cliente_visivel.value = true; };
-    const fechar_modal_cliente = () => modal_cliente_visivel.value = false;
+    const fechar_modal_cliente   = () => modal_cliente_visivel.value = false;
 
     const confirmar_novo_cliente = async () => {
         if (!input_novo_cliente.value) return toast_global.exibir_toast("Digite o nome do cliente.", "erro");
-        const uuid = gerarUUID();
+        const uuid    = gerarUUID();
         const payload = { 
-            mesa_id: rota_atual.params.id_mesa, 
-            nome_cliente: input_novo_cliente.value, 
-            tipo_conta: 'individual', 
+            mesa_id      : rota_atual.params.id_mesa, 
+            nome_cliente : input_novo_cliente.value, 
+            tipo_conta   : 'individual', 
             uuid_operacao: uuid 
         };
         try {
@@ -129,11 +166,11 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) { 
             if (!erro.response || erro.response.status >= 500) { 
                 await db.vendas_pendentes.add({ 
-                    tenant_id: localStorage.getItem('nitec_tenant_id'), 
-                    data_venda: new Date().toISOString(), 
-                    valor_total: 0, 
-                    url_destino: '/abrir-comanda', 
-                    metodo: 'POST', 
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
+                    data_venda   : new Date().toISOString(), 
+                    valor_total  : 0, 
+                    url_destino  : '/abrir-comanda', 
+                    metodo       : 'POST', 
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
@@ -145,13 +182,11 @@ export function useLogicaMesaDetalhes() {
     };
 
     const alterar_quantidade = async (id_item, acao) => {
-        // Bloqueia itens offline — não têm ID real no servidor
         if (String(id_item).startsWith('offline_item_')) {
             return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de alterar.", "aviso");
         }
-
         item_processando.value = id_item;
-        const uuid = gerarUUID();
+        const uuid    = gerarUUID();
         const payload = { acao, uuid_operacao: uuid };
         try {
             await api_cliente.post(`/alterar-quantidade-item/${id_item}`, payload);
@@ -160,32 +195,27 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) { 
             if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ 
-                    tenant_id: localStorage.getItem('nitec_tenant_id'), 
-                    data_venda: new Date().toISOString(), 
-                    valor_total: 0, 
-                    url_destino: `/alterar-quantidade-item/${id_item}`, 
-                    metodo: 'POST', 
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
+                    data_venda   : new Date().toISOString(), 
+                    valor_total  : 0, 
+                    url_destino  : `/alterar-quantidade-item/${id_item}`, 
+                    metodo       : 'POST', 
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
-                toast_global.exibir_toast("⚠️ Offline: Alteração guardada no PC!", "aviso");
+                toast_global.exibir_toast("⚠️ Offline: Alteração guardada!", "aviso");
                 voltar_mapa();
             } else toast_global.exibir_toast("Erro ao atualizar quantidade.", "erro"); 
-        } finally {
-            item_processando.value = null;
-        }
+        } finally { item_processando.value = null; }
     };
 
     const remover_item_consumido = async (id_item_comanda) => {
-        // Bloqueia itens offline
         if (String(id_item_comanda).startsWith('offline_item_')) {
             return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de remover.", "aviso");
         }
-
         if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
-        
         item_processando.value = id_item_comanda;
-        const uuid = gerarUUID();
+        const uuid    = gerarUUID();
         const payload = { uuid_operacao: uuid };
         try {
             await api_cliente.delete(`/remover-item-comanda/${id_item_comanda}`, { data: payload });
@@ -194,36 +224,34 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) { 
             if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ 
-                    tenant_id: localStorage.getItem('nitec_tenant_id'), 
-                    data_venda: new Date().toISOString(), 
-                    valor_total: 0, 
-                    url_destino: `/remover-item-comanda/${id_item_comanda}`, 
-                    metodo: 'DELETE', 
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
+                    data_venda   : new Date().toISOString(), 
+                    valor_total  : 0, 
+                    url_destino  : `/remover-item-comanda/${id_item_comanda}`, 
+                    metodo       : 'DELETE', 
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
                 toast_global.exibir_toast("⚠️ Offline: Remoção enviada para a fila!", "aviso");
                 voltar_mapa();
             } else toast_global.exibir_toast("Erro ao remover os itens.", "erro"); 
-        } finally {
-            item_processando.value = null;
-        }
+        } finally { item_processando.value = null; }
     };
 
     const abrir_modal_cancelamento = (id_comanda) => {
-        form_cancelamento.comanda_id = id_comanda;
+        form_cancelamento.comanda_id          = id_comanda;
         form_cancelamento.motivo_cancelamento = 'Erro de Digitação / Lançamento';
         form_cancelamento.retornar_ao_estoque = true;
-        modal_cancelamento_visivel.value = true;
+        modal_cancelamento_visivel.value      = true;
     };
 
     const confirmar_cancelamento = async () => {
         cancelando.value = true;
-        const uuid = gerarUUID();
+        const uuid    = gerarUUID();
         const payload = { 
-            motivo_cancelamento: form_cancelamento.motivo_cancelamento, 
-            retornar_ao_estoque: form_cancelamento.retornar_ao_estoque, 
-            uuid_operacao: uuid 
+            motivo_cancelamento : form_cancelamento.motivo_cancelamento, 
+            retornar_ao_estoque : form_cancelamento.retornar_ao_estoque, 
+            uuid_operacao       : uuid 
         };
         try {
             await api_cliente.post(`/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, payload);
@@ -233,18 +261,18 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
                 await db.vendas_pendentes.add({ 
-                    tenant_id: localStorage.getItem('nitec_tenant_id'), 
-                    data_venda: new Date().toISOString(), 
-                    valor_total: 0, 
-                    url_destino: `/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, 
-                    metodo: 'POST', 
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
+                    data_venda   : new Date().toISOString(), 
+                    valor_total  : 0, 
+                    url_destino  : `/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, 
+                    metodo       : 'POST', 
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
-                toast_global.exibir_toast("⚠️ Offline: Cancelamento salvo no PC!", "aviso");
+                toast_global.exibir_toast("⚠️ Offline: Cancelamento salvo!", "aviso");
                 modal_cancelamento_visivel.value = false;
                 voltar_mapa();
-            } else toast_global.exibir_toast(erro.response?.data?.mensagem || "Erro ao cancelar comanda.", "erro");
+            } else toast_global.exibir_toast(erro.response?.data?.mensagem || "Erro ao cancelar.", "erro");
         } finally { cancelando.value = false; }
     };
 
@@ -254,12 +282,11 @@ export function useLogicaMesaDetalhes() {
     onActivated(() => carregar_dados_completos());
 
     return {
-        dados_mesa, voltar_mapa, abrir_pdv_para_comanda,
+        dados_mesa, carregando, voltar_mapa, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
         fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
         remover_item_consumido, fechar_conta_comanda,
         modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
-        confirmar_cancelamento, cancelando,
-        item_processando, // 🟢 Agora exportado — o template usa para grayscale/pointer-events
+        confirmar_cancelamento, cancelando, item_processando,
     };
 }

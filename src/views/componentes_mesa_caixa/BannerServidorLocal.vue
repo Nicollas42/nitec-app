@@ -63,6 +63,13 @@
                             Conectar
                         </button>
 
+                        <!-- Botão de nova tentativa quando não encontrou servidor -->
+                        <button v-if="!servidor_encontrado && !buscando"
+                                @click="tentar_novamente"
+                                class="bg-white/20 hover:bg-white/30 text-white font-black text-xs px-4 py-2 rounded-xl transition-all active:scale-95 uppercase tracking-wide">
+                            🔄 Tentar novamente
+                        </button>
+
                         <span v-if="conectado"
                               class="bg-white/20 text-white font-black text-xs px-3 py-2 rounded-lg">
                             ✅ Offline local
@@ -173,6 +180,30 @@ const iniciar_ping_periodico = () => {
             ao_detectar_vps_online();
         }
     }, 15000);
+};
+
+/**
+ * Reinicia a busca pelo servidor local.
+ * Chamado quando a primeira busca não encontrou nada.
+ */
+const tentar_novamente = async () => {
+    buscando.value            = true;
+    servidor_encontrado.value = false;
+
+    // Limpa o cache para forçar redescoberta completa
+    localStorage.removeItem('nitec_servidor_local');
+
+    try {
+        const url = await descobrir_servidor_local();
+        if (url) {
+            url_servidor_local.value  = url;
+            servidor_encontrado.value = true;
+        }
+    } catch (e) {
+        console.warn('[Banner] Erro na redescoberta:', e.message);
+    } finally {
+        buscando.value = false;
+    }
 };
 
 /**

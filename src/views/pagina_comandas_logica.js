@@ -6,9 +6,9 @@ import { useComandasStore } from '../stores/comandas_store.js';
 import { db } from '../banco_local/db.js';
 
 export function useLogicaComandas() {
-    const roteador         = useRouter();
-    const toast_store      = useToastStore();
-    const loja_comandas    = useComandasStore();
+    const roteador      = useRouter();
+    const toast_store   = useToastStore();
+    const loja_comandas = useComandasStore();
 
     const filtro_status           = ref('todas');
     const termo_pesquisa_comanda  = ref('');
@@ -23,7 +23,6 @@ export function useLogicaComandas() {
             : Date.now().toString(36) + Math.random().toString(36).substring(2);
     };
 
-    // Usa o store persistido — nunca perde dados ao trocar de aba
     const carregar_comandas = async () => {
         await loja_comandas.buscar_comandas();
     };
@@ -35,19 +34,19 @@ export function useLogicaComandas() {
 
         lista.forEach(c => {
             if (!c.mesa_id) {
-                c._sessao       = 'balcao_' + c.id;
+                c._sessao        = 'balcao_' + c.id;
                 c._sessao_inicio = new Date(c.data_hora_abertura).getTime();
             } else {
                 if (c.tipo_conta === 'geral') {
                     sessoes_ativas[c.mesa_id] = c;
-                    c._sessao       = 'sessao_' + c.id;
+                    c._sessao        = 'sessao_' + c.id;
                     c._sessao_inicio = new Date(c.data_hora_abertura).getTime();
                 } else {
                     if (sessoes_ativas[c.mesa_id]) {
-                        c._sessao       = 'sessao_' + sessoes_ativas[c.mesa_id].id;
+                        c._sessao        = 'sessao_' + sessoes_ativas[c.mesa_id].id;
                         c._sessao_inicio = new Date(sessoes_ativas[c.mesa_id].data_hora_abertura).getTime();
                     } else {
-                        c._sessao       = 'sessao_orfa_' + c.id;
+                        c._sessao        = 'sessao_orfa_' + c.id;
                         c._sessao_inicio = new Date(c.data_hora_abertura).getTime();
                     }
                 }
@@ -98,27 +97,40 @@ export function useLogicaComandas() {
 
     const abrir_detalhes = async (comanda, acao) => {
         if (comanda.status_comanda === 'aberta') {
+            // Comanda aberta — vai para a tela de detalhes da mesa ou PDV
             if (comanda.mesa_id) roteador.push(`/mesa/${comanda.mesa_id}/detalhes`);
             else {
                 if (acao === 'lancar') roteador.push(`/pdv-caixa?comanda=${comanda.id}`);
                 else roteador.push(`/pdv-caixa?pagamento=${comanda.id}`);
             }
         } else {
+            // Comanda fechada/cancelada — tenta buscar detalhes
+            // 1ª tentativa: API (VPS ou servidor local)
             try {
                 const res = await api_cliente.get(`/buscar-comanda/${comanda.id}`);
                 comanda_selecionada.value     = res.data.dados;
                 modal_historico_visivel.value = true;
             } catch (e) {
-                if (!e.response) toast_store.exibir_toast("⚠️ Offline: Recibo indisponível agora.", "aviso");
-                else toast_store.exibir_toast("Erro ao buscar detalhes do recibo.", "erro");
+                if (!e.response) {
+                    // 2ª tentativa: usa os dados do store persistido diretamente
+                    // A comanda já está na lista com todos os campos disponíveis
+                    comanda_selecionada.value = {
+                        ...comanda,
+                        listar_itens: comanda.listar_itens || [],
+                    };
+                    modal_historico_visivel.value = true;
+                    toast_store.exibir_toast("⚠️ Offline: exibindo dados salvos.", "aviso");
+                } else {
+                    toast_store.exibir_toast("Erro ao buscar detalhes do recibo.", "erro");
+                }
             }
         }
     };
 
     const reabrir_comanda = async () => {
-        reabrindo.value = true;
-        const payload   = { uuid_operacao: gerarUUID() };
-        const id_mesa   = comanda_selecionada.value.mesa_id;
+        reabrindo.value  = true;
+        const payload    = { uuid_operacao: gerarUUID() };
+        const id_mesa    = comanda_selecionada.value.mesa_id;
         const id_comanda = comanda_selecionada.value.id;
 
         try {
@@ -131,11 +143,11 @@ export function useLogicaComandas() {
         } catch (e) {
             if (!e.response) {
                 await db.vendas_pendentes.add({
-                    tenant_id  : localStorage.getItem('nitec_tenant_id'),
-                    data_venda : new Date().toISOString(),
-                    valor_total: 0,
-                    url_destino: `/reabrir-comanda/${id_comanda}`,
-                    metodo     : 'POST',
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'),
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : `/reabrir-comanda/${id_comanda}`,
+                    metodo       : 'POST',
                     payload_venda: payload
                 });
                 toast_store.exibir_toast("⚠️ Offline: Reabertura salva!", "aviso");
