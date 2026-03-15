@@ -74,7 +74,6 @@ api_cliente.interceptors.response.use((response) => {
         console.groupCollapsed(`🔴 [DEBUG OFFLINE] Falha na VPS: ${config_original.url}`);
         console.log("1. Detetada falha na VPS ou ausência de internet. Tentando transição para Servidor Local...");
 
-        // 🟢 CORREÇÃO: Agora chama a função que se comunica com o Electron corretamente
         let url_local = await obter_url_servidor_local();
         
         if (!url_local) {
@@ -103,7 +102,31 @@ api_cliente.interceptors.response.use((response) => {
                 return resposta_local;
 
             } catch (erro_local) {
-                console.warn("4. ❌ FALHA! Servidor local não atendeu:", erro_local.message);
+                console.warn("4. ❌ FALHA no IP principal:", erro_local.message);
+                
+                // 🟢 NOVO: PLANO B DE SOBREVIVÊNCIA (Localhost)
+                // Se a placa de rede foi desligada (ERR_INTERNET_DISCONNECTED) e estamos no PC (Electron)
+                if (window?.require && !url_local.includes('127.0.0.1')) {
+                    console.log("5. 🔄 Tentando auto-resgate via Localhost (127.0.0.1)...");
+                    try {
+                        const api_localhost = axios.create({
+                            baseURL: `http://127.0.0.1:3737/api`,
+                            headers: { ...config_original.headers },
+                            timeout: 3000,
+                        });
+                        const resposta_localhost = await api_localhost.request({
+                            method: config_original.method,
+                            url   : config_original.url,
+                            data  : config_original.data,
+                        });
+                        console.log("6. ✔️ SUCESSO via Localhost!");
+                        console.groupEnd();
+                        return resposta_localhost;
+                    } catch (erro_localhost) {
+                        console.warn("6. ❌ Localhost também falhou.");
+                    }
+                }
+
                 if (!erro_local.response) {
                     limpar_cache_servidor();
                 }

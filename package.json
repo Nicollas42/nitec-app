@@ -1,6 +1,6 @@
 {
   "name": "nitec_app",
-  "version": "1.1.43",
+  "version": "1.1.44",
   "private": true,
   "type": "module",
   "main": "app_desktop.cjs",
