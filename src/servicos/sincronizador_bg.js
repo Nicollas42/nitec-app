@@ -13,21 +13,21 @@ export function iniciar_sincronizacao_de_fundo() {
     intervaloId = setInterval(async () => {
         const usuario_raw = localStorage.getItem('nitec_usuario');
         if (!usuario_raw) return;
-        
+
         const usuario = JSON.parse(usuario_raw);
         if (usuario.tipo_usuario === 'admin_master') return;
 
+        // 🟢 Só sincroniza quando há conexão com a internet
+        // Quando offline, o ping do BannerServidorLocal detecta e age
+        // Forçar busca offline destruiria os dados persistidos
         if (navigator.onLine && !sincronizando) {
             sincronizando = true;
             try {
-                // 1. Envia fila do Dexie (ações offline deste dispositivo) para a VPS
                 await processar_fila_offline();
-
-                // 2. Envia fila do servidor local (ações dos garçons) para a VPS
-                // Só roda no Electron (PC do caixa que hospeda o servidor local)
                 await sincronizar_servidor_local_com_vps();
 
-                // 3. Atualiza o mapa de mesas
+                // Atualiza mesas em background — a proteção no store evita
+                // sobrescrever com dados vazios se a resposta for ruim
                 const loja_mesas = useMesasStore();
                 await loja_mesas.buscar_mesas(true);
             } catch (erro) {
@@ -43,9 +43,7 @@ async function processar_fila_offline() {
     const toast_global = useToastStore();
     let sincronizou_algo = false;
 
-    // Processa vendas pendentes no Dexie
     const vendas = await db.vendas_pendentes.toArray();
-    
     if (vendas.length > 0) {
         for (const venda of vendas) {
             try {
@@ -57,12 +55,11 @@ async function processar_fila_offline() {
                 await db.vendas_pendentes.delete(venda.id_local);
                 sincronizou_algo = true;
             } catch (erro) {
-                console.error(`Falha ao sincronizar operação offline ID ${venda.id_local}:`, erro);
+                console.error(`Falha ao sincronizar ID ${venda.id_local}:`, erro);
             }
         }
     }
 
-    // Processa cadastros pendentes
     const cadastros = await db.cadastros_pendentes.toArray();
     if (cadastros.length > 0) {
         for (const cadastro of cadastros) {
@@ -71,21 +68,18 @@ async function processar_fila_offline() {
                 await db.cadastros_pendentes.delete(cadastro.id_local);
                 sincronizou_algo = true;
             } catch (erro) {
-                console.error(`Falha ao sincronizar cadastro offline ID ${cadastro.id_local}:`, erro);
+                console.error(`Falha ao sincronizar cadastro ID ${cadastro.id_local}:`, erro);
             }
         }
     }
 
     if (sincronizou_algo) {
-        // Se a fila ficou vazia, limpa o snapshot local — VPS tem tudo agora
         const restantes = await db.vendas_pendentes.count();
         if (restantes === 0) {
             await db.estado_comandas_local.clear();
-            console.log("🧹 Estado local limpo — tudo sincronizado com o servidor.");
+            console.log("🧹 Estado local limpo — tudo sincronizado.");
         }
-
-        toast_global.exibir_toast("☁️ Dados offline enviados com sucesso para o servidor!", "sucesso");
-        console.log("☁️ Sincronização offline concluída com sucesso.");
+        toast_global.exibir_toast("☁️ Dados offline enviados com sucesso!", "sucesso");
     }
 }
 

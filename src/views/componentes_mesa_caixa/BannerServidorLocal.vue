@@ -8,7 +8,7 @@
             leave-from-class="opacity-100 translate-y-0"
             leave-to-class="opacity-0 -translate-y-full">
 
-            <!-- ── Banner do PC (Electron) — é o servidor, informa o IP ── -->
+            <!-- Banner do PC (Electron) — é o servidor, informa o IP -->
             <div v-if="visivel && eh_electron_ref"
                  class="fixed top-0 left-0 right-0 z-[9999] bg-green-600 text-white px-4 py-3 shadow-lg">
                 <div class="max-w-3xl mx-auto flex items-center justify-between gap-3">
@@ -26,14 +26,12 @@
                             {{ ip_servidor }}:3737
                         </span>
                         <button @click="visivel = false"
-                                class="text-white/70 hover:text-white font-black text-xl leading-none px-2 transition-colors">
-                            ×
-                        </button>
+                                class="text-white/70 hover:text-white font-black text-xl leading-none px-2">×</button>
                     </div>
                 </div>
             </div>
 
-            <!-- ── Banner do Celular/PWA — conecta ao servidor local ── -->
+            <!-- Banner do Celular/PWA — conecta ao servidor local -->
             <div v-else-if="visivel && !eh_electron_ref"
                  class="fixed top-0 left-0 right-0 z-[9999] bg-orange-500 text-white px-4 py-3 shadow-lg">
                 <div class="max-w-2xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -46,7 +44,7 @@
                             </p>
                             <p class="text-orange-100 text-xs font-bold mt-0.5">
                                 <span v-if="buscando">Procurando servidor local na rede Wi-Fi...</span>
-                                <span v-else-if="conectado">Usando servidor local — operação normal</span>
+                                <span v-else-if="conectado">Usando servidor local — dados preservados</span>
                                 <span v-else-if="servidor_encontrado">Servidor local encontrado: {{ url_servidor_local }}</span>
                                 <span v-else>Servidor local não encontrado na rede.</span>
                             </p>
@@ -59,25 +57,19 @@
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
 
-                        <!-- Botão conectar — só aparece se encontrou e ainda não conectou -->
                         <button v-if="servidor_encontrado && !conectado && !buscando"
                                 @click="conectar_servidor_local"
-                                :disabled="conectando"
-                                class="bg-white text-orange-600 font-black text-xs px-4 py-2 rounded-xl hover:bg-orange-50 transition-all active:scale-95 uppercase tracking-wide shadow-sm disabled:opacity-60">
-                            {{ conectando ? 'Conectando...' : 'Conectar' }}
+                                class="bg-white text-orange-600 font-black text-xs px-4 py-2 rounded-xl hover:bg-orange-50 transition-all active:scale-95 uppercase tracking-wide shadow-sm">
+                            Conectar
                         </button>
 
-                        <!-- Badge verde após conectar — não tem botão de fechar, é informativo -->
                         <span v-if="conectado"
                               class="bg-white/20 text-white font-black text-xs px-3 py-2 rounded-lg">
                             ✅ Offline local
                         </span>
 
-                        <!-- Fechar só quando não conectado -->
                         <button v-if="!conectado" @click="visivel = false"
-                                class="text-white/70 hover:text-white font-black text-xl leading-none px-2 transition-colors">
-                            ×
-                        </button>
+                                class="text-white/70 hover:text-white font-black text-xl leading-none px-2">×</button>
                     </div>
                 </div>
             </div>
@@ -89,13 +81,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { descobrir_servidor_local } from '../../servicos/descoberta_rede.js';
-import { useProdutosStore } from '../../stores/produtos_store.js';
-import { useMesasStore } from '../../stores/mesas_store.js';
 import axios from 'axios';
 
 const visivel             = ref(false);
 const buscando            = ref(false);
-const conectando          = ref(false);
 const servidor_encontrado = ref(false);
 const url_servidor_local  = ref('');
 const conectado           = ref(false);
@@ -107,18 +96,10 @@ let intervalo_ping = null;
 
 const eh_desenvolvimento = import.meta.env.DEV;
 
-// ─── Detectores de ambiente ──────────────────────────────────────────────────
-
-/**
- * Verifica se está rodando no Electron (PC do caixa = servidor local).
- */
 const detectar_electron = () => {
-    try {
-        return !!(window?.require && window.require('electron'));
-    } catch { return false; }
+    try { return !!(window?.require && window.require('electron')); }
+    catch { return false; }
 };
-
-// ─── Ping VPS ────────────────────────────────────────────────────────────────
 
 const axios_ping = axios.create({ timeout: 5000 });
 
@@ -138,26 +119,20 @@ const testar_vps = async () => {
     }
 };
 
-// ─── Ao detectar VPS offline ─────────────────────────────────────────────────
-
 const ao_detectar_vps_offline = async () => {
     if (visivel.value) return;
     visivel.value = true;
 
-    // PC (Electron) — mostra o banner informativo com o IP
     if (eh_electron_ref.value) {
         try {
             const { ipcRenderer } = window.require('electron');
             const info = await ipcRenderer.invoke('obter-servidor-local');
             ip_servidor.value = info?.ip || '192.168.x.x';
-        } catch {
-            ip_servidor.value = '192.168.x.x';
-        }
-        return; // PC não precisa buscar servidor — ele é o servidor
+        } catch { ip_servidor.value = '192.168.x.x'; }
+        return;
     }
 
-    // Celular/PWA — busca o servidor local na rede
-    buscando.value = true;
+    buscando.value            = true;
     servidor_encontrado.value = false;
 
     try {
@@ -178,44 +153,6 @@ const ao_detectar_vps_online = () => {
     conectado.value = false;
     localStorage.removeItem('nitec_servidor_local');
 };
-
-// ─── Conectar ao servidor local (CELULAR/PWA) ────────────────────────────────
-
-/**
- * Salva o endereço do servidor local e recarrega os dados.
- * NÃO navega para outra URL — o api_cliente usa o servidor local automaticamente
- * via interceptor quando a VPS estiver offline.
- */
-const conectar_servidor_local = async () => {
-    const url = url_servidor_local.value;
-    if (!url) return;
-
-    conectando.value = true;
-
-    try {
-        // 1. Salva o servidor local para o api_cliente usar automaticamente
-        localStorage.setItem('nitec_servidor_local', url);
-
-        // 2. Recarrega os stores — o api_cliente vai redirecionar para o servidor local
-        const loja_produtos = useProdutosStore();
-        const loja_mesas    = useMesasStore();
-
-        await Promise.allSettled([
-            loja_produtos.buscar_produtos(true),
-            loja_mesas.buscar_mesas(true),
-        ]);
-
-        // 3. Marca como conectado — banner muda para informativo
-        conectado.value = true;
-
-    } catch (e) {
-        console.warn('[Banner] Erro ao conectar:', e.message);
-    } finally {
-        conectando.value = false;
-    }
-};
-
-// ─── Ping periódico ──────────────────────────────────────────────────────────
 
 const iniciar_ping_periodico = () => {
     if (intervalo_ping) return;
@@ -238,17 +175,33 @@ const iniciar_ping_periodico = () => {
     }, 15000);
 };
 
+/**
+ * Conecta ao servidor local.
+ * 🟢 NÃO força busca imediata — apenas salva o endereço no localStorage.
+ * O interceptor do api_cliente vai redirecionar automaticamente nas próximas
+ * requisições. Os dados persistidos no localStorage continuam disponíveis.
+ */
+const conectar_servidor_local = () => {
+    const url = url_servidor_local.value;
+    if (!url) return;
+
+    localStorage.setItem('nitec_servidor_local', url);
+    conectado.value = true;
+
+    // Não chama buscar_mesas nem buscar_produtos aqui
+    // Os dados já estão no localStorage via pinia-plugin-persistedstate
+    // O interceptor do api_cliente vai usar o servidor local automaticamente
+    // nas próximas requisições naturais do app
+};
+
 const ao_ficar_offline_nativo = () => {
     vps_estava_online.value = false;
     ao_detectar_vps_offline();
 };
 
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
 onMounted(() => {
     eh_electron_ref.value = detectar_electron();
 
-    // Desenvolvimento — ping desativado (Laravel local sempre responde)
     if (eh_desenvolvimento) {
         console.log('[Banner] Modo desenvolvimento — ping desativado.');
         return;
