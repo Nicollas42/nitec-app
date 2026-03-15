@@ -3,7 +3,6 @@ import { useRouter, useRoute } from 'vue-router';
 import { useProdutosStore } from '../stores/produtos_store.js';
 import { useMesasStore    } from '../stores/mesas_store.js';
 import { useComandasStore } from '../stores/comandas_store.js';
-import { useComandasStore } from '../stores/comandas_store.js';
 import api_cliente from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js';
 import { useToastStore } from '../stores/toast_store.js';
