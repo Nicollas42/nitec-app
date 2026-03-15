@@ -70,8 +70,15 @@ api_cliente.interceptors.response.use((response) => {
                     data  : config_original.data,
                 });
             } catch (erro_local) {
-                limpar_cache_servidor();
-                console.warn('[api_cliente] Servidor local também falhou:', erro_local.message);
+                // 🟢 CORREÇÃO 1: Limpa o cache APENAS se for erro de rede/timeout (sem resposta do servidor local)
+                // Se for um erro 404 (ex: mesa não encontrada), NÃO apaga o IP do servidor!
+                if (!erro_local.response) {
+                    limpar_cache_servidor();
+                }
+                console.warn('[api_cliente] Servidor local falhou:', erro_local.message);
+                
+                // 🟢 CORREÇÃO 2: Rejeitar o erro local para o Vue saber o que se passou
+                return Promise.reject(erro_local); 
             }
         }
     }

@@ -18,10 +18,8 @@ let servidor_http = null;
 let bonjour       = null;
 let servico_mdns  = null;
 let data_dir      = null;
-let app_dir       = null; // Caminho do dist/ do Vue
-let tenant_id_ativo = null; // Tenant do dono logado — validado no ping
-
-// ─── Utilitários de armazenamento JSON ───────────────────────────────────────
+let app_dir       = null; 
+let tenant_id_ativo = null; 
 
 const garantir_dir = (caminho) => {
     if (!fs.existsSync(caminho)) fs.mkdirSync(caminho, { recursive: true });
@@ -42,25 +40,17 @@ const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => 
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
 });
 
-// ─── Fila de sincronização com VPS ───────────────────────────────────────────
-
 const enfileirar_sync = (metodo, url, payload) => {
     const fila = ler_json('sync_queue.json', []);
     fila.push({ id: uuid(), metodo, url, payload, criado_em: new Date().toISOString() });
     salvar_json('sync_queue.json', fila);
 };
 
-// ─── Rotas da API ─────────────────────────────────────────────────────────────
-
 const configurar_rotas = (app_express) => {
 
-    // Ping — descoberta de serviço
-    // Retorna o tenant_id para que o celular valide que está no servidor certo
     app_express.get('/api/ping', (req, res) => {
         res.json({ ok: true, servidor: 'nitec_local', porta: PORTA, tenant: tenant_id_ativo });
     });
-
-    // ── Mesas ────────────────────────────────────────────────────────────────
 
     app_express.get('/api/listar-mesas', (req, res) => {
         const mesas = ler_json('mesas.json', []);
@@ -73,18 +63,13 @@ const configurar_rotas = (app_express) => {
         const comandas = ler_json('comandas.json', []);
         const itens    = ler_json('itens.json', []);
 
-        // 🟢 Tenta encontrar a mesa nos JSONs
-        // Se não encontrar, reconstrói um objeto mínimo a partir das comandas
-        // Isso evita 404 quando o sync ainda não enviou mesas.json completo
         let mesa = mesas.find(m => m.id === id_mesa);
 
         if (!mesa) {
-            // Verifica se existe alguma comanda aberta para essa mesa
             const tem_comanda = comandas.some(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta');
             if (!tem_comanda) {
                 return res.status(404).json({ sucesso: false, mensagem: 'Mesa não encontrada.' });
             }
-            // Reconstrói mesa mínima a partir das comandas
             mesa = { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
         }
 
@@ -95,8 +80,8 @@ const configurar_rotas = (app_express) => {
                 buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
                 buscar_mesa   : { nome_mesa: mesa.nome_mesa },
                 listar_itens  : itens
-                    .filter(i => i.comanda_id === c.id)
-                    .map(i => ({ ...i, buscar_produto: { nome_produto: i.nome_produto } }))
+                    .filter(i => String(i.comanda_id) === String(c.id)) // 🟢 CORREÇÃO 1: Cast para String
+                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })) // 🟢 CORREÇÃO 2: Preserva objeto da VPS
             }));
 
         res.json({
@@ -109,23 +94,16 @@ const configurar_rotas = (app_express) => {
         });
     });
 
-    // ── Produtos ─────────────────────────────────────────────────────────────
-
     app_express.get('/api/listar-produtos', (req, res) => {
         const produtos = ler_json('produtos_cache.json', []);
         res.json({ sucesso: true, produtos });
     });
-
-    // ── Comandas ─────────────────────────────────────────────────────────────
 
     app_express.get('/api/listar-comandas', (req, res) => {
         const comandas = ler_json('comandas.json', []);
         const mesas    = ler_json('mesas.json', []);
         const itens    = ler_json('itens.json', []);
 
-        // Enriquece cada comanda com os campos aninhados que o frontend espera
-        // Comandas sincronizadas da VPS já trazem esses campos — mas as criadas
-        // localmente (offline) precisam ser enriquecidas aqui
         const comandas_enriquecidas = comandas.map(c => {
             const mesa = mesas.find(m => m.id === c.mesa_id);
             return {
@@ -134,8 +112,8 @@ const configurar_rotas = (app_express) => {
                 buscar_mesa    : c.buscar_mesa     || (mesa ? { nome_mesa: mesa.nome_mesa } : null),
                 buscar_usuario : c.buscar_usuario  || null,
                 listar_itens   : itens
-                    .filter(i => i.comanda_id === c.id)
-                    .map(i => ({ ...i, buscar_produto: { nome_produto: i.nome_produto } })),
+                    .filter(i => String(i.comanda_id) === String(c.id)) // 🟢 CORREÇÃO 1
+                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })), // 🟢 CORREÇÃO 2
             };
         });
 
@@ -152,8 +130,8 @@ const configurar_rotas = (app_express) => {
             dados: {
                 ...comanda,
                 listar_itens: itens
-                    .filter(i => i.comanda_id === comanda.id)
-                    .map(i => ({ ...i, buscar_produto: { nome_produto: i.nome_produto } }))
+                    .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
+                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } })) // 🟢 CORREÇÃO 2
             }
         });
     });
@@ -173,7 +151,6 @@ const configurar_rotas = (app_express) => {
             status_comanda: 'aberta', valor_total: 0,
             data_hora_abertura: data_hora_abertura || new Date().toISOString(),
             data_hora_fechamento: null, uuid_abertura: uuid_operacao, origem: 'local',
-            // Campos aninhados para compatibilidade com o template Vue
             buscar_cliente : nome_cliente ? { nome_cliente } : null,
             buscar_mesa    : mesa_info ? { nome_mesa: mesa_info.nome_mesa } : null,
             buscar_usuario : null,
@@ -239,7 +216,7 @@ const configurar_rotas = (app_express) => {
         const comanda = comandas.find(c => String(c.id) === String(item.comanda_id));
         if (comanda) {
             comanda.valor_total = todos_itens
-                .filter(i => i.comanda_id === comanda.id)
+                .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
                 .reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
         }
 
@@ -259,7 +236,7 @@ const configurar_rotas = (app_express) => {
             todos_itens.splice(idx, 1);
             if (comanda) {
                 comanda.valor_total = todos_itens
-                    .filter(i => i.comanda_id === comanda.id)
+                    .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
                     .reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
             }
             salvar_json('itens.json', todos_itens);
@@ -277,7 +254,7 @@ const configurar_rotas = (app_express) => {
         const comanda = comandas.find(c => String(c.id) === String(req.params.id));
         if (!comanda) return res.status(404).json({ sucesso: false });
 
-        if (!todos_itens.some(i => i.comanda_id === comanda.id)) {
+        if (!todos_itens.some(i => String(i.comanda_id) === String(comanda.id))) { // 🟢 CORREÇÃO 1
             comanda.status_comanda = 'cancelada';
             salvar_json('comandas.json', comandas);
             enfileirar_sync('POST', `/fechar-comanda/${req.params.id}`, req.body);
@@ -320,6 +297,7 @@ const configurar_rotas = (app_express) => {
         comanda.status_comanda       = 'aberta';
         comanda.data_hora_fechamento = null;
         salvar_json('comandas.json', comandas);
+    
         if (comanda.mesa_id) {
             const idx = mesas.findIndex(m => m.id === comanda.mesa_id);
             if (idx >= 0) { mesas[idx].status_mesa = 'ocupada'; salvar_json('mesas.json', mesas); }
@@ -328,20 +306,14 @@ const configurar_rotas = (app_express) => {
         res.json({ sucesso: true, mensagem: 'Comanda reaberta!' });
     });
 
-    // ── Autenticação local ────────────────────────────────────────────────────
-    // Valida o token contra os usuários cacheados (sem chamar a VPS)
     app_express.post('/api/realizar-login', (req, res) => {
         const { email, password } = req.body;
         const usuarios = ler_json('usuarios_cache.json', []);
         const usuario  = usuarios.find(u => u.email === email);
         if (!usuario) return res.status(401).json({ mensagem: 'Usuário não encontrado no cache local.' });
-        // Aceita qualquer senha no modo local (a VPS validou antes)
-        // Em produção pode adicionar hash de senha no cache
         res.json({ token: usuario.token_cache || 'local_token', usuario });
     });
 
-    // ── Cache de produtos, mesas e usuários (recebe do cliente Vue) ───────────
-    // Recebe snapshot completo da VPS — produtos, mesas, comandas e itens
     app_express.post("/api/sync-produtos", (req, res) => {
         const { produtos, mesas, usuarios, comandas, itens } = req.body;
         if (produtos) salvar_json('produtos_cache.json', produtos);
@@ -352,12 +324,9 @@ const configurar_rotas = (app_express) => {
         res.json({ ok: true });
     });
 
-    // ── Serve o app Vue completo (DEVE ser a última rota) ─────────────────────
-    // Isso resolve o Mixed Content — o celular acessa tudo em HTTP local
     if (app_dir && fs.existsSync(app_dir)) {
         app_express.use(express.static(app_dir));
         app_express.get('/{*path}', (req, res) => {
-            // Não intercepta rotas /api/
             if (req.path.startsWith('/api/')) return res.status(404).json({ erro: 'Rota não encontrada.' });
             res.sendFile(path.join(app_dir, 'index.html'));
         });
@@ -366,8 +335,6 @@ const configurar_rotas = (app_express) => {
         console.warn('[Nitec Local] dist/ não encontrado — app Vue não será servido pelo servidor local.');
     }
 };
-
-// ─── Sincronização com VPS ────────────────────────────────────────────────────
 
 const sincronizar_com_vps = async (url_base, token) => {
     const fila = ler_json('sync_queue.json', []);
@@ -405,13 +372,11 @@ const obter_ip_local = () => {
     return '127.0.0.1';
 };
 
-// ─── API pública ──────────────────────────────────────────────────────────────
-
 const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
     return new Promise((resolve, reject) => {
         data_dir = path.join(caminho_dados, 'nitec_local');
-        app_dir  = caminho_app; // Caminho do dist/ do Vue
-        tenant_id_ativo = tenant_id; // Tenant do dono — usado no /api/ping
+        app_dir  = caminho_app; 
+        tenant_id_ativo = tenant_id; 
         garantir_dir(data_dir);
 
         const app_express = express();
@@ -426,7 +391,7 @@ const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
             console.log(`[Nitec Local] Servidor rodando em http://${ip}:${PORTA}`);
 
             try {
-                bonjour      = new Bonjour();
+                bonjour = new Bonjour();
                 servico_mdns = bonjour.publish({
                     name: `NitecLocal_${ip.replace(/\./g, '_')}`,
                     type: 'nitec',
@@ -447,7 +412,7 @@ const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
 
 const parar = () => {
     if (servico_mdns) { servico_mdns.stop(); servico_mdns = null; }
-    if (bonjour)      { bonjour.destroy();   bonjour      = null; }
+    if (bonjour)      { bonjour.destroy(); bonjour = null; }
     if (servidor_http){ servidor_http.close(); servidor_http = null; }
     console.log('[Nitec Local] Servidor encerrado.');
 };
