@@ -6,10 +6,6 @@ export const useComandasStore = defineStore('comandas_store', () => {
     const lista_comandas     = ref([]);
     const ultima_atualizacao = ref(null);
 
-    /**
-     * Busca comandas da VPS ou usa cache persistido.
-     * Nunca limpa os dados existentes se offline — mantém o que tem.
-     */
     const buscar_comandas = async (forcar_atualizacao = false) => {
         const usuario_raw = localStorage.getItem('nitec_usuario');
         if (usuario_raw) {
@@ -20,30 +16,33 @@ export const useComandasStore = defineStore('comandas_store', () => {
             }
         }
 
-        // Usa cache se tiver dados recentes (menos de 30s)
-        const agora = Date.now();
+        const agora       = Date.now();
         const cache_fresco = ultima_atualizacao.value && (agora - ultima_atualizacao.value) < 30000;
         if (lista_comandas.value.length > 0 && !forcar_atualizacao && cache_fresco) return;
 
         try {
-            const resposta = await api_cliente.get('/listar-comandas');
-            lista_comandas.value     = resposta.data.comandas || [];
+            const resposta   = await api_cliente.get('/listar-comandas');
+            const recebidas  = resposta.data.comandas || [];
+
+            // 🟢 PROTEÇÃO CRÍTICA: nunca sobrescreve dados existentes com lista vazia
+            // O servidor local pode retornar vazio se o snapshot ainda não chegou
+            if (recebidas.length === 0 && lista_comandas.value.length > 0) {
+                console.warn('[comandas_store] Resposta vazia ignorada — mantendo dados persistidos.');
+                return;
+            }
+
+            lista_comandas.value     = recebidas;
             ultima_atualizacao.value = agora;
 
-            // Envia para servidor local
-            sincronizar_cache_para_local(null, null, lista_comandas.value).catch(() => {});
+            sincronizar_cache_para_local(null, null, recebidas).catch(() => {});
 
         } catch (erro) {
             console.warn("🔴 Offline: usando comandas persistidas.");
-            // Mantém o que já está no store — não limpa
+            // Persist já tem dados — não limpa, não substitui
         }
     };
 
-    return {
-        lista_comandas,
-        ultima_atualizacao,
-        buscar_comandas,
-    };
+    return { lista_comandas, ultima_atualizacao, buscar_comandas };
 }, {
     persist: {
         key    : 'nitec_comandas_store',
