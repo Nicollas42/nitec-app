@@ -65,7 +65,6 @@ api_cliente.interceptors.response.use((response) => {
     }
 
     // 🟢 AUTO-CACHE (Espionagem Positiva)
-    // Se a VPS devolveu os dados com sucesso, fazemos um backup silencioso pro PC!
     try {
         if (response.config.method === 'get') {
             const url = response.config.url;
@@ -80,10 +79,11 @@ api_cliente.interceptors.response.use((response) => {
 
     return response;
 }, async (error) => {
-    const sem_resposta    = !error.response || error.response.status >= 500;
+    // 🟢 CORREÇÃO: Tratar o 404 (Not Found) e o 0 (Network Error) como falhas legítimas para o Plano B
+    const erro_critico = !error.response || error.response.status >= 500 || error.response.status === 404 || error.response.status === 0;
     const config_original = error.config;
 
-    if (sem_resposta && config_original && !config_original._tentou_local) {
+    if (erro_critico && config_original && !config_original._tentou_local) {
         config_original._tentou_local = true;
         
         console.groupCollapsed(`🔴 [DEBUG OFFLINE] Falha na VPS: ${config_original.url}`);
@@ -114,7 +114,6 @@ api_cliente.interceptors.response.use((response) => {
 
                 console.log("4. ✔️ SUCESSO! Servidor local respondeu.");
                 
-                // 🟢 A MÁGICA: Puxa o log do servidor para o seu navegador!
                 if (resposta_local.data && resposta_local.data._debug) {
                     console.log(`%c 🧠 [O CÉREBRO DO SERVIDOR LOCAL - ${config_original.url}] `, 'background: #111; color: #00ff00; font-size: 13px; font-weight: bold;', resposta_local.data._debug);
                 }
@@ -125,8 +124,7 @@ api_cliente.interceptors.response.use((response) => {
             } catch (erro_local) {
                 console.warn("4. ❌ FALHA no IP principal:", erro_local.message);
                 
-                // 🟢 NOVO: PLANO B DE SOBREVIVÊNCIA (Localhost)
-                // Se a placa de rede foi desligada (ERR_INTERNET_DISCONNECTED) e estamos no PC (Electron)
+                // 🟢 PLANO B DE SOBREVIVÊNCIA (Localhost)
                 if (window?.require && !url_local.includes('127.0.0.1')) {
                     console.log("5. 🔄 Tentando auto-resgate via Localhost (127.0.0.1)...");
                     try {

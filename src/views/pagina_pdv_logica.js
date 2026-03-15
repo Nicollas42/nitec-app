@@ -215,7 +215,7 @@ export function useLogicaPdv() {
         // 1. PAGAMENTO DE CONTA
         if (id_comanda_pagamento.value) {
             try {
-                await sincronizar_pendencias_bd(); 
+                if (typeof sincronizar_pendencias_bd === 'function') await sincronizar_pendencias_bd(); 
                 if (carrinho_venda.value.length > 0) {
                     const payload_add = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
                     await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_pagamento.value}`, payload_add);
@@ -227,7 +227,7 @@ export function useLogicaPdv() {
                 roteador.push('/mapa-mesas');
                 toast_global.exibir_toast(res.data.mensagem || "Processado com sucesso!", "sucesso"); 
             } catch (e) { 
-                if (!e.response || e.response.status >= 500) { 
+                if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_pgto = gerarUUID();
                     const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento, uuid_operacao: uuid_pgto });
@@ -241,51 +241,45 @@ export function useLogicaPdv() {
         // 2. LANÇAR NA MESA
         if (id_comanda_vinculada.value) {
             try {
-                await sincronizar_pendencias_bd(); 
+                if (typeof sincronizar_pendencias_bd === 'function') await sincronizar_pendencias_bd(); 
                 if (carrinho_venda.value.length === 0) {
                     toast_global.exibir_toast("✔️ Comanda atualizada com sucesso!", "sucesso");
                     return roteador.go(-1);
                 }
                 const uuid_add = gerarUUID();
                 const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
+                
+                // Tenta enviar via API (Se a VPS falhar, o interceptor manda para o Servidor Local)
                 await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_vinculada.value}`, payload);
                 toast_global.exibir_toast("📥 Novos itens lançados com sucesso!", "sucesso");
-
-                // 🟢 Atualiza o store local com os novos itens
-                // Isso garante que o polling dos outros dispositivos vai ver os itens
-                // sem precisar esperar pela próxima busca completa na VPS/servidor local
-                loja_comandas.atualizar_itens_comanda(id_comanda_vinculada.value,
-                    carrinho_venda.value.map(i => ({
-                        id            : `local_${Date.now()}_${i.id}`,
-                        produto_id    : i.id,
-                        quantidade    : i.quantidade,
-                        preco_unitario: i.preco_venda,
-                        buscar_produto: { nome_produto: i.nome_produto }
-                    }))
-                );
-
+                
                 loja_produtos.buscar_produtos(true);
+                carrinho_venda.value = [];
                 roteador.go(-1);
+                
             } catch (e) { 
-                if (!e.response || e.response.status >= 500) { 
+                // SÓ ENTRA AQUI SE A NUVEM E O SERVIDOR LOCAL FALHAREM
+                console.error("Falha ao adicionar itens (VPS e Local):", e);
+                if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_add = gerarUUID();
                     const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
                     
-                    // 🟢 Salva na fila para o servidor
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/adicionar-itens-comanda/${id_comanda_vinculada.value}`, metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_add });
                     
-                    // 🟢 Salva snapshot legível para o QR Sync P2P
-                    const itens_para_estado = carrinho_venda.value.map(i => ({
-                        produto_id: i.id,
-                        nome_produto: i.nome_produto,
-                        quantidade: i.quantidade,
-                        preco_unitario: i.preco_venda,
-                    }));
-                    await salvar_estado_local(id_comanda_vinculada.value, itens_para_estado, uuid_add);
+                    // Salva na comanda fantasma para visualização offline extrema
+                    const c_offline = `off_${rota_atual.query.comanda}`;
+                    let estado = await db.estado_comandas_local.get(c_offline) || { id: c_offline, itens: [] };
+                    for(const it of payload.itens) {
+                        estado.itens.push({...it, nome_produto: carrinho_venda.value.find(p => p.id === it.produto_id)?.nome_produto });
+                    }
+                    await db.estado_comandas_local.put(estado);
 
-                    toast_global.exibir_toast("⚠️ Servidor indisponível: Lançamento salvo no PC!", "aviso");
+                    toast_global.exibir_toast("⚠️ Sobrevivência: Lançamento salvo no telemóvel!", "aviso");
+                    carrinho_venda.value = [];
                     roteador.go(-1);
-                } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
+                } else {
+                    toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
+                }
             } finally { processando_finalizacao.value = false; }
         
         // 3. VENDA BALCÃO AVULSA
@@ -299,7 +293,7 @@ export function useLogicaPdv() {
                 valor_desconto.value = '';
                 loja_produtos.buscar_produtos(true); 
             } catch (e) { 
-                if (!e.response || e.response.status >= 500) { 
+                if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: '/venda-balcao', metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_balcao });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Venda Balcão salva no PC!", "aviso");
                     carrinho_venda.value = [];

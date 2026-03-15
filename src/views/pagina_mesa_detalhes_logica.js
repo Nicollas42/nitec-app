@@ -67,99 +67,73 @@ export function useLogicaMesaDetalhes() {
 
         carregando.value = true;
 
-        // 🟢 Exibição imediata com dados do cache (Evita a tela piscar em branco)
         if (typeof montar_dados_do_cache === 'function') {
             const dados_cache = montar_dados_do_cache(id_dinamico);
             if (dados_cache) dados_mesa.value = dados_cache;
         }
 
         try {
-            // 1. Puxa a verdade oficial (da Nuvem ou do Servidor Local via Interceptor)
+            // A nossa espinha dorsal (Interceptor) garante que se a VPS não responder, 
+            // ele vai buscar os dados limpinhos e perfeitinhos ao Servidor Local.
             const resposta = await api_cliente.get(`/detalhes-mesa/${id_dinamico}`);
             let dados_oficiais = resposta.data.dados;
 
-            // 2. RECUPERAÇÃO: Comandas abertas 100% offline que a API ainda não conhece
-            const comanda_id_offline = `off_${id_dinamico}`;
-            const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
-            if (estado_local && estado_local.itens) {
-                const comanda_ja_existe = (dados_oficiais.listar_comandas || []).some(c => String(c.id) === String(comanda_id_offline));
-                if (!comanda_ja_existe) {
-                    dados_oficiais.listar_comandas.push({
-                        id: comanda_id_offline,
-                        tipo_conta: 'geral', status_comanda: 'aberta', valor_total: 0,
-                        buscar_cliente: { nome_cliente: estado_local.nome_cliente || 'Atendimento Offline' },
-                        listar_itens: estado_local.itens.map(i => ({
-                            id: `off_item_${i.produto_id}`, produto_id: i.produto_id,
-                            quantidade: i.quantidade, preco_unitario: i.preco_unitario,
-                            buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` },
-                            is_offline: true
-                        })),
-                        is_offline: true
-                    });
-                }
-            }
-
-            // 3. INJEÇÃO DE ITENS E AGRUPAMENTO VISUAL
-            const vendas_pendentes = await db.vendas_pendentes.toArray();
-            
+            // Agrupador Visual: Junta produtos iguais na mesma linha (O fim da lista infinita de produtos repetidos)
             dados_oficiais.listar_comandas = (dados_oficiais.listar_comandas || []).map(c => {
-                let itens_da_comanda = [...(c.listar_itens || [])];
-
-                // a) Injetar os itens que o Garçom acabou de lançar no PDV Offline
-                const adicoes_offline = vendas_pendentes.filter(v => v.url_destino.includes(`/adicionar-itens-comanda/${c.id}`));
-                for (const adicao of adicoes_offline) {
-                    const itens_novos = adicao.payload_venda?.itens || [];
-                    for (const n_item of itens_novos) {
-                        // Vai buscar o nome real do produto à loja
-                        const prod_store = loja_produtos.lista_produtos.find(p => String(p.id) === String(n_item.produto_id));
-                        itens_da_comanda.push({
-                            id: `off_item_${gerarUUID()}`,
-                            produto_id: n_item.produto_id,
-                            quantidade: Number(n_item.quantidade),
-                            preco_unitario: Number(n_item.preco_unitario),
-                            buscar_produto: { nome_produto: prod_store ? prod_store.nome_produto : `Produto #${n_item.produto_id}` },
-                            is_offline: true
-                        });
-                    }
-                }
-
-                // b) AGRUPAR ITENS IGUAIS (Resolve o problema de X-Tudo em linhas separadas)
                 const mapa_agrupado = {};
-                for (const it of itens_da_comanda) {
+                for (const it of (c.listar_itens || [])) {
                     const p_id = String(it.produto_id);
                     if (!mapa_agrupado[p_id]) {
                         mapa_agrupado[p_id] = { ...it, quantidade: Number(it.quantidade) };
                     } else {
-                        // Se já existe, apenas soma a quantidade!
                         mapa_agrupado[p_id].quantidade += Number(it.quantidade);
                     }
                 }
                 const itens_finais = Object.values(mapa_agrupado);
-
-                // c) Recalcular o valor total exato da comanda
                 const valor_somado = itens_finais.reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
-
                 return { ...c, listar_itens: itens_finais, valor_total: valor_somado };
             });
 
-            // Atualiza a tela com o resultado perfeito
             dados_mesa.value = dados_oficiais;
 
         } catch (erro) {
-            // 4. MODO FALHA CRÍTICA (Tudo falhou)
-            const erro_de_rede  = !erro.response || erro.response.status >= 500;
+            // Se chegámos aqui, o Restaurante está em colapso total (Sem VPS e Sem Servidor Local/XAMPP)
+            // Aí sim, mostramos o que o telemóvel tem no Dexie.
+            console.error("Falha Absoluta (Nuvem e Local):", erro);
+            const usando_local  = !!localStorage.getItem('nitec_servidor_local');
+            const sem_internet  = !navigator.onLine || usando_local;
+            const erro_de_rede  = !erro.response || erro.response.status >= 500 || erro.response.status === 404;
+
             if (erro_de_rede) {
-                if (typeof montar_dados_do_cache === 'function') {
-                    const fallback_store = montar_dados_do_cache(id_dinamico);
-                    if (fallback_store) {
-                        dados_mesa.value = fallback_store;
-                        return;
-                    }
+                const mesa_em_cache = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico)) || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
+                const comanda_id_offline = `off_${id_dinamico}`;
+                const estado_local = await db.estado_comandas_local.get(comanda_id_offline);
+                const itens_brutos = estado_local?.itens || [];
+
+                const itens_agrupados = [];
+                for (const item of itens_brutos) {
+                    const existente = itens_agrupados.find(i => i.produto_id === item.produto_id);
+                    if (existente) existente.quantidade += item.quantidade;
+                    else itens_agrupados.push({ ...item });
                 }
-                toast_global.exibir_toast("Sem rede e sem cache disponível.", "erro");
-                voltar_mapa();
+
+                dados_mesa.value = {
+                    nome_mesa: mesa_em_cache.nome_mesa,
+                    status_mesa: 'ocupada',
+                    listar_comandas: [{
+                        id: comanda_id_offline,
+                        tipo_conta: 'geral',
+                        status_comanda: 'aberta',
+                        valor_total: itens_agrupados.reduce((acc, i) => acc + (i.preco_unitario * i.quantidade), 0),
+                        buscar_cliente: { nome_cliente: estado_local?.nome_cliente || 'Atendimento Offline' },
+                        listar_itens: itens_agrupados.map(i => ({
+                            id: `offline_item_${i.produto_id}`, produto_id: i.produto_id, quantidade: i.quantidade, preco_unitario: i.preco_unitario, buscar_produto: { nome_produto: i.nome_produto || `Produto #${i.produto_id}` }, is_offline: true
+                        })),
+                        is_offline: true
+                    }]
+                };
             } else {
-                toast_global.exibir_toast("Erro ao carregar informações da mesa.", "erro");
+                toast_global.exibir_toast("Erro fatal ao carregar a mesa.", "erro");
                 if (!dados_mesa.value) voltar_mapa();
             }
         } finally {
