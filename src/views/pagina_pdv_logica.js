@@ -1,7 +1,8 @@
 import { ref, computed, onMounted, watch } from 'vue'; 
 import { useRouter, useRoute } from 'vue-router'; 
 import { useProdutosStore } from '../stores/produtos_store.js';
-import { useMesasStore } from '../stores/mesas_store.js';
+import { useMesasStore    } from '../stores/mesas_store.js';
+import { useComandasStore } from '../stores/comandas_store.js';
 import { useComandasStore } from '../stores/comandas_store.js';
 import api_cliente from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js';
@@ -261,7 +262,21 @@ export function useLogicaPdv() {
                 const uuid_add = gerarUUID();
                 const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
                 await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_vinculada.value}`, payload);
-                toast_global.exibir_toast("📥 Novos itens lançados com sucesso!", "sucesso"); 
+                toast_global.exibir_toast("📥 Novos itens lançados com sucesso!", "sucesso");
+
+                // 🟢 Atualiza o store local com os novos itens
+                // Isso garante que o polling dos outros dispositivos vai ver os itens
+                // sem precisar esperar pela próxima busca completa na VPS/servidor local
+                loja_comandas.atualizar_itens_comanda(id_comanda_vinculada.value,
+                    carrinho_venda.value.map(i => ({
+                        id            : `local_${Date.now()}_${i.id}`,
+                        produto_id    : i.id,
+                        quantidade    : i.quantidade,
+                        preco_unitario: i.preco_venda,
+                        buscar_produto: { nome_produto: i.nome_produto }
+                    }))
+                );
+
                 loja_produtos.buscar_produtos(true);
                 roteador.go(-1);
             } catch (e) { 
