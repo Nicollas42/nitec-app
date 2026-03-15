@@ -1,11 +1,12 @@
-import { ref, reactive, onMounted, onActivated, watch } from 'vue'; 
+import { ref, reactive, onMounted, onActivated, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
 import { useMesasStore } from '../stores/mesas_store.js';
 import { useComandasStore } from '../stores/comandas_store.js';
-import { db } from '../banco_local/db.js'; 
-import { useToastStore } from '../stores/toast_store.js'; 
+import { obter_servidor_cacheado } from '../servicos/descoberta_rede.js';
+import { db } from '../banco_local/db.js';
+import { useToastStore } from '../stores/toast_store.js';
 
 export function useLogicaMesaDetalhes() {
     const rota_atual    = useRoute();
@@ -14,7 +15,7 @@ export function useLogicaMesaDetalhes() {
     const loja_mesas    = useMesasStore();
     const loja_comandas = useComandasStore();
     const toast_global  = useToastStore();
-    
+
     const dados_mesa                 = ref(null);
     const carregando                 = ref(false);
     const item_processando           = ref(null);
@@ -25,20 +26,17 @@ export function useLogicaMesaDetalhes() {
     const form_cancelamento          = reactive({
         comanda_id          : null,
         motivo_cancelamento : 'Erro de Digitação / Lançamento',
-        retornar_ao_estoque : true 
+        retornar_ao_estoque : true
     });
 
+    let intervalo_polling = null;
+
     const gerarUUID = () => {
-        return typeof crypto !== 'undefined' && crypto.randomUUID 
-            ? crypto.randomUUID() 
+        return typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
             : Date.now().toString(36) + Math.random().toString(36).substring(2);
     };
 
-    /**
-     * Monta os dados da mesa a partir dos stores persistidos (sem requisição).
-     * Usado como exibição imediata enquanto a API responde,
-     * e como fallback principal quando offline.
-     */
     const montar_dados_do_cache = (id_mesa) => {
         const mesa = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_mesa))
             || { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
@@ -82,15 +80,14 @@ export function useLogicaMesaDetalhes() {
         } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
 
-                // Fallback 1 — store persistido (mais completo)
+                // Fallback 1 — store persistido
                 const fallback_store = montar_dados_do_cache(id_dinamico);
                 if (fallback_store) {
                     dados_mesa.value = fallback_store;
-                    toast_global.exibir_toast("⚠️ Offline: Exibindo dados salvos.", "aviso");
                     return;
                 }
 
-                // Fallback 2 — Dexie estado_comandas_local (QR Sync)
+                // Fallback 2 — Dexie (QR Sync)
                 const mesa_em_cache      = loja_mesas.lista_mesas.find(m => String(m.id) === String(id_dinamico))
                     || { id: id_dinamico, nome_mesa: `Mesa ${id_dinamico}` };
                 const comanda_id_offline = `off_${id_dinamico}`;
@@ -129,15 +126,38 @@ export function useLogicaMesaDetalhes() {
                     }]
                 };
 
-                toast_global.exibir_toast("⚠️ Offline: Dados do cache local.", "aviso");
-
             } else {
                 toast_global.exibir_toast("Erro ao carregar informações da mesa.", "erro");
-                // Só volta se não tem nada para mostrar
                 if (!dados_mesa.value) voltar_mapa();
             }
         } finally {
             carregando.value = false;
+        }
+    };
+
+    /**
+     * Polling offline — atualiza os detalhes da mesa a cada 15s
+     * enquanto offline mas conectado ao servidor local.
+     * Seguro: carregar_dados_completos nunca limpa dados existentes,
+     * sempre exibe o cache antes da requisição terminar.
+     */
+    const iniciar_polling_offline = () => {
+        if (intervalo_polling) return;
+
+        intervalo_polling = setInterval(async () => {
+            const offline      = !navigator.onLine;
+            const tem_servidor = !!obter_servidor_cacheado();
+
+            if (offline && tem_servidor) {
+                await carregar_dados_completos();
+            }
+        }, 15000);
+    };
+
+    const parar_polling_offline = () => {
+        if (intervalo_polling) {
+            clearInterval(intervalo_polling);
+            intervalo_polling = null;
         }
     };
 
@@ -153,24 +173,24 @@ export function useLogicaMesaDetalhes() {
     const confirmar_novo_cliente = async () => {
         if (!input_novo_cliente.value) return toast_global.exibir_toast("Digite o nome do cliente.", "erro");
         const uuid    = gerarUUID();
-        const payload = { 
-            mesa_id      : rota_atual.params.id_mesa, 
-            nome_cliente : input_novo_cliente.value, 
-            tipo_conta   : 'individual', 
-            uuid_operacao: uuid 
+        const payload = {
+            mesa_id      : rota_atual.params.id_mesa,
+            nome_cliente : input_novo_cliente.value,
+            tipo_conta   : 'individual',
+            uuid_operacao: uuid
         };
         try {
             await api_cliente.post('/abrir-comanda', payload);
             fechar_modal_cliente();
             carregar_dados_completos();
-        } catch (erro) { 
-            if (!erro.response || erro.response.status >= 500) { 
-                await db.vendas_pendentes.add({ 
-                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
-                    data_venda   : new Date().toISOString(), 
-                    valor_total  : 0, 
-                    url_destino  : '/abrir-comanda', 
-                    metodo       : 'POST', 
+        } catch (erro) {
+            if (!erro.response || erro.response.status >= 500) {
+                await db.vendas_pendentes.add({
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'),
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : '/abrir-comanda',
+                    metodo       : 'POST',
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
@@ -182,9 +202,9 @@ export function useLogicaMesaDetalhes() {
     };
 
     const alterar_quantidade = async (id_item, acao) => {
-        if (String(id_item).startsWith('offline_item_')) {
+        if (String(id_item).startsWith('offline_item_'))
             return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de alterar.", "aviso");
-        }
+
         item_processando.value = id_item;
         const uuid    = gerarUUID();
         const payload = { acao, uuid_operacao: uuid };
@@ -192,27 +212,27 @@ export function useLogicaMesaDetalhes() {
             await api_cliente.post(`/alterar-quantidade-item/${id_item}`, payload);
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) { 
+        } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
-                await db.vendas_pendentes.add({ 
-                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
-                    data_venda   : new Date().toISOString(), 
-                    valor_total  : 0, 
-                    url_destino  : `/alterar-quantidade-item/${id_item}`, 
-                    metodo       : 'POST', 
+                await db.vendas_pendentes.add({
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'),
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : `/alterar-quantidade-item/${id_item}`,
+                    metodo       : 'POST',
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
                 toast_global.exibir_toast("⚠️ Offline: Alteração guardada!", "aviso");
                 voltar_mapa();
-            } else toast_global.exibir_toast("Erro ao atualizar quantidade.", "erro"); 
+            } else toast_global.exibir_toast("Erro ao atualizar quantidade.", "erro");
         } finally { item_processando.value = null; }
     };
 
     const remover_item_consumido = async (id_item_comanda) => {
-        if (String(id_item_comanda).startsWith('offline_item_')) {
+        if (String(id_item_comanda).startsWith('offline_item_'))
             return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de remover.", "aviso");
-        }
+
         if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
         item_processando.value = id_item_comanda;
         const uuid    = gerarUUID();
@@ -221,20 +241,20 @@ export function useLogicaMesaDetalhes() {
             await api_cliente.delete(`/remover-item-comanda/${id_item_comanda}`, { data: payload });
             carregar_dados_completos();
             loja_produtos.buscar_produtos(true);
-        } catch (erro) { 
+        } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
-                await db.vendas_pendentes.add({ 
-                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
-                    data_venda   : new Date().toISOString(), 
-                    valor_total  : 0, 
-                    url_destino  : `/remover-item-comanda/${id_item_comanda}`, 
-                    metodo       : 'DELETE', 
+                await db.vendas_pendentes.add({
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'),
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : `/remover-item-comanda/${id_item_comanda}`,
+                    metodo       : 'DELETE',
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
                 toast_global.exibir_toast("⚠️ Offline: Remoção enviada para a fila!", "aviso");
                 voltar_mapa();
-            } else toast_global.exibir_toast("Erro ao remover os itens.", "erro"); 
+            } else toast_global.exibir_toast("Erro ao remover os itens.", "erro");
         } finally { item_processando.value = null; }
     };
 
@@ -248,24 +268,24 @@ export function useLogicaMesaDetalhes() {
     const confirmar_cancelamento = async () => {
         cancelando.value = true;
         const uuid    = gerarUUID();
-        const payload = { 
-            motivo_cancelamento : form_cancelamento.motivo_cancelamento, 
-            retornar_ao_estoque : form_cancelamento.retornar_ao_estoque, 
-            uuid_operacao       : uuid 
+        const payload = {
+            motivo_cancelamento: form_cancelamento.motivo_cancelamento,
+            retornar_ao_estoque: form_cancelamento.retornar_ao_estoque,
+            uuid_operacao      : uuid
         };
         try {
             await api_cliente.post(`/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, payload);
             modal_cancelamento_visivel.value = false;
-            voltar_mapa(); 
-            loja_produtos.buscar_produtos(true); 
+            voltar_mapa();
+            loja_produtos.buscar_produtos(true);
         } catch (erro) {
             if (!erro.response || erro.response.status >= 500) {
-                await db.vendas_pendentes.add({ 
-                    tenant_id    : localStorage.getItem('nitec_tenant_id'), 
-                    data_venda   : new Date().toISOString(), 
-                    valor_total  : 0, 
-                    url_destino  : `/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`, 
-                    metodo       : 'POST', 
+                await db.vendas_pendentes.add({
+                    tenant_id    : localStorage.getItem('nitec_tenant_id'),
+                    data_venda   : new Date().toISOString(),
+                    valor_total  : 0,
+                    url_destino  : `/fechar-comanda/cancelar/${form_cancelamento.comanda_id}`,
+                    metodo       : 'POST',
                     payload_venda: payload,
                     uuid_operacao: uuid
                 });
@@ -278,15 +298,24 @@ export function useLogicaMesaDetalhes() {
 
     const voltar_mapa = () => roteador.push('/mapa-mesas');
 
-    onMounted(() => carregar_dados_completos());
-    onActivated(() => carregar_dados_completos());
+    onMounted(() => {
+        carregar_dados_completos();
+        iniciar_polling_offline();
+    });
+
+    onActivated(() => {
+        carregar_dados_completos();
+        iniciar_polling_offline();
+    });
+
+    onUnmounted(() => parar_polling_offline());
 
     return {
         dados_mesa, carregando, voltar_mapa, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
-        fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
+        fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
         remover_item_consumido, fechar_conta_comanda,
-        modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
+        modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento,
         confirmar_cancelamento, cancelando, item_processando,
     };
 }
