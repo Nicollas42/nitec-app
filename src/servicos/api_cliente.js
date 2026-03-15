@@ -18,6 +18,25 @@ export const configurar_url_base = (codigo_loja = null) => {
     return `${protocolo}://${dominio_final}/api`;
 };
 
+// ─── Utilitário: obtém URL do servidor local (Movido para o topo) ────────────
+
+const obter_url_servidor_local = async () => {
+    const cacheado = obter_servidor_cacheado();
+    if (cacheado) return cacheado;
+
+    if (window?.require) {
+        try {
+            const { ipcRenderer } = window.require('electron');
+            const info = await ipcRenderer.invoke('obter-servidor-local');
+            if (info?.url) {
+                localStorage.setItem('nitec_servidor_local', info.url);
+                return info.url;
+            }
+        } catch { /* não está no Electron */ }
+    }
+    return null;
+};
+
 // ─── Instância principal (aponta para VPS) ───────────────────────────────────
 
 const api_cliente = axios.create({
@@ -38,7 +57,7 @@ api_cliente.interceptors.request.use((config) => {
     return config;
 });
 
-// ─── Interceptor de resposta ─────────────────────────────────────────────────
+// ─── Interceptor de resposta (O Cérebro do Offline) ──────────────────────────
 
 api_cliente.interceptors.response.use((response) => {
     if (typeof response.data === 'string' && response.data.includes('<html')) {
@@ -51,11 +70,19 @@ api_cliente.interceptors.response.use((response) => {
 
     if (sem_resposta && config_original && !config_original._tentou_local) {
         config_original._tentou_local = true;
+        
+        console.groupCollapsed(`🔴 [DEBUG OFFLINE] Falha na VPS: ${config_original.url}`);
+        console.log("1. Detetada falha na VPS ou ausência de internet. Tentando transição para Servidor Local...");
 
-        let url_local = obter_servidor_cacheado();
+        // 🟢 CORREÇÃO: Agora chama a função que se comunica com o Electron corretamente
+        let url_local = await obter_url_servidor_local();
+        
         if (!url_local) {
+            console.log("2. O IP local não estava no cache. Tentando descobrir na rede...");
             url_local = await descobrir_servidor_local();
         }
+
+        console.log("3. IP do Servidor Local resolvido:", url_local || "Nenhum encontrado");
 
         if (url_local) {
             try {
@@ -71,22 +98,20 @@ api_cliente.interceptors.response.use((response) => {
                     data  : config_original.data,
                 });
 
-                // 🟢 RASTREADOR 2: O que o Axios recebeu do Servidor Local?
-                console.log(`[DEBUG AXIOS] Resposta do Servidor Local para ${config_original.url}:`, resposta_local.data);
-
+                console.log("4. ✔️ SUCESSO! Servidor local respondeu:", resposta_local.data);
+                console.groupEnd();
                 return resposta_local;
 
             } catch (erro_local) {
-                // 🟢 CORREÇÃO 1: Limpa o cache APENAS se for erro de rede/timeout
+                console.warn("4. ❌ FALHA! Servidor local não atendeu:", erro_local.message);
                 if (!erro_local.response) {
                     limpar_cache_servidor();
                 }
-                console.warn('[api_cliente] Servidor local falhou:', erro_local.message);
-                
-                // 🟢 CORREÇÃO 2: Rejeitar o erro local
+                console.groupEnd();
                 return Promise.reject(erro_local); 
             }
         }
+        console.groupEnd();
     }
 
     return Promise.reject(error);
@@ -94,35 +119,8 @@ api_cliente.interceptors.response.use((response) => {
 
 export default api_cliente;
 
-// ─── Utilitário: obtém URL do servidor local ─────────────────────────────────
-
-/**
- * Retorna URL do servidor local via cache ou IPC do Electron.
- * @returns {Promise<string|null>}
- */
-const obter_url_servidor_local = async () => {
-    const cacheado = obter_servidor_cacheado();
-    if (cacheado) return cacheado;
-
-    if (window?.require) {
-        try {
-            const { ipcRenderer } = window.require('electron');
-            const info = await ipcRenderer.invoke('obter-servidor-local');
-            if (info?.url) {
-                localStorage.setItem('nitec_servidor_local', info.url);
-                return info.url;
-            }
-        } catch { /* não está no Electron */ }
-    }
-    return null;
-};
-
 // ─── Sincronizadores ─────────────────────────────────────────────────────────
 
-/**
- * Sincroniza a fila do servidor local com a VPS quando a internet voltar.
- * Chamado pelo sincronizador_bg.js a cada 20s.
- */
 export const sincronizar_servidor_local_com_vps = async () => {
     if (!window?.require) return;
 
@@ -141,23 +139,11 @@ export const sincronizar_servidor_local_com_vps = async () => {
     }
 };
 
-/**
- * Envia snapshot completo para o servidor local.
- * Inclui produtos, mesas, comandas e itens — tudo que o app precisa
- * para funcionar normalmente quando a VPS ficar offline.
- *
- * Chamado pelos stores após cada busca bem-sucedida na VPS.
- *
- * @param {Array|null} produtos
- * @param {Array|null} mesas
- * @param {Array|null} comandas  Lista de comandas com listar_itens embutidos
- */
 export const sincronizar_cache_para_local = async (produtos, mesas, comandas = null) => {
     const url_local = await obter_url_servidor_local();
     if (!url_local) return;
 
     try {
-        // Desmembra comandas e itens em listas separadas para o servidor local
         let itens = null;
         let comandas_sem_itens = null;
 
@@ -180,5 +166,5 @@ export const sincronizar_cache_para_local = async (produtos, mesas, comandas = n
         }, { timeout: 5000 });
 
         console.log('[Cache→Local] Snapshot completo enviado para o servidor local.');
-    } catch { /* silencioso — servidor local pode não estar disponível */ }
+    } catch { /* silencioso */ }
 };
