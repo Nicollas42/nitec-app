@@ -67,28 +67,75 @@ export function useLogicaPdv() {
     const recarregar_dados_comanda = async () => {
         const id = id_comanda_pagamento.value || id_comanda_vinculada.value;
         if (!id) return;
+
+        // 1. Já prepara os itens fantasmas (offline) para o caso de precisarmos deles
+        const id_mesa = rota_atual.query.mesa;
+        let itens_fantasmas = [];
+        if (id_mesa) {
+            const estado_local = await db.estado_comandas_local.get(`off_${id_mesa}`);
+            if (estado_local && estado_local.itens) {
+                itens_fantasmas = [...estado_local.itens];
+            }
+        }
         
         try {
-            // A API já engloba o fallback para o Servidor Local internamente.
-            // Se devolver sucesso, é porque ou a VPS ou o Localhost atendeu.
+            // 2. Tenta a API (que vai buscar à Nuvem ou ao Localhost pelo interceptor)
             const res = await api_cliente.get(`/buscar-comanda/${id}`);
-            
-            itens_ja_lancados.value = res.data.dados.listar_itens.map(i => ({
+            let itens_oficiais = res.data.dados.listar_itens || [];
+
+            // 3. Fusão Inteligente: Junta o oficial com os fantasmas que ainda não subiram
+            const ids_oficiais = new Set(itens_oficiais.map(i => String(i.uuid_operacao || i.id)));
+            const fantasmas_nao_sincronizados = itens_fantasmas.filter(i => !ids_oficiais.has(String(i.uuid_operacao)));
+
+            for (const fant of fantasmas_nao_sincronizados) {
+                itens_oficiais.push({
+                    id: `off_item_${fant.produto_id}_${Date.now()}`,
+                    produto_id: fant.produto_id,
+                    quantidade: fant.quantidade,
+                    preco_unitario: fant.preco_unitario,
+                    buscar_produto: { nome_produto: fant.nome_produto }
+                });
+            }
+
+            // 4. Agrupa produtos iguais (Resolve linhas duplicadas no carrinho)
+            const mapa_agrupado = {};
+            for (const it of itens_oficiais) {
+                const p_id = String(it.produto_id);
+                if (!mapa_agrupado[p_id]) mapa_agrupado[p_id] = { ...it, quantidade: Number(it.quantidade) };
+                else mapa_agrupado[p_id].quantidade += Number(it.quantidade);
+            }
+
+            itens_ja_lancados.value = Object.values(mapa_agrupado).map(i => ({
                 id_item_comanda: i.id,
-                nome_produto: i.buscar_produto?.nome_produto || `Produto ${i.produto_id}`, // Proteção extra contra null
+                produto_id: i.produto_id,
+                nome_produto: i.buscar_produto?.nome_produto || `Produto #${i.produto_id}`,
                 quantidade: i.quantidade,
                 preco_venda: i.preco_unitario
             }));
 
         } catch(e) { 
-            // 🟢 Só entra aqui se TUDO falhar (Cabo arrancado E fora do PC)
             console.error("Falha total ao buscar comanda (Nuvem e Local):", e);
-            if (!e.response || e.response.status >= 500) {
-                toast_global.exibir_toast("Modo Sobrevivência: Lançando itens sem visualização da comanda original.", "aviso");
-                // Permite ao garçom lançar novos itens cegamente.
-                itens_ja_lancados.value = [];
+            
+            // 5. MODO SOBREVIVÊNCIA EXTREMA: A Nuvem e o PC falharam.
+            // Exibe APENAS os itens fantasmas guardados no Dexie do Telemóvel!
+            if (itens_fantasmas.length > 0) {
+                const mapa_agrupado = {};
+                for (const it of itens_fantasmas) {
+                    const p_id = String(it.produto_id);
+                    if (!mapa_agrupado[p_id]) mapa_agrupado[p_id] = { ...it, quantidade: Number(it.quantidade) };
+                    else mapa_agrupado[p_id].quantidade += Number(it.quantidade);
+                }
+                
+                itens_ja_lancados.value = Object.values(mapa_agrupado).map(i => ({
+                    id_item_comanda: `off_${i.produto_id}`,
+                    produto_id: i.produto_id,
+                    nome_produto: i.nome_produto || `Produto #${i.produto_id}`,
+                    quantidade: i.quantidade,
+                    preco_venda: i.preco_unitario
+                }));
             } else {
-                toast_global.exibir_toast("Erro ao carregar itens da mesa.", "erro");
+                toast_global.exibir_toast("Modo Sobrevivência: Lançamento cego...", "aviso");
+                itens_ja_lancados.value = [];
             }
         }
     };

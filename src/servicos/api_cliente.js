@@ -42,7 +42,7 @@ const obter_url_servidor_local = async () => {
 const api_cliente = axios.create({
     baseURL: configurar_url_base(localStorage.getItem('nitec_tenant_id')),
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    timeout: 8000,
+    timeout: 3500, // 🟢 Reduzido para 3.5s. Desiste rápido da Nuvem para focar no Local!
 });
 
 // ─── Interceptor de requisição ────────────────────────────────────────────────
