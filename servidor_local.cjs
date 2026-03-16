@@ -18,8 +18,10 @@ let servidor_http = null;
 let bonjour       = null;
 let servico_mdns  = null;
 let data_dir      = null;
-let app_dir       = null; 
-let tenant_id_ativo = null; 
+let app_dir       = null; // Caminho do dist/ do Vue
+let tenant_id_ativo = null; // Tenant do dono logado — validado no ping
+
+// ─── Utilitários de armazenamento JSON ───────────────────────────────────────
 
 const garantir_dir = (caminho) => {
     if (!fs.existsSync(caminho)) fs.mkdirSync(caminho, { recursive: true });
@@ -40,17 +42,24 @@ const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => 
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
 });
 
+// ─── Fila de sincronização com VPS ───────────────────────────────────────────
+
 const enfileirar_sync = (metodo, url, payload) => {
     const fila = ler_json('sync_queue.json', []);
     fila.push({ id: uuid(), metodo, url, payload, criado_em: new Date().toISOString() });
     salvar_json('sync_queue.json', fila);
 };
 
+// ─── Rotas da API ─────────────────────────────────────────────────────────────
+
 const configurar_rotas = (app_express) => {
 
+    // Ping — descoberta de serviço
     app_express.get('/api/ping', (req, res) => {
         res.json({ ok: true, servidor: 'nitec_local', porta: PORTA, tenant: tenant_id_ativo });
     });
+
+    // ── Mesas ────────────────────────────────────────────────────────────────
 
     app_express.get('/api/listar-mesas', (req, res) => {
         const mesas = ler_json('mesas.json', []);
@@ -104,6 +113,91 @@ const configurar_rotas = (app_express) => {
         });
     });
 
+    // ── Produtos ─────────────────────────────────────────────────────────────
+
+    app_express.get('/api/listar-produtos', (req, res) => {
+        const produtos = ler_json('produtos_cache.json', []);
+        res.json({ sucesso: true, produtos });
+    });
+
+    // ── Comandas ─────────────────────────────────────────────────────────────
+
+    app_express.get('/api/listar-comandas', (req, res) => {
+        const comandas = ler_json('comandas.json', []);
+        const mesas    = ler_json('mesas.json', []);
+        const itens    = ler_json('itens.json', []);
+
+        const comandas_enriquecidas = comandas.map(c => {
+            const mesa = mesas.find(m => m.id === c.mesa_id);
+            return {
+                ...c,
+                buscar_cliente : c.buscar_cliente  || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
+                buscar_mesa    : c.buscar_mesa     || (mesa ? { nome_mesa: mesa.nome_mesa } : null),
+                buscar_usuario : c.buscar_usuario  || null,
+                listar_itens   : itens
+                    .filter(i => String(i.comanda_id) === String(c.id))
+                    .map(i => ({ ...i, buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } }))
+            };
+        });
+
+        res.json({ status: true, comandas: comandas_enriquecidas });
+    });
+
+    app_express.get('/api/buscar-comanda/:id', (req, res) => {
+        const id_buscado = req.params.id;
+        const comandas   = ler_json('comandas.json', []);
+        const itens      = ler_json('itens.json', []);
+        
+        const comanda = comandas.find(c => String(c.id) === String(id_buscado));
+        
+        if (!comanda) {
+            return res.status(404).json({ sucesso: false, mensagem: "Comanda não encontrada localmente." });
+        }
+
+        const itens_filtrados = itens.filter(i => String(i.comanda_id) === String(comanda.id));
+
+        res.json({
+            sucesso: true,
+            dados: {
+                ...comanda,
+                listar_itens: itens_filtrados.map(i => ({ 
+                    ...i, 
+                    buscar_produto: i.buscar_produto || { nome_produto: i.nome_produto } 
+                }))
+            }
+        });
+    });
+
+    app_express.post('/api/abrir-comanda', (req, res) => {
+        const { mesa_id, nome_cliente, tipo_conta, data_hora_abertura, uuid_operacao } = req.body;
+        const comandas = ler_json('comandas.json', []);
+        const mesas    = ler_json('mesas.json', []);
+
+        const existente = comandas.find(c => c.uuid_abertura === uuid_operacao);
+        if (existente) return res.status(201).json({ sucesso: true, mensagem: 'Comanda aberta!', comanda: existente });
+
+        const mesa_info = mesas.find(m => m.id === Number(mesa_id));
+        const nova = {
+            id: `local_${uuid()}`, mesa_id: Number(mesa_id),
+            nome_cliente: nome_cliente || null, tipo_conta: tipo_conta || 'geral',
+            status_comanda: 'aberta', valor_total: 0,
+            data_hora_abertura: data_hora_abertura || new Date().toISOString(),
+            data_hora_fechamento: null, uuid_abertura: uuid_operacao, origem: 'local',
+            buscar_cliente : nome_cliente ? { nome_cliente } : null,
+            buscar_mesa    : mesa_info ? { nome_mesa: mesa_info.nome_mesa } : null,
+            buscar_usuario : null,
+        };
+
+        comandas.push(nova);
+        salvar_json('comandas.json', comandas);
+
+        const idx = mesas.findIndex(m => m.id === Number(mesa_id));
+        if (idx >= 0) { mesas[idx].status_mesa = 'ocupada'; salvar_json('mesas.json', mesas); }
+
+        enfileirar_sync('POST', '/abrir-comanda', req.body);
+        res.status(201).json({ sucesso: true, mensagem: 'Comanda aberta!', comanda: nova });
+    });
+
     app_express.post('/api/adicionar-itens-comanda/:id', (req, res) => {
         const { itens, uuid_operacao } = req.body;
         const comandas    = ler_json('comandas.json', []);
@@ -135,13 +229,7 @@ const configurar_rotas = (app_express) => {
         salvar_json('comandas.json', comandas);
 
         enfileirar_sync('POST', `/adicionar-itens-comanda/${req.params.id}`, req.body);
-        
-        res.json({ 
-            status: true, 
-            mensagem: 'Itens lançados!', 
-            comanda, 
-            _debug: { acao: "Itens adicionados e salvos no itens.json com sucesso", novo_total: todos_itens.length } // 🟢 DEBUG AQUI
-        });
+        res.json({ status: true, mensagem: 'Itens lançados!', comanda, _debug: { acao: "Itens adicionados e salvos no itens.json com sucesso", novo_total: todos_itens.length } });
     });
 
     app_express.post('/api/alterar-quantidade-item/:id_item', (req, res) => {
@@ -160,7 +248,7 @@ const configurar_rotas = (app_express) => {
         const comanda = comandas.find(c => String(c.id) === String(item.comanda_id));
         if (comanda) {
             comanda.valor_total = todos_itens
-                .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
+                .filter(i => String(i.comanda_id) === String(comanda.id))
                 .reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
         }
 
@@ -180,7 +268,7 @@ const configurar_rotas = (app_express) => {
             todos_itens.splice(idx, 1);
             if (comanda) {
                 comanda.valor_total = todos_itens
-                    .filter(i => String(i.comanda_id) === String(comanda.id)) // 🟢 CORREÇÃO 1
+                    .filter(i => String(i.comanda_id) === String(comanda.id))
                     .reduce((acc, i) => acc + (i.quantidade * i.preco_unitario), 0);
             }
             salvar_json('itens.json', todos_itens);
@@ -198,7 +286,7 @@ const configurar_rotas = (app_express) => {
         const comanda = comandas.find(c => String(c.id) === String(req.params.id));
         if (!comanda) return res.status(404).json({ sucesso: false });
 
-        if (!todos_itens.some(i => String(i.comanda_id) === String(comanda.id))) { // 🟢 CORREÇÃO 1
+        if (!todos_itens.some(i => String(i.comanda_id) === String(comanda.id))) {
             comanda.status_comanda = 'cancelada';
             salvar_json('comandas.json', comandas);
             enfileirar_sync('POST', `/fechar-comanda/${req.params.id}`, req.body);
@@ -250,6 +338,7 @@ const configurar_rotas = (app_express) => {
         res.json({ sucesso: true, mensagem: 'Comanda reaberta!' });
     });
 
+    // ── Autenticação local ────────────────────────────────────────────────────
     app_express.post('/api/realizar-login', (req, res) => {
         const { email, password } = req.body;
         const usuarios = ler_json('usuarios_cache.json', []);
@@ -270,7 +359,6 @@ const configurar_rotas = (app_express) => {
         if (comandas && Array.isArray(comandas)) {
             let cmd_existentes = ler_json('comandas.json', []);
             const ids_novas = comandas.map(c => String(c.id));
-            // Remove as antigas que têm o mesmo ID para não duplicar
             cmd_existentes = cmd_existentes.filter(c => !ids_novas.includes(String(c.id)));
             salvar_json('comandas.json', [...cmd_existentes, ...comandas]);
         }
@@ -279,7 +367,6 @@ const configurar_rotas = (app_express) => {
         if (itens && Array.isArray(itens) && comandas && Array.isArray(comandas)) {
             let it_existentes = ler_json('itens.json', []);
             const ids_comand_novas = comandas.map(c => String(c.id));
-            // Apaga apenas os itens antigos das comandas que estamos a atualizar agora
             it_existentes = it_existentes.filter(i => !ids_comand_novas.includes(String(i.comanda_id)));
             salvar_json('itens.json', [...it_existentes, ...itens]);
         }
@@ -287,6 +374,7 @@ const configurar_rotas = (app_express) => {
         res.json({ ok: true });
     });
 
+    // ── Serve o app Vue completo (DEVE ser a última rota) ─────────────────────
     if (app_dir && fs.existsSync(app_dir)) {
         app_express.use(express.static(app_dir));
         app_express.get('/{*path}', (req, res) => {
@@ -298,6 +386,8 @@ const configurar_rotas = (app_express) => {
         console.warn('[Nitec Local] dist/ não encontrado — app Vue não será servido pelo servidor local.');
     }
 };
+
+// ─── Sincronização com VPS ────────────────────────────────────────────────────
 
 const sincronizar_com_vps = async (url_base, token) => {
     const fila = ler_json('sync_queue.json', []);
@@ -335,11 +425,13 @@ const obter_ip_local = () => {
     return '127.0.0.1';
 };
 
+// ─── API pública ──────────────────────────────────────────────────────────────
+
 const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
     return new Promise((resolve, reject) => {
         data_dir = path.join(caminho_dados, 'nitec_local');
-        app_dir  = caminho_app; 
-        tenant_id_ativo = tenant_id; 
+        app_dir  = caminho_app; // Caminho do dist/ do Vue
+        tenant_id_ativo = tenant_id; // Tenant do dono — usado no /api/ping
         garantir_dir(data_dir);
 
         const app_express = express();
@@ -354,7 +446,7 @@ const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
             console.log(`[Nitec Local] Servidor rodando em http://${ip}:${PORTA}`);
 
             try {
-                bonjour = new Bonjour();
+                bonjour      = new Bonjour();
                 servico_mdns = bonjour.publish({
                     name: `NitecLocal_${ip.replace(/\./g, '_')}`,
                     type: 'nitec',
@@ -375,7 +467,7 @@ const iniciar = (caminho_dados, caminho_app = null, tenant_id = null) => {
 
 const parar = () => {
     if (servico_mdns) { servico_mdns.stop(); servico_mdns = null; }
-    if (bonjour)      { bonjour.destroy(); bonjour = null; }
+    if (bonjour)      { bonjour.destroy(); bonjour      = null; }
     if (servidor_http){ servidor_http.close(); servidor_http = null; }
     console.log('[Nitec Local] Servidor encerrado.');
 };
