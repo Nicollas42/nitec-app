@@ -50,6 +50,23 @@ const enfileirar_sync = (metodo, url, payload) => {
     salvar_json('sync_queue.json', fila);
 };
 
+// ─── Utilitário: libera mesa se não houver mais comandas abertas ─────────────
+
+const liberar_mesa_se_vazia = (mesa_id, comandas) => {
+    if (!mesa_id) return;
+    const ainda_abertas = comandas.filter(
+        c => c.mesa_id === mesa_id && c.status_comanda === 'aberta'
+    );
+    if (ainda_abertas.length === 0) {
+        const mesas = ler_json('mesas.json', []);
+        const idx   = mesas.findIndex(m => m.id === mesa_id);
+        if (idx >= 0) {
+            mesas[idx].status_mesa = 'livre';
+            salvar_json('mesas.json', mesas);
+        }
+    }
+};
+
 // ─── Rotas da API ─────────────────────────────────────────────────────────────
 
 const configurar_rotas = (app_express) => {
@@ -276,8 +293,10 @@ const configurar_rotas = (app_express) => {
         if (!comanda) return res.status(404).json({ sucesso: false });
 
         if (!todos_itens.some(i => String(i.comanda_id) === String(comanda.id))) {
+            // Conta vazia — cancela e libera a mesa se não houver outras abertas
             comanda.status_comanda = 'cancelada';
             salvar_json('comandas.json', comandas);
+            liberar_mesa_se_vazia(comanda.mesa_id, comandas);
             enfileirar_sync('POST', `/fechar-comanda/${req.params.id}`, req.body);
             return res.json({ sucesso: true, mensagem: '✔️ Conta vazia anulada e descartada!' });
         }
@@ -285,15 +304,10 @@ const configurar_rotas = (app_express) => {
         comanda.status_comanda       = 'fechada';
         comanda.data_hora_fechamento = data_hora_fechamento || new Date().toISOString();
         comanda.desconto             = desconto || 0;
-        // 🟢 Aplica desconto no valor_total — alinhado com ComandaService.fechar_pagamento()
+        // Aplica desconto no valor_total — alinhado com ComandaService.fechar_pagamento()
         comanda.valor_total          = Math.max(0, (comanda.valor_total || 0) - (desconto || 0));
         salvar_json('comandas.json', comandas);
-
-        const abertas = comandas.filter(c => c.mesa_id === comanda.mesa_id && c.status_comanda === 'aberta');
-        if (abertas.length === 0) {
-            const idx = mesas.findIndex(m => m.id === comanda.mesa_id);
-            if (idx >= 0) { mesas[idx].status_mesa = 'livre'; salvar_json('mesas.json', mesas); }
-        }
+        liberar_mesa_se_vazia(comanda.mesa_id, comandas);
 
         enfileirar_sync('POST', `/fechar-comanda/${req.params.id}`, req.body);
         res.json({ sucesso: true, mensagem: '💳 Pagamento confirmado!' });
@@ -302,7 +316,11 @@ const configurar_rotas = (app_express) => {
     app_express.post('/api/fechar-comanda/cancelar/:id', (req, res) => {
         const comandas = ler_json('comandas.json', []);
         const comanda  = comandas.find(c => String(c.id) === String(req.params.id));
-        if (comanda) { comanda.status_comanda = 'cancelada'; salvar_json('comandas.json', comandas); }
+        if (comanda) {
+            comanda.status_comanda = 'cancelada';
+            salvar_json('comandas.json', comandas);
+            liberar_mesa_se_vazia(comanda.mesa_id, comandas);
+        }
         enfileirar_sync('POST', `/fechar-comanda/cancelar/${req.params.id}`, req.body);
         res.json({ sucesso: true, mensagem: 'Comanda cancelada!' });
     });

@@ -47,13 +47,24 @@ const api_cliente = axios.create({
 
 // ─── Interceptor de requisição ────────────────────────────────────────────────
 
-api_cliente.interceptors.request.use((config) => {
+api_cliente.interceptors.request.use(async (config) => {
     const token = localStorage.getItem('nitec_token');
     if (token) config.headers.Authorization = `Bearer ${token}`;
     config.headers['X-Requested-With'] = 'XMLHttpRequest';
     config.headers['Accept']           = 'application/json';
     const loja_atual = localStorage.getItem('nitec_tenant_id') || 'master';
     config.baseURL   = configurar_url_base(loja_atual);
+
+    // 🟢 ATALHO OFFLINE: Se o navegador sabe que está sem internet E já temos
+    // o servidor local em cache, redirecionamos direto para ele — zero espera.
+    if (!navigator.onLine) {
+        const url_local = await obter_url_servidor_local();
+        if (url_local) {
+            config.baseURL = `${url_local}/api`;
+            config.timeout = 5000;
+        }
+    }
+
     return config;
 });
 
@@ -210,3 +221,23 @@ export const sincronizar_cache_para_local = async (produtos, mesas, comandas = n
         console.log(`[Cache→Local] Snapshot enviado. Quantidade de Itens gravados: ${itens ? itens.length : 'Nenhum/Vazio'}`);
     } catch { /* silencioso */ }
 };
+
+// ─── Sincronização automática ao voltar online ────────────────────────────────────────
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', async () => {
+        console.log('[Nitec] 🟢 Internet voltou! Sincronizando fila local com a VPS...');
+        // Passo 1: Envia todas as ações offline acumuladas para a VPS
+        await sincronizar_servidor_local_com_vps();
+        console.log('[Nitec] Fila sincronizada. Atualizando stores...');
+        // Passo 2: Só agora busca dados frescos — evita comanda reaparecer
+        try {
+            const { useMesasStore }    = await import('../stores/mesas_store.js');
+            const { useComandasStore } = await import('../stores/comandas_store.js');
+            useMesasStore().buscar_mesas(true);
+            useComandasStore().buscar_comandas(true);
+        } catch (e) {
+            console.warn('[Nitec] Erro ao atualizar stores após reconexão:', e.message);
+        }
+    });
+}
