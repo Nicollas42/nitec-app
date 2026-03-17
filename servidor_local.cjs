@@ -361,25 +361,66 @@ const configurar_rotas = (app_express) => {
         const { produtos, mesas, usuarios, comandas, itens } = req.body;
         
         if (produtos) salvar_json('produtos_cache.json', produtos);
-        if (mesas)    salvar_json('mesas.json', mesas);
         if (usuarios) salvar_json('usuarios_cache.json', usuarios);
-        
-        // 🟢 FUSÃO INTELIGENTE DE COMANDAS (MERGE)
+
+        // ── MERGE PROTEGIDO DE COMANDAS ────────────────────────────────────────
+        // Regra: comandas locais já fechadas/canceladas NÃO podem ser revertidas
+        // para "aberta" por dados desatualizados vindos do cache do store.
+        // Elimina a race condition: fechar-comanda é chamado, mas o sync-produtos
+        // disparado ANTES do fechamento chega DEPOIS e reverte o estado.
         if (comandas && Array.isArray(comandas)) {
-            let cmd_existentes = ler_json('comandas.json', []);
-            const ids_novas = comandas.map(c => String(c.id));
-            cmd_existentes = cmd_existentes.filter(c => !ids_novas.includes(String(c.id)));
-            salvar_json('comandas.json', [...cmd_existentes, ...comandas]);
+            const cmd_locais  = ler_json('comandas.json', []);
+            const locais_map  = {};
+            for (const c of cmd_locais) locais_map[String(c.id)] = c;
+
+            const ids_novas    = new Set(comandas.map(c => String(c.id)));
+            const cmd_resultado = [];
+
+            // Mantém comandas criadas localmente (offline) que não vêm no payload
+            for (const c of cmd_locais) {
+                if (!ids_novas.has(String(c.id))) cmd_resultado.push(c);
+            }
+
+            // Mescla as novas, mas nunca reverte estado local mais avançado
+            for (const nova of comandas) {
+                const local = locais_map[String(nova.id)];
+                const local_mais_avancado =
+                    local &&
+                    nova.status_comanda === 'aberta' &&
+                    (local.status_comanda === 'fechada' || local.status_comanda === 'cancelada');
+                cmd_resultado.push(local_mais_avancado ? local : nova);
+            }
+
+            salvar_json('comandas.json', cmd_resultado);
+
+            // ── RECONCILIAÇÃO DE MESAS ─────────────────────────────────────────
+            // Recalcula status de cada mesa a partir das comandas reais — evita
+            // sobrescrever mesas.json com estado desatualizado vindo do store.
+            const mesas_local = ler_json('mesas.json', []);
+            let houve_mudanca = false;
+            for (const mesa of mesas_local) {
+                const tem_aberta   = cmd_resultado.some(c => c.mesa_id === mesa.id && c.status_comanda === 'aberta');
+                const status_certo = tem_aberta ? 'ocupada' : 'livre';
+                if (mesa.status_mesa !== status_certo) {
+                    mesa.status_mesa = status_certo;
+                    houve_mudanca    = true;
+                }
+            }
+            if (houve_mudanca) salvar_json('mesas.json', mesas_local);
+
+        } else if (mesas) {
+            // Payload sem comandas — sobrescreve mesas normalmente
+            salvar_json('mesas.json', mesas);
         }
-        
-        // 🟢 FUSÃO INTELIGENTE DE ITENS (MERGE)
+
+        // ── MERGE PROTEGIDO DE ITENS ───────────────────────────────────────────
         if (itens && Array.isArray(itens) && comandas && Array.isArray(comandas)) {
             let it_existentes = ler_json('itens.json', []);
-            const ids_comand_novas = comandas.map(c => String(c.id));
-            it_existentes = it_existentes.filter(i => !ids_comand_novas.includes(String(i.comanda_id)));
+            const ids_cmd_novas = comandas.map(c => String(c.id));
+            it_existentes = it_existentes.filter(i => !ids_cmd_novas.includes(String(i.comanda_id)));
             salvar_json('itens.json', [...it_existentes, ...itens]);
         }
-        
+
         res.json({ ok: true });
     });
 

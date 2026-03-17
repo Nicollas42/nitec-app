@@ -37,6 +37,14 @@ const obter_url_servidor_local = async () => {
     return null;
 };
 
+// ─── Circuit Breaker — VPS ───────────────────────────────────────────────────
+// Quando a VPS falha, marca por 30s para evitar os 3.5s de timeout em cada
+// requisição seguinte. Funciona mesmo com WiFi sem internet (navigator.onLine=true).
+let _vps_indisponivel_ate = 0;
+const _marcar_vps_indisponivel  = () => { _vps_indisponivel_ate = Date.now() + 30_000; };
+const _resetar_circuit_breaker  = () => { _vps_indisponivel_ate = 0; };
+const _vps_bloqueada            = () => Date.now() < _vps_indisponivel_ate;
+
 // ─── Instância principal (aponta para VPS) ───────────────────────────────────
 
 const api_cliente = axios.create({
@@ -57,11 +65,15 @@ api_cliente.interceptors.request.use(async (config) => {
 
     // 🟢 ATALHO OFFLINE: Se o navegador sabe que está sem internet E já temos
     // o servidor local em cache, redirecionamos direto para ele — zero espera.
-    if (!navigator.onLine) {
+    // Vai direto ao servidor local se:
+    // (a) navigator diz offline, OU
+    // (b) circuit breaker está aberto (VPS falhou recentemente)
+    if (!navigator.onLine || _vps_bloqueada()) {
         const url_local = await obter_url_servidor_local();
         if (url_local) {
-            config.baseURL = `${url_local}/api`;
-            config.timeout = 5000;
+            config.baseURL            = `${url_local}/api`;
+            config.timeout            = 5000;
+            config._roteado_ao_local  = true;
         }
     }
 
@@ -88,6 +100,11 @@ api_cliente.interceptors.response.use((response) => {
         }
     } catch (e) { /* Silencioso, não trava o sistema se falhar */ }
 
+    // Resposta real da VPS — reativa o circuit breaker
+    if (!response.config._roteado_ao_local) {
+        _resetar_circuit_breaker();
+    }
+
     return response;
 }, async (error) => {
     // 🟢 CORREÇÃO: Tratar o 404 (Not Found) e o 0 (Network Error) como falhas legítimas para o Plano B
@@ -96,7 +113,12 @@ api_cliente.interceptors.response.use((response) => {
 
     if (erro_critico && config_original && !config_original._tentou_local) {
         config_original._tentou_local = true;
-        
+
+        // Abre o circuit breaker — próximas requisições vão direto ao local
+        if (!config_original._roteado_ao_local) {
+            _marcar_vps_indisponivel();
+        }
+
         console.groupCollapsed(`🔴 [DEBUG OFFLINE] Falha na VPS: ${config_original.url}`);
         console.log("1. Detetada falha na VPS ou ausência de internet. Tentando transição para Servidor Local...");
 
