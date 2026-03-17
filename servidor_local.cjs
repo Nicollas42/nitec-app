@@ -80,20 +80,10 @@ const configurar_rotas = (app_express) => {
             mesa = { id: id_mesa, nome_mesa: `Mesa ${id_mesa}`, status_mesa: 'ocupada' };
         }
 
-        // 🟢 PREPARANDO O PACOTE DE DEBUG
-        const log_debug = {
-            total_itens_no_banco_local: itens.length,
-            itens_brutos_no_banco: itens
-        };
-
         const comandas_da_mesa = comandas
             .filter(c => c.mesa_id === id_mesa && c.status_comanda === 'aberta')
             .map(c => {
                 const itens_desta_comanda = itens.filter(i => String(i.comanda_id) === String(c.id));
-                
-                // 🟢 INJETANDO NO DEBUG
-                log_debug[`itens_filtrados_cmd_${c.id}`] = itens_desta_comanda;
-
                 return {
                     ...c,
                     buscar_cliente: c.buscar_cliente || (c.nome_cliente ? { nome_cliente: c.nome_cliente } : null),
@@ -104,7 +94,6 @@ const configurar_rotas = (app_express) => {
 
         res.json({
             sucesso: true,
-            _debug: log_debug, // 🟢 ENVIANDO PARA O NAVEGADOR
             dados  : {
                 nome_mesa      : mesa.nome_mesa,
                 status_mesa    : mesa.status_mesa,
@@ -229,7 +218,7 @@ const configurar_rotas = (app_express) => {
         salvar_json('comandas.json', comandas);
 
         enfileirar_sync('POST', `/adicionar-itens-comanda/${req.params.id}`, req.body);
-        res.json({ status: true, mensagem: 'Itens lançados!', comanda, _debug: { acao: "Itens adicionados e salvos no itens.json com sucesso", novo_total: todos_itens.length } });
+        res.json({ status: true, mensagem: 'Itens lançados!', comanda });
     });
 
     app_express.post('/api/alterar-quantidade-item/:id_item', (req, res) => {
@@ -296,6 +285,8 @@ const configurar_rotas = (app_express) => {
         comanda.status_comanda       = 'fechada';
         comanda.data_hora_fechamento = data_hora_fechamento || new Date().toISOString();
         comanda.desconto             = desconto || 0;
+        // 🟢 Aplica desconto no valor_total — alinhado com ComandaService.fechar_pagamento()
+        comanda.valor_total          = Math.max(0, (comanda.valor_total || 0) - (desconto || 0));
         salvar_json('comandas.json', comandas);
 
         const abertas = comandas.filter(c => c.mesa_id === comanda.mesa_id && c.status_comanda === 'aberta');
