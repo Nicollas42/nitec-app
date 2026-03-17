@@ -4,14 +4,95 @@
    TEMA CUSTOMIZADO DA NITEC (Tailwind v4)
    ========================================== */
 @theme {
-  --color-nitec_blue: #2563eb; /* Um azul vibrante e profissional */
-  --color-nitec_dark: #1e293b; /* Um cinzento/azul muito escuro e elegante */
+  --color-nitec_blue: #2563eb;
+  --color-nitec_dark: #1e293b;
+
+  /* Redirecionamento das vars CSS para Tailwind v4 utility classes: bg-page -> var(--bg-page) etc. */
+  --color-page: var(--bg-page);
+  --color-card: var(--bg-card);
+  --color-card-hover: var(--bg-card-hover);
+  --color-border-subtle: var(--border-subtle);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+}
+
+/* ==========================================
+   DESIGN TOKENS (CSS Custom Properties)
+   ========================================== */
+:root {
+    /* MODO CLARO (Padrão) */
+    --bg-page: #f8f9fa;        /* Fundo principal da página (gray-50) */
+    --bg-card: #ffffff;        /* Fundo de containers e cards (white) */
+    --bg-card-hover: #f3f4f6;  /* Hover em cards e listas (gray-100) */
+    --border-subtle: #e5e7eb;  /* Bordas suaves (gray-200) */
+    
+    --text-primary: #1f2937;   /* Textos importantes e títulos (gray-800) */
+    --text-muted: #6b7280;     /* Textos secundários (gray-500) */
+    
+    /* Scrollbars */
+    --sb-track: transparent;
+    --sb-thumb: #d1d5db;
+    --sb-thumb-hover: #9ca3af;
+}
+
+html.dark {
+    /* MODO ESCURO */
+    --bg-page: #0f111a;        /* Fundo profundo e escuro quase preto azulado */
+    --bg-card: #1e2230;        /* Fundos elevados ligeiramente mais claros */
+    --bg-card-hover: #262b3d;  
+    --border-subtle: #2d3348;  
+    
+    --text-primary: #f3f4f6;   
+    --text-muted: #9ca3af;     
+    
+    /* Scrollbars Dark */
+    --sb-thumb: #374151;
+    --sb-thumb-hover: #4b5563;
 }
 
 /* ==========================================
    ESTILOS GLOBAIS
    ========================================== */
-/* Reset básico para o PDV não ter scroll indesejado */
 body {
-    @apply bg-gray-100 overflow-hidden;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    @apply overflow-hidden font-sans antialiased;
 }
+
+/* Scrollbar Customizada Global */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--sb-track);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--sb-thumb-hover);
+}
+
+/* Classes utilitárias padronizadas */
+.card-padrao {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1rem;
+    transition: all 0.2s ease;
+}
+.input-padrao {
+    background-color: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    outline: none;
+    transition: border-color 0.2s;
+}
+.input-padrao:focus {
+    border-color: var(--color-nitec_blue);
+}
+.input-padrao::placeholder {
+    color: var(--text-muted);
+}

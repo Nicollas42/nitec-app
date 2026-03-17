@@ -1,17 +1,17 @@
 <template>
-    <div class="tela_mesas p-6 md:p-8 bg-gray-50 h-full font-sans flex flex-col relative overflow-y-auto">
+    <div class="tela_mesas p-6 md:p-8 bg-[var(--bg-page)] h-full font-sans flex flex-col relative overflow-y-auto transition-colors duration-300">
         
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 shrink-0">
             <div>
-                <h1 class="text-2xl font-black text-gray-800 tracking-tight">Mapa de Mesas</h1>
-                <p class="text-sm text-gray-500 mt-1">Gestão de salão e comandas em tempo real.</p>
+                <h1 class="text-2xl font-black text-[var(--text-primary)] tracking-tight">Mapa de Mesas</h1>
+                <p class="text-sm text-[var(--text-muted)] mt-1">Gestão de salão e comandas em tempo real.</p>
             </div>
             
             <div class="flex gap-3 w-full md:w-auto">
-                <button @click="voltar_painel" class="md:hidden px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-bold transition-all flex-1">
+                <button @click="voltar_painel" class="md:hidden px-5 py-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card-hover)] text-sm font-bold transition-all flex-1">
                     Voltar
                 </button>
-                <button @click="modal_nova_mesa = true" class="px-5 py-2.5 bg-nitec_blue text-white rounded-lg hover:bg-blue-700 text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
+                <button @click="modal_nova_mesa = true" class="px-5 py-2.5 bg-nitec_blue text-white rounded-lg hover:bg-blue-600 text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
                     <span>➕</span> Nova Mesa
                 </button>
             </div>
@@ -20,37 +20,37 @@
         <main class="area_principal flex flex-col gap-6 flex-1">
             
             <section class="secao_balcao shrink-0">
-                <button @click="iniciar_venda_balcao" class="w-full bg-white border border-gray-200 p-5 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+                <button @click="iniciar_venda_balcao" class="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl font-black group-hover:scale-110 transition-transform">
+                        <div class="w-12 h-12 bg-blue-500/10 text-nitec_blue rounded-xl flex items-center justify-center text-xl font-black group-hover:scale-110 transition-transform">
                             🛒
                         </div>
                         <div class="text-left">
-                            <h2 class="text-base font-black text-gray-800 uppercase tracking-tight">Venda Balcão (Caixa Rápido)</h2>
-                            <p class="text-xs text-gray-500 font-medium mt-0.5">Lançamento direto sem vincular a uma mesa.</p>
+                            <h2 class="text-base font-black text-[var(--text-primary)] uppercase tracking-tight">Venda Balcão (Caixa Rápido)</h2>
+                            <p class="text-xs text-[var(--text-muted)] font-medium mt-0.5">Lançamento direto sem vincular a uma mesa.</p>
                         </div>
                     </div>
-                    <span class="text-blue-500 font-bold text-sm hidden sm:block bg-blue-50 px-3 py-1 rounded-lg group-hover:bg-blue-100 transition-colors">Iniciar &rarr;</span>
+                    <span class="text-nitec_blue font-bold text-sm hidden sm:block bg-blue-500/10 px-3 py-1 rounded-lg group-hover:bg-blue-500/20 transition-colors">Iniciar &rarr;</span>
                 </button>
             </section>
             
             <section class="secao_grelha_mesas flex-1">
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-6">
                     <button v-for="mesa in lista_mesas" :key="mesa.id" @click="selecionar_mesa(mesa)" 
-                            class="p-5 rounded-2xl border transition-all transform active:scale-95 bg-white relative flex flex-col items-start justify-between h-32 group"
-                            :class="mesa.status_mesa === 'livre' ? 'border-gray-200 hover:border-green-500 shadow-sm hover:shadow-md' : 'border-red-200 bg-red-50/30 shadow-sm opacity-95'">
+                            class="p-5 rounded-2xl transition-all transform active:scale-95 bg-[var(--bg-card)] relative flex flex-col items-start justify-between h-32 group border"
+                            :class="mesa.status_mesa === 'livre' ? 'border-[var(--border-subtle)] hover:border-green-500 shadow-sm hover:shadow-md' : 'border-red-500/50 bg-red-500/5 shadow-sm opacity-95'">
                         
                         <div class="w-full flex justify-between items-center mb-2">
                             <span class="w-3 h-3 rounded-full shadow-sm" :class="mesa.status_mesa === 'livre' ? 'bg-green-500' : 'bg-red-500 animate-pulse'"></span>
-                            <svg v-if="mesa_carregando === mesa.id" class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg v-if="mesa_carregando === mesa.id" class="animate-spin h-5 w-5 text-nitec_blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </div>
                         
                         <div class="text-left w-full mt-auto">
-                            <h3 class="text-lg font-black text-gray-800 leading-tight truncate">{{ mesa.nome_mesa }}</h3>
-                            <p class="text-[10px] uppercase font-bold tracking-widest mt-1" :class="mesa.status_mesa === 'livre' ? 'text-gray-400' : 'text-red-500'">
+                            <h3 class="text-lg font-black text-[var(--text-primary)] leading-tight truncate">{{ mesa.nome_mesa }}</h3>
+                            <p class="text-[10px] uppercase font-bold tracking-widest mt-1" :class="mesa.status_mesa === 'livre' ? 'text-[var(--text-muted)]' : 'text-red-500'">
                                 {{ mesa.status_mesa === 'livre' ? 'Disponível' : 'Ocupada' }}
                             </p>
                         </div>

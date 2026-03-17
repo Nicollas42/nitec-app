@@ -25,6 +25,9 @@ export function useLogicaPdv() {
     const valor_desconto = ref('');
     const processando_finalizacao = ref(false); 
 
+    // 🟢 Controle UI (Mobile)
+    const carrinho_expandido = ref(false);
+
     const termo_pesquisa = ref('');
     const categoria_selecionada = ref('todas');
     const produtos_fixados = ref(JSON.parse(localStorage.getItem('nitec_pdv_fixados') || '[]'));
@@ -359,6 +362,7 @@ export function useLogicaPdv() {
         adicionar_ao_carrinho, remover_do_carrinho, alterar_quantidade_novo,
         subtotal_comanda, valor_final_comanda, valor_desconto, 
         id_comanda_vinculada, id_comanda_pagamento, 
+        carrinho_expandido, // 🟢 Estado de UI mobile exportado
         processar_acao_principal, voltar_painel: () => roteador.push('/painel-central'),
     };
 }

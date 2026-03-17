@@ -50,20 +50,26 @@
                 </div>
             </div>
             
-            <div class="perfil_usuario flex items-center gap-4 bg-white/5 p-2 px-4 rounded-2xl border border-white/10">
+            <div class="perfil_usuario flex items-center gap-4 bg-[var(--bg-card)]/10 p-2 px-4 rounded-2xl border border-[var(--border-subtle)]/10">
                 <div class="info_texto text-right hidden sm:block">
                     <p class="nome_user text-sm font-black uppercase italic">{{ auth_store.usuario_logado?.nome }}</p>
                     <p class="cargo_user text-[10px] text-nitec_blue font-bold uppercase tracking-widest">{{ auth_store.usuario_logado?.tipo_usuario }}</p>
                 </div>
+
+                <!-- 🟢 TOGGLE DARK MODE -->
+                <button @click="tema_store.alternar_tema()" class="text-xl hover:scale-110 transition-transform px-2" :title="tema_store.modo_escuro ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'">
+                    {{ tema_store.modo_escuro ? '☀️' : '🌙' }}
+                </button>
+
                 <button @click="sair" class="botao_sair text-red-400 hover:text-red-500 hover:bg-red-500/20 p-2 rounded-xl transition-all">
                     <span class="text-xl block">🚪</span>
                 </button>
             </div>
         </header>
 
-        <div class="hidden md:flex bg-white border-b border-gray-200 px-6 pt-4 gap-2 shadow-sm z-30 overflow-x-auto">
+        <div class="hidden md:flex bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-6 pt-4 gap-2 shadow-sm z-30 overflow-x-auto transition-colors duration-300">
             <button @click="ir_para('/pdv-caixa')" 
-                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-[var(--bg-page)] text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>💰</span> PDV / Caixa
             </button>
@@ -93,7 +99,7 @@
                 <span>📈</span> Análises
             </button>
             <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" 
-                    :class="rota_atual.path.includes('/permissoes') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+                    :class="rota_atual.path.includes('/permissoes') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-[var(--bg-page)] text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>🔐</span> Permissões
             </button>
@@ -102,32 +108,32 @@
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 mr-2">
                 <span>⚙️</span> Gestão SaaS
             </button>
-            <button @click="abrir_modal_atualizacoes" class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider bg-gray-50 text-gray-500 hover:bg-green-50 transition-all flex items-center gap-2 relative">
+            <button @click="abrir_modal_atualizacoes" class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider bg-[var(--bg-page)] text-[var(--text-muted)] hover:bg-green-50 transition-all flex items-center gap-2 relative">
                 <span v-if="tem_atualizacao_nova" class="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full animate-ping"></span>
                 <span>🔄</span>
             </button>
         </div>
 
-        <main class="conteudo_principal flex-1 bg-gray-100 flex flex-col md:overflow-hidden overflow-y-auto">
+        <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col md:overflow-hidden overflow-y-auto transition-colors duration-300">
             
             <div v-if="rota_atual.path === '/painel-central'" class="md:hidden p-4 grid grid-cols-2 gap-4 shrink-0">
-                <button @click="ir_para('/pdv-caixa')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">💰</span><h3 class="font-black text-gray-800 uppercase text-sm">PDV / Caixa</h3>
+                <button @click="ir_para('/pdv-caixa')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">💰</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">PDV / Caixa</h3>
                 </button>
-                <button @click="ir_para('/mapa-mesas')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-gray-800 uppercase text-sm">Mesas</h3>
+                <button @click="ir_para('/mapa-mesas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Mesas</h3>
                 </button>
-                <button @click="ir_para('/comandas')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">📝</span><h3 class="font-black text-gray-800 uppercase text-sm">Comandas</h3>
+                <button @click="ir_para('/comandas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">📝</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Comandas</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">📦</span><h3 class="font-black text-gray-800 uppercase text-sm">Produtos</h3>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">📦</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Produtos</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">👥</span><h3 class="font-black text-gray-800 uppercase text-sm">Equipa</h3>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">👥</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Equipa</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center">
-                    <span class="text-4xl mb-2">📈</span><h3 class="font-black text-gray-800 uppercase text-sm">Análises</h3>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">📈</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Análises</h3>
                 </button>
 
                 <!-- 🟢 Botões QR Sync no menu mobile — col-span-full -->
@@ -189,8 +195,8 @@
             </div>
         </main>
         
-        <footer class="rodape_infos bg-white border-t border-gray-200 p-2 text-center z-30 shrink-0">
-            <p class="text-[10px] text-gray-400 uppercase font-bold">Nitec Tecnologia &copy; 2026</p>
+        <footer class="rodape_infos bg-[var(--bg-card)] border-t border-[var(--border-subtle)] p-2 text-center z-30 shrink-0 transition-colors duration-300">
+            <p class="text-[10px] text-[var(--text-muted)] uppercase font-bold">Nitec Tecnologia &copy; 2026</p>
         </footer>
 
         <!-- 🟢 Modal: Gerar QR (📤) -->
@@ -277,6 +283,7 @@ import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth_store.js'; 
 import { useLogicaDashboard } from './pagina_dashboard_logica.js';
 import { useToastStore } from '../stores/toast_store.js'; 
+import { useTemaStore } from '../stores/tema_store.js';
 import GeradorQrOffline from './componentes_mesa_caixa/GeradorQrOffline.vue';
 import LeitorQrOffline from './componentes_mesa_caixa/LeitorQrOffline.vue';
 import { useRouter } from 'vue-router';
@@ -284,6 +291,8 @@ import BannerServidorLocal from './componentes_mesa_caixa/BannerServidorLocal.vu
 
 const toast_store = useToastStore(); 
 const auth_store = useAuthStore();
+const string_tema = useTemaStore(); // Usaremos 'tema_store' abaixo
+const tema_store = string_tema;
 const roteador = useRouter();
 
 const { 

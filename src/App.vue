@@ -6,8 +6,10 @@
 import { onMounted } from 'vue';
 import { db } from './banco_local/db.js';
 import { useRouter } from 'vue-router';
+import { useTemaStore } from './stores/tema_store.js';
 
 const roteador = useRouter();
+const tema = useTemaStore(); // Injeta a store e aplica o tema automaticamente no boot
 
 onMounted(async () => {
     // 🟢 1. TRAVA ANTI-ZUMBI: Executa antes de qualquer outra coisa
