@@ -68,44 +68,44 @@
         </header>
 
         <div class="hidden md:flex bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-6 pt-4 gap-2 shadow-sm z-30 overflow-x-auto transition-colors duration-300">
-            <button @click="ir_para('/pdv-caixa')" 
-                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-[var(--bg-page)] text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
+            <button v-if="tem_permissao('acessar_pdv')" @click="ir_para('/pdv-caixa')" 
+                    :class="rota_atual.path.includes('/pdv-caixa') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>💰</span> PDV / Caixa
             </button>
-            <button @click="ir_para('/mapa-mesas')" 
-                    :class="rota_atual.path.includes('/mapa-mesas') || rota_atual.path.includes('/mesa') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+            <button v-if="tem_permissao('acessar_mesas')" @click="ir_para('/mapa-mesas')" 
+                    :class="rota_atual.path.includes('/mapa-mesas') || rota_atual.path.includes('/mesa') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>🪑</span> Mesas
             </button>
-            <button @click="ir_para('/comandas')" 
-                    :class="rota_atual.path.includes('/comandas') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+            <button v-if="tem_permissao('acessar_comandas')" @click="ir_para('/comandas')" 
+                    :class="rota_atual.path.includes('/comandas') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>📝</span> Comandas
             </button>
-            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" 
-                    :class="rota_atual.path.includes('/produtos') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+            <button v-if="tem_permissao('gerenciar_produtos')" @click="ir_para('/produtos')" 
+                    :class="rota_atual.path.includes('/produtos') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 ml-4">
                 <span>📦</span> Produtos
             </button>
-            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" 
-                    :class="rota_atual.path.includes('/equipe') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+            <button v-if="tem_permissao('gerenciar_equipe')" @click="ir_para('/equipe')" 
+                    :class="rota_atual.path.includes('/equipe') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>👥</span> Equipe
             </button>
-            <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" 
-                    :class="rota_atual.path.includes('/analises') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-gray-50 text-gray-500 border-transparent hover:bg-gray-100'"
+            <button v-if="tem_permissao('ver_analises')" @click="ir_para('/analises')" 
+                    :class="rota_atual.path.includes('/analises') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>📈</span> Análises
             </button>
             <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" 
-                    :class="rota_atual.path.includes('/permissoes') ? 'bg-blue-50 text-blue-700 border-blue-500 border-b-0' : 'bg-[var(--bg-page)] text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
+                    :class="rota_atual.path.includes('/permissoes') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>🔐</span> Permissões
             </button>
             <div class="flex-1"></div>
             <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" 
-                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 mr-2">
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2 bg-purple-500/10 text-purple-600 border-purple-500/20 hover:bg-purple-500/20 mr-2 dark:text-purple-400">
                 <span>⚙️</span> Gestão SaaS
             </button>
             <button @click="abrir_modal_atualizacoes" class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider bg-[var(--bg-page)] text-[var(--text-muted)] hover:bg-green-50 transition-all flex items-center gap-2 relative">
@@ -117,22 +117,22 @@
         <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col md:overflow-hidden overflow-y-auto transition-colors duration-300">
             
             <div v-if="rota_atual.path === '/painel-central'" class="md:hidden p-4 grid grid-cols-2 gap-4 shrink-0">
-                <button @click="ir_para('/pdv-caixa')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('acessar_pdv')" @click="ir_para('/pdv-caixa')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">💰</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">PDV / Caixa</h3>
                 </button>
-                <button @click="ir_para('/mapa-mesas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('acessar_mesas')" @click="ir_para('/mapa-mesas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">🪑</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Mesas</h3>
                 </button>
-                <button @click="ir_para('/comandas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('acessar_comandas')" @click="ir_para('/comandas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📝</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Comandas</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/produtos')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('gerenciar_produtos')" @click="ir_para('/produtos')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📦</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Produtos</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/equipe')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('gerenciar_equipe')" @click="ir_para('/equipe')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">👥</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Equipa</h3>
                 </button>
-                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/analises')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                <button v-if="tem_permissao('ver_analises')" @click="ir_para('/analises')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📈</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Análises</h3>
                 </button>
 
@@ -312,6 +312,14 @@ const abrir_modal_gerar  = () => modal_gerar_visivel.value  = true;
 const fechar_modal_gerar = () => modal_gerar_visivel.value  = false;
 const abrir_modal_leitor  = () => modal_leitor_visivel.value = true;
 const fechar_modal_leitor = () => modal_leitor_visivel.value = false;
+
+// Helpers de Permissão
+const tem_permissao = (permissao) => {
+    const user = auth_store.usuario_logado;
+    if (!user) return false;
+    if (user.tipo_usuario === 'admin_master' || user.tipo_usuario === 'dono') return true;
+    return !!(user.permissoes && user.permissoes[permissao]);
+};
 
 // Após leitura bem-sucedida: fecha o modal e força refresh da view atual
 const ao_sincronizar_sucesso = () => {

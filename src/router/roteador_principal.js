@@ -25,43 +25,43 @@ const rotas_do_aplicativo = [
                 path: '/pdv-caixa',
                 name: 'pdv_frente_caixa',
                 component: () => import('../views/PaginaPdv.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono', 'caixa'] } 
+                meta: { permissao_necessaria: 'acessar_pdv' } 
             },
             {
                 path: '/mapa-mesas',
                 name: 'gestao_mesas',
                 component: () => import('../views/PaginaMesas.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono', 'caixa', 'garcom'] }
+                meta: { permissao_necessaria: 'acessar_mesas' }
             },
             {
                 path: '/mesa/:id_mesa/detalhes',
                 name: 'detalhes_mesa',
                 component: () => import('../views/PaginaMesaDetalhes.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono', 'caixa', 'garcom'] }
+                meta: { permissao_necessaria: 'acessar_mesas' }
             },
             {
                 path: '/comandas',
                 name: 'gestao_comandas',
                 component: () => import('../views/PaginaComandas.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono', 'caixa', 'garcom'] }
+                meta: { permissao_necessaria: 'acessar_comandas' }
             },
             {
                 path: '/produtos',
                 name: 'gestao_produtos',
                 component: () => import('../views/PaginaProdutos.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono'] } 
+                meta: { permissao_necessaria: 'gerenciar_produtos' } 
             },
             {
                 path: '/equipe',
                 name: 'gestao_equipe',
                 component: () => import('../views/PaginaEquipe.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono'] } 
+                meta: { permissao_necessaria: 'gerenciar_equipe' } 
             },
             {
                 path: '/analises',
                 name: 'gestao_analises',
                 component: () => import('../views/PaginaAnalises.vue'),
-                meta: { papeis_permitidos: ['admin_master', 'dono'] }
+                meta: { permissao_necessaria: 'ver_analises' }
             },
             {
                 path: '/permissoes',
@@ -132,6 +132,18 @@ roteador_principal.beforeEach((to, from) => {
         if (!usuario || (!to.meta.papeis_permitidos.includes(usuario.tipo_usuario) && usuario.tipo_usuario !== 'admin_master')) {
             alert(`Acesso negado. O seu perfil (${usuario?.tipo_usuario || 'desconhecido'}) não tem permissão para acessar esta área.`);
             return '/painel-central';
+        }
+    }
+
+    if (to.meta.permissao_necessaria && esta_autenticado) {
+        const usuario = loja_auth.usuario_logado || JSON.parse(localStorage.getItem('nitec_usuario'));
+
+        if (!usuario || (usuario.tipo_usuario !== 'admin_master' && usuario.tipo_usuario !== 'dono')) {
+            const permissoes = usuario?.permissoes || {};
+            if (!permissoes[to.meta.permissao_necessaria]) {
+                alert(`Acesso restrito. O seu perfil não possui a permissão '${to.meta.permissao_necessaria}'.`);
+                return '/painel-central';
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 
 export function useLogicaEquipe() {
@@ -9,6 +10,9 @@ export function useLogicaEquipe() {
 
     const termo_pesquisa = ref('');
     const mostrar_demitidos = ref(false);
+
+    const router = useRouter();
+    const voltar_painel = () => router.push('/painel-central');
 
     // 🟢 Controle de Edição
     const modo_edicao = ref(false);
@@ -117,6 +121,7 @@ export function useLogicaEquipe() {
         carregando, funcionarios_filtrados, modal_aberto, salvando, form,
         termo_pesquisa, mostrar_demitidos, modal_confirmacao, modo_edicao,
         abrir_modal_novo, abrir_modal_edicao, fechar_modal: () => modal_aberto.value = false,
-        salvar_funcionario, alternar_status, pedir_confirmacao, fechar_confirmacao, executar_confirmacao
+        salvar_funcionario, alternar_status, pedir_confirmacao, fechar_confirmacao, executar_confirmacao,
+        voltar_painel
     };
 }

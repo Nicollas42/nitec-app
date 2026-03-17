@@ -1,11 +1,15 @@
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js'; // 🟢 Importando o Toast Global
 
 export function useLogicaPermissoes() {
     const toast_store = useToastStore(); // 🟢 Instanciando
+    const router = useRouter();
     const carregando = ref(true); 
     const matriz_permissoes = ref([]);
+
+    const voltar_painel = () => router.push('/painel-central');
 
     const perfis = ['caixa', 'garcom', 'gerente'];
     
@@ -23,12 +27,8 @@ export function useLogicaPermissoes() {
 
     const carregar_permissoes_atuais = async () => {
         try {
-            // Mock de dados atualizado com as novas chaves (em breve virá da API)
-            matriz_permissoes.value = [
-                { perfil: 'caixa', acessar_pdv: true, acessar_mesas: true, acessar_comandas: true, cancelar_vendas: false, aplicar_desconto: true, gerenciar_produtos: false, gerenciar_equipe: false, ver_analises: false },
-                { perfil: 'garcom', acessar_pdv: false, acessar_mesas: true, acessar_comandas: true, cancelar_vendas: false, aplicar_desconto: false, gerenciar_produtos: false, gerenciar_equipe: false, ver_analises: false },
-                { perfil: 'gerente', acessar_pdv: true, acessar_mesas: true, acessar_comandas: true, cancelar_vendas: true, aplicar_desconto: true, gerenciar_produtos: true, gerenciar_equipe: true, ver_analises: true }
-            ];
+            const resposta = await api_cliente.get('/permissoes');
+            matriz_permissoes.value = resposta.data;
         } catch (erro) {
             console.error(erro);
             toast_store.exibir_toast("Erro ao carregar permissões", "erro");
@@ -39,11 +39,10 @@ export function useLogicaPermissoes() {
 
     const salvar_permissoes = async () => {
         try {
-            // Simulando o tempo de salvamento na API
-            setTimeout(() => {
-                toast_store.exibir_toast("Permissões atualizadas com sucesso!", "sucesso"); // 🟢 Usando o Pop-up Global
-            }, 800);
+            await api_cliente.post('/permissoes', { matriz: matriz_permissoes.value });
+            toast_store.exibir_toast("Permissões atualizadas com sucesso!", "sucesso");
         } catch (erro) {
+            console.error(erro);
             toast_store.exibir_toast("Erro ao salvar permissões", "erro");
         }
     };
@@ -52,5 +51,5 @@ export function useLogicaPermissoes() {
         carregar_permissoes_atuais();
     });
 
-    return { carregando, matriz_permissoes, perfis, modulos, salvar_permissoes };
+    return { carregando, matriz_permissoes, perfis, modulos, salvar_permissoes, voltar_painel };
 }

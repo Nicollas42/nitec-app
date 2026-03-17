@@ -1,4 +1,5 @@
 import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js';
 
@@ -6,7 +7,10 @@ export function useLogicaAnalises() {
     const carregando = ref(true);
     const dados_dashboard = ref(null);
     const aba_ativa = ref('inteligência'); 
-    const toast_global = useToastStore(); 
+    const toast_global = useToastStore();
+    const router = useRouter();
+
+    const voltar_painel = () => router.push('/painel-central');
 
     // 🟢 TODOS os gráficos registados aqui para não sumirem!
     const visibilidade = ref({
@@ -134,6 +138,7 @@ export function useLogicaAnalises() {
         produtos_comparador, formatarDataLog,
         filtro_auditoria_texto, filtro_auditoria_tipo, log_auditoria_filtrado,
         modal_config_visivel, hora_virada_turno, salvar_config_turno,
-        modal_recibo_visivel, comanda_selecionada, abrir_recibo_auditoria, fechar_modal_recibo 
+        modal_recibo_visivel, comanda_selecionada, abrir_recibo_auditoria, fechar_modal_recibo,
+        voltar_painel
     };
 }

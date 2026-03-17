@@ -1,19 +1,19 @@
 <template>
     <div class="flex flex-col relative w-full">
         <div class="flex justify-between items-end mb-2 px-2">
-            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Painel de Comparador de Vendas</span>
-            <button @click="$emit('alternar')" class="text-gray-500 hover:text-blue-600 font-bold flex items-center gap-1 text-[10px] uppercase tracking-widest transition-colors px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm bg-white hover:bg-gray-50">
+            <span class="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest ml-2">Painel de Comparador de Vendas</span>
+            <button @click="$emit('alternar')" class="text-[var(--text-muted)] hover:text-blue-500 font-bold flex items-center gap-1 text-[10px] uppercase tracking-widest transition-colors px-3 py-1.5 rounded-lg border border-[var(--border-subtle)] shadow-sm bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)]">
                 {{ visivel ? '👁️ Ocultar Comparador' : '👁️‍🗨️ Mostrar Comparador' }}
             </button>
         </div>
 
-        <div v-show="visivel" class="bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col relative">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-gray-100 gap-4 bg-gray-50 rounded-t-3xl">
+        <div v-show="visivel" class="bg-[var(--bg-card)] rounded-3xl shadow-sm border border-[var(--border-subtle)] flex flex-col relative transition-colors duration-300">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-[var(--border-subtle)] gap-4 bg-[var(--bg-page)] rounded-t-3xl transition-colors duration-300">
                 
                 <div class="flex items-center gap-2">
-                    <h2 class="text-sm font-black text-gray-800 uppercase">Guerra de Produtos</h2>
+                    <h2 class="text-sm font-black text-[var(--text-primary)] uppercase">Guerra de Produtos</h2>
                     <div class="relative group">
-                        <span class="cursor-pointer text-gray-400 hover:text-blue-500 bg-white border border-gray-200 rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
+                        <span class="cursor-pointer text-[var(--text-muted)] hover:text-blue-500 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
                         <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">
                             <p>Selecione até 5 produtos diferentes na lista ao lado e cruze o desempenho deles ao longo das 24 horas para descobrir em que período vendem mais.</p>
                             <div class="absolute top-full left-4 border-4 border-transparent border-t-gray-800"></div>
@@ -22,25 +22,25 @@
                 </div>
 
                 <div class="relative w-full md:w-72" ref="containerMenu">
-                    <button @click="menu_aberto = !menu_aberto" class="w-full bg-white border border-gray-200 text-xs font-black uppercase tracking-widest rounded-xl p-3 outline-none text-nitec_blue shadow-sm flex justify-between items-center hover:border-nitec_blue transition-colors">
+                    <button @click="menu_aberto = !menu_aberto" class="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] text-xs font-black uppercase tracking-widest rounded-xl p-3 outline-none text-nitec_blue shadow-sm flex justify-between items-center hover:border-nitec_blue transition-colors">
                         <span>📊 Comparar ({{ (produtosSelecionados || []).length }}/5)</span>
-                        <span class="text-gray-400" :class="menu_aberto ? 'rotate-180' : ''">▼</span>
+                        <span class="text-[var(--text-muted)] transition-transform duration-300" :class="menu_aberto ? 'rotate-180' : ''">▼</span>
                     </button>
                     
-                    <div v-if="menu_aberto" class="absolute right-0 top-full mt-2 w-full md:w-80 bg-white border border-gray-200 rounded-2xl shadow-2xl z-[200] max-h-64 overflow-y-auto custom-scrollbar p-2">
-                        <label v-for="p in produtos_disponiveis" :key="p.produto_id" class="flex items-center gap-3 p-3 hover:bg-blue-50 rounded-xl cursor-pointer transition-colors border-b border-gray-50 last:border-0 group">
-                            <input type="checkbox" :value="p.produto_id" v-model="selecionados_locais" :disabled="selecionados_locais.length >= 5 && !selecionados_locais.includes(p.produto_id)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500">
-                            <span class="text-xs font-bold text-gray-700 group-hover:text-blue-700">{{ p.nome_produto }}</span>
+                    <div v-if="menu_aberto" class="absolute right-0 top-full mt-2 w-full md:w-80 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl z-[200] max-h-64 overflow-y-auto custom-scrollbar p-2 transition-colors duration-300">
+                        <label v-for="p in produtos_disponiveis" :key="p.produto_id" class="flex items-center gap-3 p-3 hover:bg-[var(--bg-card-hover)] rounded-xl cursor-pointer transition-colors border-b border-[var(--border-subtle)] last:border-0 group">
+                            <input type="checkbox" :value="p.produto_id" v-model="selecionados_locais" :disabled="selecionados_locais.length >= 5 && !selecionados_locais.includes(p.produto_id)" class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 bg-[var(--bg-page)] border-[var(--border-subtle)]">
+                            <span class="text-xs font-bold text-[var(--text-primary)] group-hover:text-blue-500">{{ p.nome_produto }}</span>
                         </label>
-                        <div v-if="!produtos_disponiveis || produtos_disponiveis.length === 0" class="p-3 text-xs text-gray-400 text-center italic">Nenhum produto para comparar.</div>
+                        <div v-if="!produtos_disponiveis || produtos_disponiveis.length === 0" class="p-3 text-xs text-[var(--text-muted)] text-center italic">Nenhum produto para comparar.</div>
                     </div>
                 </div>
             </div>
 
             <div class="p-6">
-                <div class="h-72 w-full bg-gray-50 rounded-2xl p-4 shadow-inner border border-gray-100">
+                <div class="h-72 w-full bg-[var(--bg-page)] rounded-2xl p-4 shadow-inner border border-[var(--border-subtle)] transition-colors duration-300">
                     <Line v-if="dados_grafico" :data="dados_grafico" :options="opcoes_grafico" />
-                    <div v-else class="h-full flex items-center justify-center text-xs text-gray-400 font-medium italic">Selecione ao menos um produto no menu acima para gerar o gráfico.</div>
+                    <div v-else class="h-full flex items-center justify-center text-xs text-[var(--text-muted)] font-medium italic">Selecione ao menos um produto no menu acima para gerar o gráfico.</div>
                 </div>
             </div>
         </div>

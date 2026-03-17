@@ -1,13 +1,13 @@
 <template>
-    <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="p-6 bg-red-50 border-b border-red-100 flex items-center gap-3">
+    <div class="bg-[var(--bg-card)] rounded-3xl shadow-sm border border-[var(--border-subtle)] overflow-hidden transition-colors duration-300">
+        <div class="p-6 bg-red-500/10 border-b border-red-500/20 flex items-center gap-3">
             <span class="text-xl">⚠️</span>
-            <h2 class="text-sm font-black text-red-800 uppercase tracking-tight">Estoque Sem Giro</h2>
+            <h2 class="text-sm font-black text-red-500 uppercase tracking-tight">Estoque Sem Giro</h2>
         </div>
         
         <div class="max-h-[500px] overflow-y-auto custom-scrollbar">
             <table class="w-full text-left text-sm">
-                <thead class="bg-white text-gray-400 sticky top-0 z-10 border-b border-gray-100 shadow-sm text-[9px] uppercase tracking-widest font-bold">
+                <thead class="bg-[var(--bg-page)] text-[var(--text-muted)] sticky top-0 z-10 border-b border-[var(--border-subtle)] shadow-sm text-[9px] uppercase tracking-widest font-bold transition-colors duration-300">
                     <tr>
                         <th class="py-3 px-5">Produto</th>
                         <th class="py-3 px-5 text-center">Tempo Parado</th>
@@ -16,31 +16,31 @@
                         <th class="py-3 px-5 text-right text-red-500">Risco (Prejuízo)</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-50">
-                    <tr v-for="p in encalhados" :key="p.nome_produto" class="hover:bg-red-50/30 transition-colors">
-                        <td class="p-5 font-bold text-gray-700">{{ p.nome_produto }}</td>
+                <tbody class="divide-y divide-[var(--border-subtle)] transition-colors duration-300">
+                    <tr v-for="p in encalhados" :key="p.nome_produto" class="hover:bg-red-500/5 transition-colors">
+                        <td class="p-5 font-bold text-[var(--text-primary)]">{{ p.nome_produto }}</td>
                         
                         <td class="p-5 text-center">
-                            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-200">
+                            <span class="bg-red-500/10 text-red-500 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-500/20">
                                 {{ (p.dias_sem_venda !== undefined && p.dias_sem_venda !== null) ? p.dias_sem_venda + ' Dias' : 'S/ Reg.' }}
                             </span>
                         </td>
 
                         <td class="p-5 text-center">
                             <span v-if="p.data_validade" 
-                                  :class="estaVencido(p.data_validade) ? 'bg-red-500 text-white border-red-600 shadow-sm' : 'bg-gray-100 text-gray-600 border-gray-200'" 
+                                  :class="estaVencido(p.data_validade) ? 'bg-red-500 text-white border-red-600 shadow-sm' : 'bg-[var(--bg-page)] text-[var(--text-muted)] border-[var(--border-subtle)]'" 
                                   class="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border">
                                 {{ estaVencido(p.data_validade) ? '⚠️ Vencido' : formatarData(p.data_validade) }}
                             </span>
-                            <span v-else class="text-[10px] font-bold text-gray-300 uppercase tracking-widest">N/A</span>
+                            <span v-else class="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">N/A</span>
                         </td>
 
-                        <td class="p-5 text-center font-bold text-gray-500">{{ p.estoque_atual }} un.</td>
+                        <td class="p-5 text-center font-bold text-[var(--text-muted)]">{{ p.estoque_atual }} un.</td>
                         
                         <td class="p-5 text-right font-black text-red-500 tracking-tight">R$ {{ p.prejuizo_potencial }}</td>
                     </tr>
                     <tr v-if="!encalhados || encalhados.length === 0">
-                        <td colspan="5" class="p-8 text-center text-xs text-gray-400 font-medium italic">O seu estoque está a girar perfeitamente!</td>
+                        <td colspan="5" class="p-8 text-center text-xs text-[var(--text-muted)] font-medium italic">O seu estoque está a girar perfeitamente!</td>
                     </tr>
                 </tbody>
             </table>
