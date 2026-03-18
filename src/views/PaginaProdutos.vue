@@ -285,6 +285,7 @@ const {
     produtos_filtrados, termo_pesquisa, voltar_painel,
     modal_novo_produto, formulario_dados, salvar_produto, salvando, modo_edicao,
     abrir_modal_novo, abrir_modal_edicao,
-    modal_perda, formulario_perda, abrir_modal_perda, registrar_perda, registrando_perda 
+    modal_perda, formulario_perda, abrir_modal_perda, registrar_perda, registrando_perda,
+    modal_entrada, formulario_entrada, abrir_modal_entrada, registrar_entrada, registrando_entrada
 } = useLogicaProdutos();
 </script>

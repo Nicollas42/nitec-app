@@ -32,13 +32,29 @@
 
                 <div v-for="produto in produtos_vitrine" :key="produto.id" class="relative group h-28">
                     <button @click="id_comanda_pagamento ? null : adicionar_ao_carrinho(produto)" 
-                            :class="id_comanda_pagamento ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-nitec_blue hover:shadow-md active:scale-95'"
+                            :class="[
+                                id_comanda_pagamento ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-nitec_blue hover:shadow-md active:scale-95',
+                                quantidade_selecionada(produto.id) > 0 ? 'opacity-80 border-nitec_blue/40 bg-nitec_blue/5' : '',
+                                tem_excedente(produto) ? 'border-orange-400 bg-orange-500/10 opacity-90' : ''
+                            ]"
                             class="w-full h-full p-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] transition-all flex flex-col items-center justify-center text-center overflow-hidden">
                         
                         <span class="text-sm font-bold text-[var(--text-primary)] leading-tight mb-2 line-clamp-2 w-full px-2">{{ produto.nome_produto }}</span>
                         <span class="text-lg font-black text-green-500">R$ {{ Number(produto.preco_venda).toFixed(2) }}</span>
                         
-                        <div class="absolute top-0 left-0 bg-[var(--bg-page)] text-[var(--text-muted)] text-[9px] font-black px-2 py-1 rounded-br-lg border-b border-r border-[var(--border-subtle)]">QTD: {{ produto.estoque_atual }}</div>
+                        <div class="absolute top-0 left-0 bg-[var(--bg-page)] text-[var(--text-muted)] text-[9px] font-black px-2 py-1 rounded-br-lg border-b border-r border-[var(--border-subtle)]">
+                            DISP: {{ estoque_disponivel_visual(produto) }}
+                        </div>
+
+                        <div v-if="quantidade_selecionada(produto.id) > 0"
+                             class="absolute bottom-0 right-0 bg-nitec_blue text-white text-[9px] font-black px-2 py-1 rounded-tl-lg border-t border-l border-white/10">
+                            {{ quantidade_selecionada(produto.id) }} no carrinho
+                        </div>
+
+                        <div v-if="tem_excedente(produto)"
+                             class="absolute inset-x-2 bottom-7 rounded-lg border border-orange-400/40 bg-orange-500/15 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-orange-500">
+                            +{{ quantidade_excedente(produto) }} entrada forcada
+                        </div>
                     </button>
 
                     <button @click.stop="alternar_fixacao(produto.id)" 
@@ -168,6 +184,7 @@ const {
     carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
     adicionar_ao_carrinho, remover_do_carrinho, 
     subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
+    quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
     id_comanda_vinculada, id_comanda_pagamento, carrinho_expandido, processar_acao_principal, voltar_painel,
 } = useLogicaPdv();
 </script>

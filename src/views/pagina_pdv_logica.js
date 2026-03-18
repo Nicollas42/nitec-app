@@ -31,6 +31,7 @@ export function useLogicaPdv() {
     const termo_pesquisa = ref('');
     const categoria_selecionada = ref('todas');
     const produtos_fixados = ref(JSON.parse(localStorage.getItem('nitec_pdv_fixados') || '[]'));
+    const avisos_excedente_emitidos = ref({});
 
     const gerarUUID = () => {
         return typeof crypto !== 'undefined' && crypto.randomUUID 
@@ -66,6 +67,63 @@ export function useLogicaPdv() {
             return a.nome_produto.localeCompare(b.nome_produto);
         });
     });
+
+    const quantidade_selecionada_por_produto = computed(() => {
+        return carrinho_venda.value.reduce((mapa, item) => {
+            mapa[item.id] = (mapa[item.id] || 0) + Number(item.quantidade || 0);
+            return mapa;
+        }, {});
+    });
+
+    const obter_estoque_numerico = (produto) => Math.max(0, Number(produto?.estoque_atual) || 0);
+    const quantidade_selecionada = (produto_id) => quantidade_selecionada_por_produto.value[produto_id] || 0;
+    const estoque_disponivel_visual = (produto) => Math.max(0, obter_estoque_numerico(produto) - quantidade_selecionada(produto.id));
+    const quantidade_excedente = (produto) => Math.max(0, quantidade_selecionada(produto.id) - obter_estoque_numerico(produto));
+    const tem_excedente = (produto) => quantidade_excedente(produto) > 0;
+
+    const limpar_aviso_excedente = (produto_id) => {
+        if (!avisos_excedente_emitidos.value[produto_id]) return;
+        delete avisos_excedente_emitidos.value[produto_id];
+        avisos_excedente_emitidos.value = { ...avisos_excedente_emitidos.value };
+    };
+
+    const marcar_aviso_excedente = (produto_id) => {
+        avisos_excedente_emitidos.value = { ...avisos_excedente_emitidos.value, [produto_id]: true };
+    };
+
+    const calcular_excedentes_carrinho = () => {
+        return carrinho_venda.value
+            .map(item => {
+                const estoque_atual = obter_estoque_numerico(item);
+                const excedente = Math.max(0, Number(item.quantidade || 0) - estoque_atual);
+                return excedente > 0 ? { item, excedente } : null;
+            })
+            .filter(Boolean);
+    };
+
+    const registrar_entradas_forcadas = async () => {
+        const excedentes = calcular_excedentes_carrinho();
+        if (excedentes.length === 0) return;
+
+        for (const { item, excedente } of excedentes) {
+            const payload = {
+                produto_id: item.id,
+                nome_produto: item.nome_produto,
+                quantidade: excedente,
+                custo_unitario: Number(item.preco_custo || 0),
+                fornecedor: 'Entrada Forcada via PDV'
+            };
+
+            try {
+                await api_cliente.post('/estoque/registrar-entrada', payload);
+            } catch (e) {
+                console.error('Falha ao registrar entrada forcada:', e);
+                const erro = new Error(e.response?.data?.mensagem || `Nao foi possivel registrar a Entrada Forcada de ${item.nome_produto}.`);
+                erro.entrada_forcada = true;
+                throw erro;
+            }
+        }
+    };
 
     const recarregar_dados_comanda = async () => {
         const id = id_comanda_pagamento.value || id_comanda_vinculada.value;
@@ -170,6 +228,7 @@ export function useLogicaPdv() {
         id_comanda_pagamento.value = novaQuery.pagamento || null;
         id_mesa_atual.value = null;
         carrinho_venda.value = [];
+        avisos_excedente_emitidos.value = {};
         itens_ja_lancados.value = [];
         acoes_pendentes_db.value = []; 
         valor_desconto.value = '';
@@ -203,16 +262,45 @@ export function useLogicaPdv() {
 
     const adicionar_ao_carrinho = (p) => {
         const item = carrinho_venda.value.find(i => i.id === p.id);
+        const estoque_atual = obter_estoque_numerico(p);
+
         if (item) item.quantidade += 1;
         else carrinho_venda.value.push({ ...p, quantidade: 1 });
+
+        const quantidade_atual = quantidade_selecionada(p.id);
+        if (quantidade_atual > estoque_atual) {
+            if (!avisos_excedente_emitidos.value[p.id]) {
+                toast_global.exibir_toast(`Estoque cadastrado insuficiente para ${p.nome_produto}. O excedente sera lancado como Entrada Forcada.`, "aviso");
+                marcar_aviso_excedente(p.id);
+            }
+        } else {
+            limpar_aviso_excedente(p.id);
+        }
     };
 
-    const remover_do_carrinho = (idx) => carrinho_venda.value.splice(idx, 1);
+    const remover_do_carrinho = (idx) => {
+        const item = carrinho_venda.value[idx];
+        carrinho_venda.value.splice(idx, 1);
+        if (item) limpar_aviso_excedente(item.id);
+    };
 
     const alterar_quantidade_novo = (idx, acao) => {
-        if (acao === 'incrementar') carrinho_venda.value[idx].quantidade++;
+        const item = carrinho_venda.value[idx];
+        if (!item) return;
+
+        if (acao === 'incrementar') {
+            item.quantidade++;
+            const estoque_atual = obter_estoque_numerico(item);
+            if (item.quantidade > estoque_atual && !avisos_excedente_emitidos.value[item.id]) {
+                toast_global.exibir_toast(`Estoque cadastrado insuficiente para ${item.nome_produto}. O excedente sera lancado como Entrada Forcada.`, "aviso");
+                marcar_aviso_excedente(item.id);
+            }
+        }
         else if (acao === 'decrementar') {
-            if (carrinho_venda.value[idx].quantidade > 1) carrinho_venda.value[idx].quantidade--;
+            if (item.quantidade > 1) {
+                item.quantidade--;
+                if (item.quantidade <= obter_estoque_numerico(item)) limpar_aviso_excedente(item.id);
+            }
             else remover_do_carrinho(idx);
         }
     };
@@ -266,6 +354,7 @@ export function useLogicaPdv() {
         if (id_comanda_pagamento.value) {
             try {
                 if (typeof sincronizar_pendencias_bd === 'function') await sincronizar_pendencias_bd(); 
+                await registrar_entradas_forcadas();
                 if (carrinho_venda.value.length > 0) {
                     const payload_add = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
                     await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_pagamento.value}`, payload_add);
@@ -277,13 +366,17 @@ export function useLogicaPdv() {
                 roteador.push('/mapa-mesas');
                 toast_global.exibir_toast(res.data.mensagem || "Processado com sucesso!", "sucesso"); 
             } catch (e) { 
+                if (e.entrada_forcada) {
+                    toast_global.exibir_toast(e.message, "erro");
+                    return;
+                }
                 if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_pgto = gerarUUID();
                     const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento, uuid_operacao: uuid_pgto });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Pagamento salvo no PC!", "aviso");
                     roteador.push('/mapa-mesas');
-                } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao processar pagamento.", "erro"); 
+                } else toast_global.exibir_toast(e.message || e.response?.data?.mensagem || "Erro ao processar pagamento.", "erro"); 
             } finally { processando_finalizacao.value = false; }
             return;
         }
@@ -296,6 +389,7 @@ export function useLogicaPdv() {
                     toast_global.exibir_toast("✔️ Comanda atualizada com sucesso!", "sucesso");
                     return roteador.go(-1);
                 }
+                await registrar_entradas_forcadas();
                 const uuid_add = gerarUUID();
                 const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
                 
@@ -305,11 +399,16 @@ export function useLogicaPdv() {
                 
                 loja_produtos.buscar_produtos(true);
                 carrinho_venda.value = [];
+                avisos_excedente_emitidos.value = {};
                 roteador.go(-1);
                 
             } catch (e) { 
                 // SÓ ENTRA AQUI SE A NUVEM E O SERVIDOR LOCAL FALHAREM
                 console.error("Falha ao adicionar itens (VPS e Local):", e);
+                if (e.entrada_forcada) {
+                    toast_global.exibir_toast(e.message, "erro");
+                    return;
+                }
                 if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_add = gerarUUID();
                     const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
@@ -326,9 +425,10 @@ export function useLogicaPdv() {
 
                     toast_global.exibir_toast("⚠️ Sobrevivência: Lançamento salvo no telemóvel!", "aviso");
                     carrinho_venda.value = [];
+                    avisos_excedente_emitidos.value = {};
                     roteador.go(-1);
                 } else {
-                    toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
+                    toast_global.exibir_toast(e.message || e.response?.data?.mensagem || "Erro ao atualizar a comanda.", "erro"); 
                 }
             } finally { processando_finalizacao.value = false; }
         
@@ -337,16 +437,23 @@ export function useLogicaPdv() {
             const uuid_balcao = gerarUUID();
             const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_balcao };
             try {
+                await registrar_entradas_forcadas();
                 await api_cliente.post('/venda-balcao', payload);
                 toast_global.exibir_toast("💸 Venda Balcão concluída!", "sucesso"); 
                 carrinho_venda.value = [];
+                avisos_excedente_emitidos.value = {};
                 valor_desconto.value = '';
                 loja_produtos.buscar_produtos(true); 
             } catch (e) { 
+                if (e.entrada_forcada) {
+                    toast_global.exibir_toast(e.message, "erro");
+                    return;
+                }
                 if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: '/venda-balcao', metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_balcao });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Venda Balcão salva no PC!", "aviso");
                     carrinho_venda.value = [];
+                    avisos_excedente_emitidos.value = {};
                     valor_desconto.value = '';
                 } else toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao processar venda balcão.", "erro"); 
             } finally { processando_finalizacao.value = false; }
@@ -360,6 +467,7 @@ export function useLogicaPdv() {
         produtos_fixados, alternar_fixacao,
         carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
         adicionar_ao_carrinho, remover_do_carrinho, alterar_quantidade_novo,
+        quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
         subtotal_comanda, valor_final_comanda, valor_desconto, 
         id_comanda_vinculada, id_comanda_pagamento, 
         carrinho_expandido, // 🟢 Estado de UI mobile exportado

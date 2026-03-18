@@ -135,26 +135,8 @@
                 <button v-if="tem_permissao('ver_analises')" @click="ir_para('/analises')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📈</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Análises</h3>
                 </button>
-
-                <!-- 🟢 Botões QR Sync no menu mobile — col-span-full -->
-                <button @click="abrir_modal_gerar"
-                        :class="esta_offline ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-gray-200'"
-                        class="p-5 rounded-2xl shadow-sm border flex items-center gap-3 col-span-2">
-                    <span class="text-3xl">📤</span>
-                    <div class="text-left">
-                        <h3 :class="esta_offline ? 'text-orange-700' : 'text-gray-700'" class="font-black uppercase text-sm">Gerar QR Sync</h3>
-                        <p :class="esta_offline ? 'text-orange-400' : 'text-gray-400'" class="text-[10px] font-bold mt-0.5">
-                            {{ esta_offline ? 'Compartilhe seus dados offline' : 'Gerar código para outro dispositivo' }}
-                        </p>
-                    </div>
-                </button>
-                <button @click="abrir_modal_leitor"
-                        class="bg-blue-50 border-blue-100 p-5 rounded-2xl shadow-sm border flex items-center gap-3 col-span-2">
-                    <span class="text-3xl">📥</span>
-                    <div class="text-left">
-                        <h3 class="text-blue-700 font-black uppercase text-sm">Ler QR Sync</h3>
-                        <p class="text-blue-400 text-[10px] font-bold mt-0.5">Receber dados de outro dispositivo</p>
-                    </div>
+                <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
+                    <span class="text-4xl mb-2">🔐</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Permissões</h3>
                 </button>
 
                 <button v-if="auth_store.usuario_logado?.tipo_usuario === 'admin_master'" @click="ir_para('/admin-estabelecimentos')" class="bg-purple-50 p-6 rounded-2xl shadow-sm border border-purple-200 flex flex-col items-center col-span-2">
@@ -326,3 +308,29 @@ const ao_sincronizar_sucesso = () => {
     fechar_modal_leitor();
 };
 </script>
+
+<style scoped>
+/* 📱 Otimização para Mobile em Paisagem (Landscape) */
+@media (max-width: 1024px) and (orientation: landscape) {
+    .barra_topo {
+        display: none !important;
+    }
+    
+    .painel_principal {
+        height: 100vh;
+        height: -webkit-fill-available;
+    }
+
+    /* Garante que o conteúdo ocupe o espaço do header removido */
+    .conteudo_principal {
+        margin-top: 0;
+    }
+}
+
+/* Ajustes finos para o grid mobile */
+@media (max-width: 640px) {
+    .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+</style>
