@@ -18,6 +18,19 @@ export const configurar_url_base = (codigo_loja = null) => {
     return `${protocolo}://${dominio_final}/api`;
 };
 
+/**
+ * Encaminha uma pergunta em linguagem natural para o agente de IA via VPS.
+ *
+ * @param {{ pergunta: string, limite_linhas?: number }} payload_consulta
+ * @returns {Promise<import('axios').AxiosResponse<any>>}
+ */
+export const consultar_agente_ia = (payload_consulta) => {
+    return api_cliente.post('/agente-ia/consultar-pergunta', payload_consulta, {
+        timeout: 120000,
+        _ignorar_fallback_local: true,
+    });
+};
+
 // ─── Utilitário: obtém URL do servidor local (Movido para o topo) ────────────
 
 const obter_url_servidor_local = async () => {
@@ -68,7 +81,7 @@ api_cliente.interceptors.request.use(async (config) => {
     // Vai direto ao servidor local se:
     // (a) navigator diz offline, OU
     // (b) circuit breaker está aberto (VPS falhou recentemente)
-    if (!navigator.onLine || _vps_bloqueada()) {
+    if (!config._ignorar_fallback_local && (!navigator.onLine || _vps_bloqueada())) {
         const url_local = await obter_url_servidor_local();
         if (url_local) {
             config.baseURL            = `${url_local}/api`;
@@ -110,6 +123,10 @@ api_cliente.interceptors.response.use((response) => {
     // 🟢 CORREÇÃO: Tratar o 404 (Not Found) e o 0 (Network Error) como falhas legítimas para o Plano B
     const erro_critico = !error.response || error.response.status >= 500 || error.response.status === 404 || error.response.status === 0;
     const config_original = error.config;
+
+    if (config_original?._ignorar_fallback_local) {
+        return Promise.reject(error);
+    }
 
     if (erro_critico && config_original && !config_original._tentou_local) {
         config_original._tentou_local = true;
