@@ -78,6 +78,33 @@ const calcular_preco_custo_medio_local = (estoque_atual, preco_custo_medio_atual
     return Number(((valor_total_anterior + Number(custo_total_entrada || 0)) / estoque_total).toFixed(2));
 };
 
+/**
+ * Cria um novo lote local para manter o detalhamento do estoque offline por entrada.
+ */
+const atualizar_estoque_por_origem_local = (produto, quantidade_entrada, custo_total_entrada, data_validade_lote = null) => {
+    const estoque_por_fornecedor = Array.isArray(produto.estoque_por_fornecedor)
+        ? [...produto.estoque_por_fornecedor]
+        : [];
+    const custo_unitario_medio_entrada = Number(quantidade_entrada || 0) > 0
+        ? Number(custo_total_entrada || 0) / Number(quantidade_entrada || 1)
+        : 0;
+
+    estoque_por_fornecedor.push({
+        lote_id: `local_lote_${uuid()}`,
+        fornecedor_id: null,
+        nome_fornecedor: null,
+        nome_exibicao: 'Producao Interna / Sem Fornecedor',
+        quantidade_atual: Number(quantidade_entrada || 0),
+        preco_custo_medio: Number(custo_unitario_medio_entrada.toFixed(2)),
+        data_validade: data_validade_lote || produto.data_validade || null,
+        primeira_entrada_em: new Date().toISOString(),
+    });
+
+    return estoque_por_fornecedor.sort((lote_a, lote_b) => {
+        return String(lote_a.primeira_entrada_em || '').localeCompare(String(lote_b.primeira_entrada_em || ''));
+    });
+};
+
 // ─── Rotas da API ─────────────────────────────────────────────────────────────
 
 const configurar_rotas = (app_express) => {
@@ -141,7 +168,7 @@ const configurar_rotas = (app_express) => {
      * Regista no servidor local apenas ajustes de estoque gerados pelo PDV.
      */
     app_express.post('/api/estoque/registrar-entrada', (req, res) => {
-        const { modo_entrada, produto_id, quantidade_comprada, custo_unitario_compra } = req.body || {};
+        const { modo_entrada, produto_id, quantidade_comprada, custo_unitario_compra, data_validade_lote } = req.body || {};
 
         if (modo_entrada !== 'ajuste_pdv') {
             return res.status(422).json({
@@ -179,11 +206,15 @@ const configurar_rotas = (app_express) => {
             quantidade_normalizada,
             custo_total_entrada
         );
+        const estoque_por_fornecedor = atualizar_estoque_por_origem_local(produto, quantidade_normalizada, custo_total_entrada, data_validade_lote || null);
 
         produtos[indice_produto] = {
             ...produto,
             estoque_atual: novo_estoque,
             preco_custo_medio: novo_preco_custo_medio,
+            data_validade: data_validade_lote || produto.data_validade || null,
+            pode_expandir_estoque: estoque_por_fornecedor.length > 1,
+            estoque_por_fornecedor,
         };
 
         salvar_json('produtos_cache.json', produtos);

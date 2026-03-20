@@ -4,34 +4,22 @@ import { storeToRefs } from 'pinia';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
 
-/**
- * Constroi um alias vazio para o formulario de produto.
- *
- * @returns {{ id: number|null, codigo_barras: string, descricao_variacao: string }}
- */
+// ─── Fábricas de estado vazio ────────────────────────────────────────────────
+
 const criar_alias_vazio = () => ({
     id: null,
     codigo_barras: '',
     descricao_variacao: '',
 });
 
-/**
- * Constroi um vinculo vazio entre produto e fornecedor.
- *
- * @returns {{ fornecedor_id: number|null, codigo_sku_fornecedor: string, fator_conversao: number, ultimo_preco_compra: string|number }}
- */
 const criar_vinculo_fornecedor_vazio = () => ({
     fornecedor_id: null,
     codigo_sku_fornecedor: '',
+    unidade_embalagem: 'CX',
     fator_conversao: 1,
-    ultimo_preco_compra: '',
+    custo_embalagem: '',
 });
 
-/**
- * Constroi o estado padrao do formulario rapido de fornecedor.
- *
- * @returns {{ nome_fantasia: string, razao_social: string, cnpj: string, telefone: string, email: string, vendedor: string, contato_vendedor: string, status_fornecedor: string }}
- */
 const criar_formulario_fornecedor_vazio = () => ({
     nome_fantasia: '',
     razao_social: '',
@@ -43,47 +31,71 @@ const criar_formulario_fornecedor_vazio = () => ({
     status_fornecedor: 'ativo',
 });
 
-/**
- * Centraliza a logica da tela de produtos, entradas e fornecedores.
- */
+// ─── Composable principal ────────────────────────────────────────────────────
+
 export function use_logica_produtos() {
     const roteador = useRouter();
     const loja_produtos = useProdutosStore();
     const { lista_produtos } = storeToRefs(loja_produtos);
 
+    // ── Estado de navegação ──────────────────────────────────────────────────
+    const aba_ativa = ref('estoque');
     const termo_pesquisa = ref('');
+    const filtro_fornecedor_id = ref('');
+    const produto_expandido_ids = ref({});
 
-    const modal_novo_produto = ref(false);
+    // ── Estado do formulário de produto ─────────────────────────────────────
     const carregando_produto = ref(false);
     const salvando = ref(false);
+    const produto_excluindo_id = ref(null);
     const modo_edicao = ref(false);
     const id_edicao = ref(null);
 
+    // ── Estado dos modais de estoque ─────────────────────────────────────────
     const modal_perda = ref(false);
     const registrando_perda = ref(false);
-
     const modal_entrada = ref(false);
     const registrando_entrada = ref(false);
     const termo_fornecedor_entrada = ref('');
     const dropdown_fornecedor_entrada_aberto = ref(false);
+
+    /**
+     * Detalhes completos do produto aberto no modal de entrada.
+     * Contém os fornecedores_vinculados do produto para filtrar o dropdown.
+     */
     const detalhes_produto_entrada = ref(null);
 
-    const modal_novo_fornecedor = ref(false);
+    // ── Estado do formulário de fornecedor ───────────────────────────────────
     const salvando_fornecedor = ref(false);
-    const contexto_modal_fornecedor = ref('produto');
+    const fornecedor_excluindo_id = ref(null);
 
+    /**
+     * 'produto' = formulário aberto pelo fluxo de cadastro de produto
+     * 'entrada' = formulário aberto pelo modal de entrada de estoque
+     * 'fornecedores' = aberto diretamente da aba fornecedores
+     */
+    const contexto_modal_fornecedor = ref('fornecedores');
+    const modo_edicao_fornecedor = ref(false);
+    const fornecedor_edicao_id = ref(null);
+    const formulario_fornecedor_minimizado = ref(false);
+
+    // ── Listas carregadas do backend ─────────────────────────────────────────
     const lista_fornecedores = ref([]);
+
+    // ── Formulários reativos ─────────────────────────────────────────────────
 
     const formulario_dados = reactive({
         nome_produto: '',
         codigo_interno: '',
+        unidade_medida: 'UN',
         preco_venda: '',
         preco_custo_medio: '',
+        margem_lucro_percentual: 0,
         categoria: 'Geral',
-        estoque_atual: 0,
-        data_validade: '',
-        codigos_barras_adicionais: [criar_alias_vazio()],
+        codigos_barras_adicionais: [],
         fornecedores_vinculados: [],
+        // Novo campo: tipo de item (orienta a UX sem mudar a estrutura do backend)
+        tipo_item: 'comprado', // 'comprado' | 'fabricado'
     });
 
     const formulario_perda = reactive({
@@ -91,6 +103,7 @@ export function use_logica_produtos() {
         nome_produto: '',
         quantidade: 1,
         motivo: 'Quebra / Dano',
+        observacao: '',
     });
 
     const formulario_entrada = reactive({
@@ -104,118 +117,134 @@ export function use_logica_produtos() {
         fator_conversao: 1,
         unidades_entrada: 1,
         custo_total_entrada: 0,
+        custo_unitario_medio_entrada: 0,
+        data_validade_lote: '',
     });
 
     const formulario_fornecedor = reactive(criar_formulario_fornecedor_vazio());
 
+    // ─── Utilitários ─────────────────────────────────────────────────────────
+
+    const normalizar_texto_busca = (valor) => String(valor || '').toLowerCase().trim();
+
     /**
-     * Retorna todos os codigos pesquisaveis de um produto.
-     *
-     * @param {Record<string, any>} produto
-     * @returns {string[]}
+     * Formata data ISO para exibição amigável.
+     */
+    const formatar_data_tabela = (valor_data) => {
+        if (!valor_data) return 'Sem validade';
+        return new Date(`${valor_data}T00:00:00`).toLocaleDateString('pt-BR');
+    };
+
+    /**
+     * Retorna todos os códigos pesquisáveis de um produto.
      */
     const obter_codigos_produto = (produto) => {
         const codigos_barras = Array.isArray(produto?.codigos_barras) ? produto.codigos_barras : [];
         const codigo_principal = produto?.codigo_barras_principal ? [produto.codigo_barras_principal] : [];
-
         return [...new Set([produto?.codigo_interno, ...codigo_principal, ...codigos_barras].filter(Boolean))];
     };
 
-    /**
-     * Filtra os produtos pelo termo digitado em nome, codigo interno ou aliases.
-     */
+    // ─── Computeds de listagem ────────────────────────────────────────────────
+
     const produtos_filtrados = computed(() => {
-        if (!termo_pesquisa.value) {
-            return lista_produtos.value;
-        }
-
-        const termo_normalizado = termo_pesquisa.value.toLowerCase().trim();
-
+        if (!termo_pesquisa.value) return lista_produtos.value;
+        const termo = termo_pesquisa.value.toLowerCase().trim();
         return lista_produtos.value.filter((produto) => {
-            const nome_corresponde = produto.nome_produto.toLowerCase().includes(termo_normalizado);
-            const codigo_corresponde = obter_codigos_produto(produto).some((codigo) => String(codigo).toLowerCase().includes(termo_normalizado));
-
-            return nome_corresponde || codigo_corresponde;
+            const nome_ok = produto.nome_produto.toLowerCase().includes(termo);
+            const codigo_ok = obter_codigos_produto(produto).some((c) => String(c).toLowerCase().includes(termo));
+            return nome_ok || codigo_ok;
         });
     });
 
+    const fornecedores_filtrados = computed(() => {
+        const ordenados = [...lista_fornecedores.value].sort((a, b) =>
+            String(a.nome_fantasia || '').localeCompare(String(b.nome_fantasia || ''))
+        );
+        if (!filtro_fornecedor_id.value) return ordenados;
+        return ordenados.filter((f) => Number(f.id) === Number(filtro_fornecedor_id.value));
+    });
+
+    const opcoes_filtro_fornecedor = computed(() =>
+        [...lista_fornecedores.value]
+            .sort((a, b) => String(a.nome_fantasia || '').localeCompare(String(b.nome_fantasia || '')))
+            .map((f) => ({
+                id: f.id,
+                label: [f.nome_fantasia, f.vendedor, f.contato_vendedor, f.cnpj].filter(Boolean).join(' | '),
+            }))
+    );
+
     /**
-     * Filtra a lista de fornecedores para o campo pesquisavel do modal de entrada.
+     * CORREÇÃO: filtra apenas os fornecedores que estão vinculados ao produto
+     * aberto no modal de entrada, evitando seleção de fornecedor não-vinculado.
      */
     const fornecedores_filtrados_entrada = computed(() => {
-        const termo_normalizado = termo_fornecedor_entrada.value.toLowerCase().trim();
+        const termo = normalizar_texto_busca(termo_fornecedor_entrada.value);
 
-        if (!termo_normalizado) {
-            return lista_fornecedores.value;
-        }
+        // Se o produto tem fornecedores vinculados, mostra só eles
+        const fornecedores_do_produto = detalhes_produto_entrada.value?.fornecedores_vinculados || [];
+        const ids_vinculados = fornecedores_do_produto.map((fv) => Number(fv.fornecedor_id));
 
-        return lista_fornecedores.value.filter((fornecedor) => {
-            const nome_fantasia = fornecedor.nome_fantasia?.toLowerCase() || '';
-            const razao_social = fornecedor.razao_social?.toLowerCase() || '';
-            const cnpj = fornecedor.cnpj?.toLowerCase() || '';
-            const vendedor = fornecedor.vendedor?.toLowerCase() || '';
-            const contato_vendedor = fornecedor.contato_vendedor?.toLowerCase() || '';
+        const base =
+            ids_vinculados.length > 0
+                ? lista_fornecedores.value.filter((f) => ids_vinculados.includes(Number(f.id)))
+                : lista_fornecedores.value;
 
-            return nome_fantasia.includes(termo_normalizado)
-                || razao_social.includes(termo_normalizado)
-                || cnpj.includes(termo_normalizado)
-                || vendedor.includes(termo_normalizado)
-                || contato_vendedor.includes(termo_normalizado);
+        if (!termo) return base;
+
+        return base.filter((f) => {
+            return (
+                normalizar_texto_busca(f.nome_fantasia).includes(termo) ||
+                normalizar_texto_busca(f.razao_social).includes(termo) ||
+                normalizar_texto_busca(f.cnpj).includes(termo) ||
+                normalizar_texto_busca(f.vendedor).includes(termo)
+            );
         });
     });
 
     /**
-     * Indica se o fornecedor selecionado na entrada esta vinculado ao produto atual.
+     * Retorna o vínculo produto-fornecedor correspondente ao fornecedor selecionado
+     * na entrada, para exibir fator de conversão e SKU.
      */
     const fornecedor_entrada_vinculado = computed(() => {
-        if (!formulario_entrada.fornecedor_id || !detalhes_produto_entrada.value) {
-            return null;
-        }
-
-        return (detalhes_produto_entrada.value.fornecedores_vinculados || []).find((fornecedor_vinculado) => {
-            return Number(fornecedor_vinculado.fornecedor_id) === Number(formulario_entrada.fornecedor_id);
-        }) || null;
+        if (!formulario_entrada.fornecedor_id || !detalhes_produto_entrada.value) return null;
+        return (detalhes_produto_entrada.value.fornecedores_vinculados || []).find(
+            (fv) => Number(fv.fornecedor_id) === Number(formulario_entrada.fornecedor_id)
+        ) || null;
     });
 
     /**
-     * Indica se o modal de entrada possui dados suficientes para salvar.
+     * CORREÇÃO: computed definido fora do return, como todos os demais.
      */
+    const produto_entrada_possui_fornecedores_vinculados = computed(() => {
+        return (detalhes_produto_entrada.value?.fornecedores_vinculados?.length || 0) > 0;
+    });
+
     const entrada_pronta_para_salvar = computed(() => {
-        if (formulario_entrada.modo_entrada !== 'compra_fornecedor') {
-            return Boolean(
-                formulario_entrada.produto_id
-                && Number(formulario_entrada.quantidade_comprada) > 0
-                && Number(formulario_entrada.custo_unitario_compra) >= 0
-            );
-        }
+        const base =
+            formulario_entrada.produto_id &&
+            Number(formulario_entrada.quantidade_comprada) > 0 &&
+            Number(formulario_entrada.custo_unitario_compra) >= 0;
 
-        return Boolean(
-            formulario_entrada.produto_id
-            && formulario_entrada.fornecedor_id
-            && fornecedor_entrada_vinculado.value
-            && Number(formulario_entrada.quantidade_comprada) > 0
-            && Number(formulario_entrada.custo_unitario_compra) >= 0
-        );
+        if (formulario_entrada.modo_entrada !== 'compra_fornecedor') return Boolean(base);
+
+        return Boolean(base && formulario_entrada.fornecedor_id && fornecedor_entrada_vinculado.value);
     });
 
-    /**
-     * Reinicia o formulario principal de produto para o estado padrao.
-     */
+    // ─── Reinicializadores ────────────────────────────────────────────────────
+
     const reiniciar_formulario_produto = () => {
         formulario_dados.nome_produto = '';
         formulario_dados.codigo_interno = '';
+        formulario_dados.unidade_medida = 'UN';
         formulario_dados.preco_venda = '';
         formulario_dados.preco_custo_medio = '';
+        formulario_dados.margem_lucro_percentual = 0;
         formulario_dados.categoria = 'Geral';
-        formulario_dados.estoque_atual = 0;
-        formulario_dados.data_validade = '';
-        formulario_dados.codigos_barras_adicionais = [criar_alias_vazio()];
+        formulario_dados.tipo_item = 'comprado';
+        formulario_dados.codigos_barras_adicionais = [];
         formulario_dados.fornecedores_vinculados = [];
     };
 
-    /**
-     * Reinicia o formulario de entrada de estoque para o estado padrao.
-     */
     const reiniciar_formulario_entrada = () => {
         formulario_entrada.modo_entrada = 'ajuste_manual';
         formulario_entrada.produto_id = null;
@@ -227,21 +256,61 @@ export function use_logica_produtos() {
         formulario_entrada.fator_conversao = 1;
         formulario_entrada.unidades_entrada = 1;
         formulario_entrada.custo_total_entrada = 0;
+        formulario_entrada.custo_unitario_medio_entrada = 0;
+        formulario_entrada.data_validade_lote = '';
         termo_fornecedor_entrada.value = '';
         dropdown_fornecedor_entrada_aberto.value = false;
         detalhes_produto_entrada.value = null;
     };
 
-    /**
-     * Reinicia o formulario rapido de fornecedor.
-     */
     const reiniciar_formulario_fornecedor = () => {
         Object.assign(formulario_fornecedor, criar_formulario_fornecedor_vazio());
     };
 
-    /**
-     * Busca a lista de fornecedores no backend para uso nos selects.
-     */
+    const preencher_formulario_fornecedor = (fornecedor) => {
+        formulario_fornecedor.nome_fantasia = fornecedor.nome_fantasia || '';
+        formulario_fornecedor.razao_social = fornecedor.razao_social || '';
+        formulario_fornecedor.cnpj = fornecedor.cnpj || '';
+        formulario_fornecedor.telefone = fornecedor.telefone || '';
+        formulario_fornecedor.email = fornecedor.email || '';
+        formulario_fornecedor.vendedor = fornecedor.vendedor || '';
+        formulario_fornecedor.contato_vendedor = fornecedor.contato_vendedor || '';
+        formulario_fornecedor.status_fornecedor = fornecedor.status_fornecedor || 'ativo';
+    };
+
+    // ─── Navegação entre abas ─────────────────────────────────────────────────
+
+    const abrir_aba_estoque = () => { aba_ativa.value = 'estoque'; };
+
+    const abrir_aba_fornecedores = () => {
+        contexto_modal_fornecedor.value = 'fornecedores';
+        aba_ativa.value = 'fornecedores';
+    };
+
+    const voltar_painel = () => roteador.push('/painel-central');
+
+    // ─── Expansão de linhas ───────────────────────────────────────────────────
+
+    const produto_tem_detalhamento_fornecedor = (produto) =>
+        Boolean(produto?.pode_expandir_estoque && Array.isArray(produto?.estoque_por_fornecedor));
+
+    const produto_esta_expandido = (produto_id) =>
+        Boolean(produto_expandido_ids.value[String(produto_id)]);
+
+    const alternar_expansao_produto = (produto_id) => {
+        const chave = String(produto_id);
+        produto_expandido_ids.value = {
+            ...produto_expandido_ids.value,
+            [chave]: !produto_expandido_ids.value[chave],
+        };
+    };
+
+    const alternar_formulario_fornecedor_minimizado = () => {
+        formulario_fornecedor_minimizado.value = !formulario_fornecedor_minimizado.value;
+    };
+
+    // ─── Carregamento de dados ────────────────────────────────────────────────
+
     const carregar_fornecedores = async () => {
         try {
             const resposta = await api_cliente.get('/listar-fornecedores');
@@ -251,216 +320,202 @@ export function use_logica_produtos() {
         }
     };
 
-    /**
-     * Busca os detalhes completos de um produto para edicao ou entrada.
-     *
-     * @param {number|string} produto_id
-     * @returns {Promise<Record<string, any>>}
-     */
     const buscar_detalhes_produto = async (produto_id) => {
         const resposta = await api_cliente.get(`/produtos/detalhes/${produto_id}`);
         return resposta.data.produto;
     };
 
+    // ─── Formulário de produto ────────────────────────────────────────────────
+
     /**
-     * Preenche o formulario principal com os detalhes completos do produto.
-     *
-     * @param {Record<string, any>} produto
+     * Derivado do tipo_item: se for 'fabricado', limpa fornecedores ao salvar.
      */
     const preencher_formulario_produto = (produto) => {
         formulario_dados.nome_produto = produto.nome_produto || '';
         formulario_dados.codigo_interno = produto.codigo_interno || '';
+        formulario_dados.unidade_medida = produto.unidade_medida || 'UN';
         formulario_dados.preco_venda = produto.preco_venda ?? '';
         formulario_dados.preco_custo_medio = produto.preco_custo_medio ?? '';
+        formulario_dados.margem_lucro_percentual = produto.margem_lucro_percentual ?? 0;
         formulario_dados.categoria = produto.categoria || 'Geral';
-        formulario_dados.estoque_atual = produto.estoque_atual ?? 0;
-        formulario_dados.data_validade = produto.data_validade || '';
-        formulario_dados.codigos_barras_adicionais = (produto.codigos_barras_adicionais || []).length > 0
-            ? produto.codigos_barras_adicionais.map((codigo_barras) => ({
-                id: codigo_barras.id ?? null,
-                codigo_barras: codigo_barras.codigo_barras || '',
-                descricao_variacao: codigo_barras.descricao_variacao || '',
-            }))
-            : [criar_alias_vazio()];
-        formulario_dados.fornecedores_vinculados = (produto.fornecedores_vinculados || []).length > 0
-            ? produto.fornecedores_vinculados.map((fornecedor_vinculado) => ({
-                fornecedor_id: fornecedor_vinculado.fornecedor_id ?? null,
-                codigo_sku_fornecedor: fornecedor_vinculado.codigo_sku_fornecedor || '',
-                fator_conversao: Number(fornecedor_vinculado.fator_conversao || 1),
-                ultimo_preco_compra: fornecedor_vinculado.ultimo_preco_compra ?? '',
-            }))
-            : [];
+
+        // Infere tipo_item a partir dos dados do produto
+        const tem_fornecedores = (produto.fornecedores_vinculados || []).length > 0;
+        formulario_dados.tipo_item = tem_fornecedores ? 'comprado' : 'fabricado';
+
+        formulario_dados.codigos_barras_adicionais =
+            (produto.codigos_barras_adicionais || []).length > 0
+                ? produto.codigos_barras_adicionais.map((cb) => ({
+                      id: cb.id ?? null,
+                      codigo_barras: cb.codigo_barras || '',
+                      descricao_variacao: cb.descricao_variacao || '',
+                  }))
+                : [];
+
+        formulario_dados.fornecedores_vinculados =
+            (produto.fornecedores_vinculados || []).length > 0
+                ? produto.fornecedores_vinculados.map((fv) => ({
+                      fornecedor_id: fv.fornecedor_id ?? null,
+                      codigo_sku_fornecedor: fv.codigo_sku_fornecedor || '',
+                      unidade_embalagem: fv.unidade_embalagem || 'CX',
+                      fator_conversao: Number(fv.fator_conversao || 1),
+                      custo_embalagem: fv.ultimo_preco_compra ?? '',
+                  }))
+                : [];
     };
 
-    /**
-     * Monta o payload do produto para envio ao backend.
-     *
-     * @returns {Record<string, any>}
-     */
     const montar_payload_produto = () => {
+        const fornecedores =
+            formulario_dados.tipo_item === 'comprado'
+                ? formulario_dados.fornecedores_vinculados
+                      .map((fv) => ({
+                          fornecedor_id: fv.fornecedor_id ? Number(fv.fornecedor_id) : null,
+                          codigo_sku_fornecedor: fv.codigo_sku_fornecedor.trim(),
+                          unidade_embalagem: fv.unidade_embalagem || 'CX',
+                          fator_conversao: Number(fv.fator_conversao || 1),
+                          custo_embalagem: Number(fv.custo_embalagem || 0),
+                      }))
+                      .filter((fv) => fv.fornecedor_id)
+                : [];
+
         return {
             nome_produto: formulario_dados.nome_produto.trim(),
             codigo_interno: formulario_dados.codigo_interno.trim(),
+            unidade_medida: formulario_dados.unidade_medida,
             preco_venda: Number(formulario_dados.preco_venda || 0),
             preco_custo_medio: Number(formulario_dados.preco_custo_medio || 0),
+            margem_lucro_percentual: Number(formulario_dados.margem_lucro_percentual || 0),
             categoria: formulario_dados.categoria,
-            estoque_atual: Number(formulario_dados.estoque_atual || 0),
-            data_validade: formulario_dados.data_validade || null,
             codigos_barras_adicionais: formulario_dados.codigos_barras_adicionais
-                .map((codigo_barras) => ({
-                    id: codigo_barras.id || null,
-                    codigo_barras: codigo_barras.codigo_barras.trim(),
-                    descricao_variacao: codigo_barras.descricao_variacao?.trim() || null,
+                .map((cb) => ({
+                    id: cb.id || null,
+                    codigo_barras: cb.codigo_barras.trim(),
+                    descricao_variacao: cb.descricao_variacao?.trim() || null,
                 }))
-                .filter((codigo_barras) => codigo_barras.codigo_barras),
-            fornecedores_vinculados: formulario_dados.fornecedores_vinculados
-                .map((fornecedor_vinculado) => ({
-                    fornecedor_id: fornecedor_vinculado.fornecedor_id ? Number(fornecedor_vinculado.fornecedor_id) : null,
-                    codigo_sku_fornecedor: fornecedor_vinculado.codigo_sku_fornecedor.trim(),
-                    fator_conversao: Number(fornecedor_vinculado.fator_conversao || 1),
-                    ultimo_preco_compra: fornecedor_vinculado.ultimo_preco_compra === '' || fornecedor_vinculado.ultimo_preco_compra === null
-                        ? null
-                        : Number(fornecedor_vinculado.ultimo_preco_compra),
-                }))
-                .filter((fornecedor_vinculado) => fornecedor_vinculado.fornecedor_id || fornecedor_vinculado.codigo_sku_fornecedor),
+                .filter((cb) => cb.codigo_barras),
+            fornecedores_vinculados: fornecedores,
         };
     };
 
-    /**
-     * Valida o formulario principal antes de enviar ao backend.
-     *
-     * @returns {boolean}
-     */
     const validar_formulario_produto = () => {
         const payload = montar_payload_produto();
-        const codigos_barras = payload.codigos_barras_adicionais.map((codigo_barras) => codigo_barras.codigo_barras);
-        const fornecedores = payload.fornecedores_vinculados.map((fornecedor_vinculado) => fornecedor_vinculado.fornecedor_id).filter(Boolean);
+        const codigos = payload.codigos_barras_adicionais.map((cb) => cb.codigo_barras);
+        const fornecedores_ids = payload.fornecedores_vinculados
+            .map((fv) => fv.fornecedor_id)
+            .filter(Boolean);
 
-        if (!payload.nome_produto || !payload.codigo_interno) {
-            alert('Informe o nome e o codigo interno do produto.');
+        if (!payload.nome_produto) {
+            alert('Informe o nome do produto.');
             return false;
         }
 
-        if (codigos_barras.length !== new Set(codigos_barras).size) {
-            alert('Existem codigos de barras duplicados no formulario.');
+        if (!payload.codigo_interno) {
+            alert('Informe o código interno do produto (ex: BEB-001).');
             return false;
         }
 
-        if (fornecedores.length !== new Set(fornecedores).size) {
-            alert('O mesmo fornecedor nao pode ser vinculado duas vezes ao mesmo produto.');
+        if (!payload.unidade_medida) {
+            alert('Selecione a unidade de medida.');
             return false;
         }
 
-        const vinculo_invalido = payload.fornecedores_vinculados.find((fornecedor_vinculado) => {
-            return fornecedor_vinculado.fornecedor_id && !fornecedor_vinculado.codigo_sku_fornecedor;
-        });
-
-        if (vinculo_invalido) {
-            alert('Preencha o codigo SKU para todos os fornecedores vinculados.');
+        if (codigos.length !== new Set(codigos).size) {
+            alert('Existem códigos de barras duplicados.');
             return false;
+        }
+
+        if (fornecedores_ids.length !== new Set(fornecedores_ids).size) {
+            alert('O mesmo fornecedor não pode ser vinculado duas vezes.');
+            return false;
+        }
+
+        if (formulario_dados.tipo_item === 'comprado') {
+            const vinculo_sem_sku = payload.fornecedores_vinculados.find(
+                (fv) => fv.fornecedor_id && !fv.codigo_sku_fornecedor
+            );
+            if (vinculo_sem_sku) {
+                alert('Preencha o código SKU para todos os fornecedores vinculados.');
+                return false;
+            }
         }
 
         return true;
     };
 
-    /**
-     * Adiciona uma nova linha de alias ao formulario.
-     */
     const adicionar_alias_codigo_barras = () => {
         formulario_dados.codigos_barras_adicionais.push(criar_alias_vazio());
     };
 
     /**
-     * Remove uma linha de alias do formulario.
-     *
-     * @param {number} indice
+     * CORREÇÃO: ao remover o único alias, limpa o array em vez de manter
+     * uma linha vazia — o formulário já tem estado vazio explícito.
      */
     const remover_alias_codigo_barras = (indice) => {
-        if (formulario_dados.codigos_barras_adicionais.length === 1) {
-            formulario_dados.codigos_barras_adicionais = [criar_alias_vazio()];
-            return;
-        }
-
         formulario_dados.codigos_barras_adicionais.splice(indice, 1);
+        if (formulario_dados.codigos_barras_adicionais.length === 0) {
+            formulario_dados.codigos_barras_adicionais = [criar_alias_vazio()];
+        }
     };
 
-    /**
-     * Adiciona uma nova linha de vinculo de fornecedor ao formulario.
-     */
     const adicionar_vinculo_fornecedor = () => {
         formulario_dados.fornecedores_vinculados.push(criar_vinculo_fornecedor_vazio());
     };
 
     /**
-     * Remove uma linha de vinculo de fornecedor do formulario.
-     *
-     * @param {number} indice
+     * CORREÇÃO: ao remover o único vínculo, limpa o array completamente —
+     * o estado vazio é representado por array vazio, não por linha fantasma.
      */
     const remover_vinculo_fornecedor = (indice) => {
-        if (formulario_dados.fornecedores_vinculados.length === 1) {
-            formulario_dados.fornecedores_vinculados = [criar_vinculo_fornecedor_vazio()];
-            return;
-        }
-
         formulario_dados.fornecedores_vinculados.splice(indice, 1);
     };
 
-    /**
-     * Abre o modal de criacao de produto com estado limpo.
-     */
     const abrir_modal_novo = async () => {
         modo_edicao.value = false;
         id_edicao.value = null;
         reiniciar_formulario_produto();
         await carregar_fornecedores();
-        modal_novo_produto.value = true;
+        aba_ativa.value = 'formulario_produto';
     };
 
-    /**
-     * Abre o modal de edicao buscando o detalhe completo do produto.
-     *
-     * @param {Record<string, any>} produto
-     */
     const abrir_modal_edicao = async (produto) => {
         carregando_produto.value = true;
         modo_edicao.value = true;
         id_edicao.value = produto.id;
-        modal_novo_produto.value = true;
-
+        aba_ativa.value = 'formulario_produto';
         try {
             await carregar_fornecedores();
-            const detalhes_produto = await buscar_detalhes_produto(produto.id);
-            preencher_formulario_produto(detalhes_produto);
+            const detalhes = await buscar_detalhes_produto(produto.id);
+            preencher_formulario_produto(detalhes);
         } catch (erro) {
             alert(erro.response?.data?.mensagem || 'Erro ao carregar os detalhes do produto.');
-            modal_novo_produto.value = false;
+            aba_ativa.value = 'estoque';
         } finally {
             carregando_produto.value = false;
         }
     };
 
-    /**
-     * Persiste o formulario de produto no backend.
-     */
+    const cancelar_formulario_produto = () => {
+        modo_edicao.value = false;
+        id_edicao.value = null;
+        reiniciar_formulario_produto();
+        aba_ativa.value = 'estoque';
+    };
+
     const salvar_produto = async () => {
-        if (!validar_formulario_produto()) {
-            return;
-        }
-
+        if (!validar_formulario_produto()) return;
         salvando.value = true;
-
         try {
             const payload = montar_payload_produto();
-
             if (modo_edicao.value) {
                 await api_cliente.post(`/produtos/editar/${id_edicao.value}`, payload);
             } else {
                 await api_cliente.post('/cadastrar-produto', payload);
             }
-
-            modal_novo_produto.value = false;
+            modo_edicao.value = false;
+            id_edicao.value = null;
             await loja_produtos.buscar_produtos(true);
             await carregar_fornecedores();
+            aba_ativa.value = 'estoque';
         } catch (erro) {
             alert(erro.response?.data?.mensagem || 'Erro ao salvar o produto.');
         } finally {
@@ -469,36 +524,61 @@ export function use_logica_produtos() {
     };
 
     /**
-     * Abre o modal de baixa para o produto selecionado.
-     *
-     * @param {Record<string, any>} produto
+     * MELHORIA: avisa ao usuário se o produto tem histórico de estoque
+     * antes de prosseguir com a exclusão (soft delete é seguro, mas o
+     * usuário merece ser informado).
      */
+    const excluir_produto = async (produto) => {
+        const tem_estoque = Number(produto.estoque_atual) > 0;
+        const mensagem = tem_estoque
+            ? `"${produto.nome_produto}" tem ${produto.estoque_atual} unidade(s) em estoque. Ao excluir, o histórico será preservado mas o produto sairá da listagem. Confirma?`
+            : `Deseja realmente excluir "${produto.nome_produto}"?`;
+
+        if (!window.confirm(mensagem)) return;
+
+        produto_excluindo_id.value = produto.id;
+        try {
+            await api_cliente.delete(`/produtos/excluir/${produto.id}`);
+            await loja_produtos.buscar_produtos(true);
+            if (Number(id_edicao.value) === Number(produto.id)) {
+                cancelar_formulario_produto();
+            }
+        } catch (erro) {
+            alert(
+                erro.response?.data?.mensagem ||
+                    erro.response?.data?.errors?.produto?.[0] ||
+                    'Erro ao excluir o produto.'
+            );
+        } finally {
+            produto_excluindo_id.value = null;
+        }
+    };
+
+    // ─── Modal de perda ───────────────────────────────────────────────────────
+
     const abrir_modal_perda = (produto) => {
         formulario_perda.produto_id = produto.id;
         formulario_perda.nome_produto = produto.nome_produto;
         formulario_perda.quantidade = 1;
         formulario_perda.motivo = 'Quebra / Dano';
+        formulario_perda.observacao = '';
         modal_perda.value = true;
     };
 
-    /**
-     * Registra a baixa de estoque do produto selecionado.
-     */
     const registrar_perda = async () => {
         if (Number(formulario_perda.quantidade) <= 0) {
             alert('A quantidade deve ser maior que zero.');
             return;
         }
-
         registrando_perda.value = true;
-
         try {
             await api_cliente.post('/estoque/registrar-perda', {
                 produto_id: formulario_perda.produto_id,
                 quantidade: Number(formulario_perda.quantidade),
-                motivo: formulario_perda.motivo,
+                motivo: formulario_perda.observacao
+                    ? `${formulario_perda.motivo} — ${formulario_perda.observacao}`
+                    : formulario_perda.motivo,
             });
-
             modal_perda.value = false;
             await loja_produtos.buscar_produtos(true);
         } catch (erro) {
@@ -508,23 +588,25 @@ export function use_logica_produtos() {
         }
     };
 
-    /**
-     * Atualiza os dados derivados da entrada de estoque.
-     */
-    const recalcular_entrada = () => {
-        const quantidade_comprada = Number(formulario_entrada.quantidade_comprada || 0);
-        const custo_unitario_compra = Number(formulario_entrada.custo_unitario_compra || 0);
-        const fator_conversao = formulario_entrada.modo_entrada === 'compra_fornecedor'
-            ? Number(formulario_entrada.fator_conversao || 1)
-            : 1;
+    // ─── Modal de entrada ─────────────────────────────────────────────────────
 
-        formulario_entrada.unidades_entrada = Math.max(0, quantidade_comprada * fator_conversao);
-        formulario_entrada.custo_total_entrada = Number((quantidade_comprada * custo_unitario_compra).toFixed(2));
+    const recalcular_entrada = () => {
+        const qtd = Number(formulario_entrada.quantidade_comprada || 0);
+        const custo = Number(formulario_entrada.custo_unitario_compra || 0);
+        const fator =
+            formulario_entrada.modo_entrada === 'compra_fornecedor'
+                ? Number(formulario_entrada.fator_conversao || 1)
+                : 1;
+        const unidades = Math.max(0, qtd * fator);
+        const custo_total = Number((qtd * custo).toFixed(2));
+
+        formulario_entrada.unidades_entrada = unidades;
+        formulario_entrada.custo_total_entrada = custo_total;
+        formulario_entrada.custo_unitario_medio_entrada = unidades > 0
+            ? Number((custo_total / unidades).toFixed(4))
+            : 0;
     };
 
-    /**
-     * Sincroniza os dados do fornecedor selecionado no modal de entrada.
-     */
     const atualizar_fornecedor_entrada = () => {
         if (formulario_entrada.modo_entrada !== 'compra_fornecedor') {
             formulario_entrada.fornecedor_id = null;
@@ -534,57 +616,43 @@ export function use_logica_produtos() {
             return;
         }
 
-        const fornecedor_vinculado = fornecedor_entrada_vinculado.value;
-
-        if (!fornecedor_vinculado) {
+        const vinculo = fornecedor_entrada_vinculado.value;
+        if (!vinculo) {
             formulario_entrada.codigo_sku_fornecedor = '';
             formulario_entrada.fator_conversao = 1;
             recalcular_entrada();
             return;
         }
 
-        formulario_entrada.codigo_sku_fornecedor = fornecedor_vinculado.codigo_sku_fornecedor || '';
-        formulario_entrada.fator_conversao = Number(fornecedor_vinculado.fator_conversao || 1);
-
-        if (formulario_entrada.custo_unitario_compra === '' || Number(formulario_entrada.custo_unitario_compra) === 0) {
-            formulario_entrada.custo_unitario_compra = fornecedor_vinculado.ultimo_preco_compra ?? '';
+        formulario_entrada.codigo_sku_fornecedor = vinculo.codigo_sku_fornecedor || '';
+        formulario_entrada.fator_conversao = Number(vinculo.fator_conversao || 1);
+        if (!formulario_entrada.custo_unitario_compra || Number(formulario_entrada.custo_unitario_compra) === 0) {
+            formulario_entrada.custo_unitario_compra = vinculo.ultimo_preco_compra ?? '';
         }
-
         recalcular_entrada();
     };
 
-    /**
-     * Alterna o modo operacional da entrada entre compra por fornecedor e ajuste manual.
-     */
     const atualizar_modo_entrada = () => {
         if (formulario_entrada.modo_entrada !== 'compra_fornecedor') {
             atualizar_fornecedor_entrada();
             return;
         }
-
-        const primeiro_fornecedor = detalhes_produto_entrada.value?.fornecedores_vinculados?.[0] || null;
-
-        if (!primeiro_fornecedor) {
+        const primeiro = detalhes_produto_entrada.value?.fornecedores_vinculados?.[0] || null;
+        if (!primeiro) {
             formulario_entrada.modo_entrada = 'ajuste_manual';
             atualizar_fornecedor_entrada();
             return;
         }
-
-        const fornecedor = lista_fornecedores.value.find((item) => Number(item.id) === Number(primeiro_fornecedor.fornecedor_id));
-
+        const fornecedor = lista_fornecedores.value.find(
+            (f) => Number(f.id) === Number(primeiro.fornecedor_id)
+        );
         if (fornecedor && !formulario_entrada.fornecedor_id) {
             selecionar_fornecedor_entrada(fornecedor);
-            return;
+        } else {
+            atualizar_fornecedor_entrada();
         }
-
-        atualizar_fornecedor_entrada();
     };
 
-    /**
-     * Seleciona um fornecedor a partir do dropdown pesquisavel da entrada.
-     *
-     * @param {Record<string, any>} fornecedor
-     */
     const selecionar_fornecedor_entrada = (fornecedor) => {
         formulario_entrada.fornecedor_id = fornecedor.id;
         termo_fornecedor_entrada.value = fornecedor.nome_fantasia;
@@ -592,28 +660,30 @@ export function use_logica_produtos() {
         atualizar_fornecedor_entrada();
     };
 
-    /**
-     * Abre o modal de entrada carregando os detalhes do produto e fornecedores.
-     *
-     * @param {Record<string, any>} produto
-     */
+    const fechar_dropdown_fornecedor_entrada = () => {
+        dropdown_fornecedor_entrada_aberto.value = false;
+    };
+
     const abrir_modal_entrada = async (produto) => {
         reiniciar_formulario_entrada();
         formulario_entrada.produto_id = produto.id;
         formulario_entrada.nome_produto = produto.nome_produto;
-        formulario_entrada.custo_unitario_compra = produto.preco_custo_medio ?? '';
+        // Custo fica vazio intencionalmente: o usuário informa o custo real
+        // da embalagem nesta compra. Será preenchido automaticamente com o
+        // ultimo_preco_compra do fornecedor assim que ele for selecionado.
+        formulario_entrada.custo_unitario_compra = '';
         modal_entrada.value = true;
 
         try {
             await carregar_fornecedores();
             detalhes_produto_entrada.value = await buscar_detalhes_produto(produto.id);
 
-            const primeiro_fornecedor = detalhes_produto_entrada.value.fornecedores_vinculados?.[0] || null;
-
-            if (primeiro_fornecedor) {
+            const primeiro = detalhes_produto_entrada.value.fornecedores_vinculados?.[0] || null;
+            if (primeiro) {
                 formulario_entrada.modo_entrada = 'compra_fornecedor';
-                const fornecedor = lista_fornecedores.value.find((item) => Number(item.id) === Number(primeiro_fornecedor.fornecedor_id));
-
+                const fornecedor = lista_fornecedores.value.find(
+                    (f) => Number(f.id) === Number(primeiro.fornecedor_id)
+                );
                 if (fornecedor) {
                     selecionar_fornecedor_entrada(fornecedor);
                 } else {
@@ -629,28 +699,26 @@ export function use_logica_produtos() {
         }
     };
 
-    /**
-     * Registra a entrada de estoque por fornecedor.
-     */
     const registrar_entrada = async () => {
         if (!entrada_pronta_para_salvar.value) {
-            alert('Preencha os valores da entrada. Se optar por compra por fornecedor, selecione um fornecedor vinculado.');
+            alert(
+                'Preencha os valores da entrada. Para compra por fornecedor, selecione um fornecedor vinculado ao produto.'
+            );
             return;
         }
-
         registrando_entrada.value = true;
-
         try {
             await api_cliente.post('/estoque/registrar-entrada', {
                 modo_entrada: formulario_entrada.modo_entrada,
                 produto_id: formulario_entrada.produto_id,
-                fornecedor_id: formulario_entrada.modo_entrada === 'compra_fornecedor'
-                    ? Number(formulario_entrada.fornecedor_id)
-                    : null,
+                fornecedor_id:
+                    formulario_entrada.modo_entrada === 'compra_fornecedor'
+                        ? Number(formulario_entrada.fornecedor_id)
+                        : null,
                 quantidade_comprada: Number(formulario_entrada.quantidade_comprada),
                 custo_unitario_compra: Number(formulario_entrada.custo_unitario_compra),
+                data_validade_lote: formulario_entrada.data_validade_lote || null,
             });
-
             modal_entrada.value = false;
             await loja_produtos.buscar_produtos(true);
         } catch (erro) {
@@ -660,25 +728,39 @@ export function use_logica_produtos() {
         }
     };
 
-    /**
-     * Abre o modal rapido de fornecedor respeitando o contexto atual.
-     *
-     * @param {'produto'|'entrada'} contexto
-     */
+    // ─── Fornecedor ───────────────────────────────────────────────────────────
+
     const abrir_modal_novo_fornecedor = (contexto = 'produto') => {
         contexto_modal_fornecedor.value = contexto;
+        modo_edicao_fornecedor.value = false;
+        fornecedor_edicao_id.value = null;
         reiniciar_formulario_fornecedor();
-        modal_novo_fornecedor.value = true;
+        formulario_fornecedor_minimizado.value = false;
+        if (contexto === 'entrada') modal_entrada.value = false;
+        aba_ativa.value = 'fornecedores';
     };
 
-    /**
-     * Salva um novo fornecedor e o injeta no contexto ativo da interface.
-     */
+    const abrir_edicao_fornecedor = (fornecedor) => {
+        contexto_modal_fornecedor.value = 'fornecedores';
+        modo_edicao_fornecedor.value = true;
+        fornecedor_edicao_id.value = fornecedor.id;
+        formulario_fornecedor_minimizado.value = false;
+        preencher_formulario_fornecedor(fornecedor);
+        aba_ativa.value = 'fornecedores';
+    };
+
+    const cancelar_formulario_fornecedor = () => {
+        contexto_modal_fornecedor.value = 'fornecedores';
+        modo_edicao_fornecedor.value = false;
+        fornecedor_edicao_id.value = null;
+        reiniciar_formulario_fornecedor();
+        aba_ativa.value = 'fornecedores';
+    };
+
     const salvar_fornecedor = async () => {
         salvando_fornecedor.value = true;
-
         try {
-            const resposta = await api_cliente.post('/fornecedores/cadastrar', {
+            const payload = {
                 nome_fantasia: formulario_fornecedor.nome_fantasia.trim(),
                 razao_social: formulario_fornecedor.razao_social.trim(),
                 cnpj: formulario_fornecedor.cnpj.trim(),
@@ -687,48 +769,73 @@ export function use_logica_produtos() {
                 vendedor: formulario_fornecedor.vendedor.trim() || null,
                 contato_vendedor: formulario_fornecedor.contato_vendedor.trim() || null,
                 status_fornecedor: formulario_fornecedor.status_fornecedor,
-            });
+            };
+
+            const resposta = modo_edicao_fornecedor.value
+                ? await api_cliente.post(`/fornecedores/editar/${fornecedor_edicao_id.value}`, payload)
+                : await api_cliente.post('/fornecedores/cadastrar', payload);
 
             const novo_fornecedor = resposta.data.fornecedor;
             await carregar_fornecedores();
 
-            if (contexto_modal_fornecedor.value === 'entrada') {
-                selecionar_fornecedor_entrada(novo_fornecedor);
-            } else {
-                let indice_vazio = formulario_dados.fornecedores_vinculados.findIndex((fornecedor_vinculado) => !fornecedor_vinculado.fornecedor_id);
-
-                if (indice_vazio === -1) {
+            // Após criar via contexto produto, injeta automaticamente no formulário
+            if (!modo_edicao_fornecedor.value && contexto_modal_fornecedor.value === 'produto') {
+                let idx = formulario_dados.fornecedores_vinculados.findIndex((fv) => !fv.fornecedor_id);
+                if (idx === -1) {
                     adicionar_vinculo_fornecedor();
-                    indice_vazio = formulario_dados.fornecedores_vinculados.length - 1;
+                    idx = formulario_dados.fornecedores_vinculados.length - 1;
                 }
-
-                formulario_dados.fornecedores_vinculados[indice_vazio].fornecedor_id = novo_fornecedor.id;
+                formulario_dados.fornecedores_vinculados[idx].fornecedor_id = novo_fornecedor.id;
+                aba_ativa.value = 'formulario_produto';
+            } else {
+                aba_ativa.value = 'fornecedores';
             }
 
-            modal_novo_fornecedor.value = false;
+            modo_edicao_fornecedor.value = false;
+            fornecedor_edicao_id.value = null;
+            reiniciar_formulario_fornecedor();
         } catch (erro) {
-            alert(erro.response?.data?.mensagem || 'Erro ao cadastrar fornecedor.');
+            alert(erro.response?.data?.mensagem || 'Erro ao salvar fornecedor.');
         } finally {
             salvando_fornecedor.value = false;
         }
     };
 
-    /**
-     * Fecha o dropdown pesquisavel de fornecedores da entrada.
-     */
-    const fechar_dropdown_fornecedor_entrada = () => {
-        dropdown_fornecedor_entrada_aberto.value = false;
+    const excluir_fornecedor = async (fornecedor) => {
+        if (!window.confirm(`Deseja realmente excluir o fornecedor "${fornecedor.nome_fantasia}"?`)) return;
+
+        fornecedor_excluindo_id.value = fornecedor.id;
+        try {
+            await api_cliente.delete(`/fornecedores/excluir/${fornecedor.id}`);
+            await carregar_fornecedores();
+
+            // Remove da lista de vínculos do formulário de produto se estiver aberto
+            formulario_dados.fornecedores_vinculados = formulario_dados.fornecedores_vinculados.filter(
+                (fv) => Number(fv.fornecedor_id) !== Number(fornecedor.id)
+            );
+
+            if (Number(fornecedor_edicao_id.value) === Number(fornecedor.id)) {
+                cancelar_formulario_fornecedor();
+            }
+        } catch (erro) {
+            const mensagem =
+                erro.response?.data?.mensagem ||
+                erro.response?.data?.errors?.fornecedor?.[0] ||
+                'Erro ao excluir o fornecedor.';
+            alert(mensagem);
+        } finally {
+            fornecedor_excluindo_id.value = null;
+        }
     };
 
-    /**
-     * Redireciona o usuario de volta ao painel central.
-     */
-    const voltar_painel = () => roteador.push('/painel-central');
+    // ─── Watches ──────────────────────────────────────────────────────────────
 
     watch(() => formulario_entrada.quantidade_comprada, recalcular_entrada);
     watch(() => formulario_entrada.custo_unitario_compra, recalcular_entrada);
     watch(() => formulario_entrada.fator_conversao, recalcular_entrada);
     watch(() => formulario_entrada.modo_entrada, atualizar_modo_entrada);
+
+    // ─── Ciclo de vida ────────────────────────────────────────────────────────
 
     onMounted(async () => {
         await loja_produtos.buscar_produtos();
@@ -740,15 +847,29 @@ export function use_logica_produtos() {
         await carregar_fornecedores();
     });
 
+    // ─── Interface pública ────────────────────────────────────────────────────
+
     return {
+        aba_ativa,
         produtos_filtrados,
         termo_pesquisa,
+        filtro_fornecedor_id,
         voltar_painel,
-        modal_novo_produto,
+        abrir_aba_estoque,
+        abrir_aba_fornecedores,
+        alternar_formulario_fornecedor_minimizado,
+        formulario_fornecedor_minimizado,
+        produto_tem_detalhamento_fornecedor,
+        produto_esta_expandido,
+        alternar_expansao_produto,
+        formatar_data_tabela,
         carregando_produto,
         formulario_dados,
         salvar_produto,
+        excluir_produto,
+        cancelar_formulario_produto,
         salvando,
+        produto_excluindo_id,
         modo_edicao,
         abrir_modal_novo,
         abrir_modal_edicao,
@@ -757,6 +878,8 @@ export function use_logica_produtos() {
         adicionar_vinculo_fornecedor,
         remover_vinculo_fornecedor,
         lista_fornecedores,
+        fornecedores_filtrados,
+        opcoes_filtro_fornecedor,
         modal_perda,
         formulario_perda,
         abrir_modal_perda,
@@ -767,21 +890,23 @@ export function use_logica_produtos() {
         abrir_modal_entrada,
         registrar_entrada,
         registrando_entrada,
+        atualizar_modo_entrada,
         termo_fornecedor_entrada,
         dropdown_fornecedor_entrada_aberto,
         fornecedores_filtrados_entrada,
         selecionar_fornecedor_entrada,
         fornecedor_entrada_vinculado,
         entrada_pronta_para_salvar,
-        atualizar_modo_entrada,
+        produto_entrada_possui_fornecedores_vinculados,
         fechar_dropdown_fornecedor_entrada,
-        modal_novo_fornecedor,
         formulario_fornecedor,
         abrir_modal_novo_fornecedor,
+        abrir_edicao_fornecedor,
         salvar_fornecedor,
+        excluir_fornecedor,
+        cancelar_formulario_fornecedor,
         salvando_fornecedor,
-        produto_entrada_possui_fornecedores_vinculados: computed(() => {
-            return (detalhes_produto_entrada.value?.fornecedores_vinculados?.length || 0) > 0;
-        }),
+        fornecedor_excluindo_id,
+        modo_edicao_fornecedor,
     };
 }
