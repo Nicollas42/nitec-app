@@ -67,6 +67,17 @@ const liberar_mesa_se_vazia = (mesa_id, comandas) => {
     }
 };
 
+/**
+ * Calcula o custo medio local do produto apos um ajuste operacional do PDV.
+ */
+const calcular_preco_custo_medio_local = (estoque_atual, preco_custo_medio_atual, unidades_entrada, custo_total_entrada) => {
+    const estoque_total = Number(estoque_atual || 0) + Number(unidades_entrada || 0);
+    if (estoque_total <= 0) return 0;
+
+    const valor_total_anterior = Number(estoque_atual || 0) * Number(preco_custo_medio_atual || 0);
+    return Number(((valor_total_anterior + Number(custo_total_entrada || 0)) / estoque_total).toFixed(2));
+};
+
 // ─── Rotas da API ─────────────────────────────────────────────────────────────
 
 const configurar_rotas = (app_express) => {
@@ -124,6 +135,72 @@ const configurar_rotas = (app_express) => {
     app_express.get('/api/listar-produtos', (req, res) => {
         const produtos = ler_json('produtos_cache.json', []);
         res.json({ sucesso: true, produtos });
+    });
+
+    /**
+     * Regista no servidor local apenas ajustes de estoque gerados pelo PDV.
+     */
+    app_express.post('/api/estoque/registrar-entrada', (req, res) => {
+        const { modo_entrada, produto_id, quantidade_comprada, custo_unitario_compra } = req.body || {};
+
+        if (modo_entrada !== 'ajuste_pdv') {
+            return res.status(422).json({
+                sucesso: false,
+                mensagem: 'O servidor local aceita apenas ajustes operacionais do PDV nesta rota.',
+            });
+        }
+
+        const produtos = ler_json('produtos_cache.json', []);
+        const indice_produto = produtos.findIndex(produto => String(produto.id) === String(produto_id));
+
+        if (indice_produto < 0) {
+            return res.status(404).json({
+                sucesso: false,
+                mensagem: 'Produto nao encontrado no cache local.',
+            });
+        }
+
+        const quantidade_normalizada = Number(quantidade_comprada || 0);
+        const custo_unitario_normalizado = Number(custo_unitario_compra || 0);
+
+        if (quantidade_normalizada <= 0 || custo_unitario_normalizado < 0) {
+            return res.status(422).json({
+                sucesso: false,
+                mensagem: 'Valores invalidos para registrar a entrada local.',
+            });
+        }
+
+        const produto = produtos[indice_produto];
+        const custo_total_entrada = quantidade_normalizada * custo_unitario_normalizado;
+        const novo_estoque = Number(produto.estoque_atual || 0) + quantidade_normalizada;
+        const novo_preco_custo_medio = calcular_preco_custo_medio_local(
+            produto.estoque_atual,
+            produto.preco_custo_medio,
+            quantidade_normalizada,
+            custo_total_entrada
+        );
+
+        produtos[indice_produto] = {
+            ...produto,
+            estoque_atual: novo_estoque,
+            preco_custo_medio: novo_preco_custo_medio,
+        };
+
+        salvar_json('produtos_cache.json', produtos);
+        enfileirar_sync('POST', '/estoque/registrar-entrada', req.body);
+
+        return res.json({
+            sucesso: true,
+            mensagem: 'Ajuste de estoque do PDV registado localmente.',
+            dados: {
+                produto_id,
+                quantidade_comprada: quantidade_normalizada,
+                unidades_entrada: quantidade_normalizada,
+                custo_total_entrada,
+                estoque_atual: novo_estoque,
+                preco_custo_medio_atualizado: novo_preco_custo_medio,
+            }
+        });
     });
 
     // ── Comandas ─────────────────────────────────────────────────────────────

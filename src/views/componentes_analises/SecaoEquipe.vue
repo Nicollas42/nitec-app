@@ -3,7 +3,7 @@
         
         <div class="p-6 bg-[var(--bg-page)] border-b border-[var(--border-subtle)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 rounded-t-3xl transition-colors duration-300">
             <div class="flex items-center gap-2">
-                <h2 class="text-sm font-black text-[var(--text-primary)] uppercase">Desempenho da Equipa</h2>
+                <h2 class="text-sm font-black text-[var(--text-primary)] uppercase">Desempenho da Equipe</h2>
                 <div class="relative group">
                     <span class="cursor-pointer text-[var(--text-muted)] hover:text-blue-500 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-full h-5 w-5 flex items-center justify-center font-bold text-[10px] shadow-sm">ℹ️</span>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-gray-800 text-white text-xs p-4 rounded-2xl shadow-xl z-[150] font-normal">

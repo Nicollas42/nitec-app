@@ -14,7 +14,7 @@
                 <div class="flex flex-col sm:flex-row gap-3">
                     <div class="flex-1 flex items-center bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-xl px-4 py-2.5 focus-within:border-nitec_blue transition-colors shadow-sm">
                         <span class="text-[var(--text-muted)] mr-2">🔍</span>
-                        <input type="text" v-model="termo_pesquisa" placeholder="Procurar produto ou código de barras..." class="bg-transparent text-sm font-bold outline-none text-[var(--text-primary)] w-full placeholder:font-medium placeholder:text-[var(--text-muted)]">
+                        <input type="text" v-model="termo_pesquisa" placeholder="Procurar produto, codigo interno ou alias..." class="bg-transparent text-sm font-bold outline-none text-[var(--text-primary)] w-full placeholder:font-medium placeholder:text-[var(--text-muted)]">
                     </div>
                     <select v-model="categoria_selecionada" class="bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] text-xs font-black uppercase tracking-widest rounded-xl px-4 py-2.5 outline-none focus:border-nitec_blue shadow-sm">
                         <option v-for="cat in categorias_unicas" :key="cat" :value="cat">
@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { useLogicaPdv } from './pagina_pdv_logica.js';
+import { use_logica_pdv } from './pagina_pdv_logica.js';
 
 const { 
     produtos_vitrine, categorias_unicas, termo_pesquisa, categoria_selecionada, 
@@ -186,7 +186,7 @@ const {
     subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
     quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
     id_comanda_vinculada, id_comanda_pagamento, carrinho_expandido, processar_acao_principal, voltar_painel,
-} = useLogicaPdv();
+} = use_logica_pdv();
 </script>
 
 <style scoped>

@@ -7,7 +7,10 @@ import api_cliente from '../servicos/api_cliente.js';
 import { db } from '../banco_local/db.js';
 import { useToastStore } from '../stores/toast_store.js';
 
-export function useLogicaPdv() {
+/**
+ * Centraliza a logica operacional do PDV, incluindo vendas e modo offline.
+ */
+export function use_logica_pdv() {
     const roteador = useRouter();
     const rota_atual = useRoute(); 
     const loja_produtos = useProdutosStore();
@@ -33,6 +36,41 @@ export function useLogicaPdv() {
     const produtos_fixados = ref(JSON.parse(localStorage.getItem('nitec_pdv_fixados') || '[]'));
     const avisos_excedente_emitidos = ref({});
 
+    /**
+     * Retorna todos os codigos pesquisaveis do produto para uso no PDV.
+     *
+     * @param {Record<string, any>} produto
+     * @returns {string[]}
+     */
+    const obter_codigos_pesquisaveis = (produto) => {
+        const codigos_barras = Array.isArray(produto?.codigos_barras) ? produto.codigos_barras : [];
+        const codigo_principal = produto?.codigo_barras_principal ? [produto.codigo_barras_principal] : [];
+
+        return [...new Set([produto?.codigo_interno, ...codigo_principal, ...codigos_barras].filter(Boolean).map(String))];
+    };
+
+    /**
+     * Verifica se o produto corresponde ao termo digitado no PDV.
+     *
+     * @param {Record<string, any>} produto
+     * @param {string} termo
+     * @returns {boolean}
+     */
+    const produto_corresponde_termo = (produto, termo) => {
+        const termo_normalizado = termo.toLowerCase().trim();
+
+        if (!termo_normalizado) {
+            return true;
+        }
+
+        const nome_corresponde = produto.nome_produto.toLowerCase().includes(termo_normalizado);
+        const codigo_corresponde = obter_codigos_pesquisaveis(produto).some((codigo) => {
+            return codigo.toLowerCase().includes(termo_normalizado);
+        });
+
+        return nome_corresponde || codigo_corresponde;
+    };
+
     const gerarUUID = () => {
         return typeof crypto !== 'undefined' && crypto.randomUUID 
             ? crypto.randomUUID() 
@@ -55,8 +93,7 @@ export function useLogicaPdv() {
 
     const produtos_vitrine = computed(() => {
         return loja_produtos.lista_produtos.filter(p => {
-            const matchTexto = p.nome_produto.toLowerCase().includes(termo_pesquisa.value.toLowerCase()) || 
-                               (p.codigo_barras && p.codigo_barras.includes(termo_pesquisa.value));
+            const matchTexto = produto_corresponde_termo(p, termo_pesquisa.value);
             const matchCat = categoria_selecionada.value === 'todas' || p.categoria === categoria_selecionada.value;
             return matchTexto && matchCat;
         }).sort((a, b) => {
@@ -101,17 +138,19 @@ export function useLogicaPdv() {
             .filter(Boolean);
     };
 
+    /**
+     * Registra ajustes operacionais de estoque quando o PDV excede o saldo atual.
+     */
     const registrar_entradas_forcadas = async () => {
         const excedentes = calcular_excedentes_carrinho();
         if (excedentes.length === 0) return;
 
         for (const { item, excedente } of excedentes) {
             const payload = {
+                modo_entrada: 'ajuste_pdv',
                 produto_id: item.id,
-                nome_produto: item.nome_produto,
-                quantidade: excedente,
-                custo_unitario: Number(item.preco_custo || 0),
-                fornecedor: 'Entrada Forcada via PDV'
+                quantidade_comprada: excedente,
+                custo_unitario_compra: Number(item.preco_custo_medio || 0),
             };
 
             try {
