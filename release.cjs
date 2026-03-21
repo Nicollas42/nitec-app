@@ -132,6 +132,20 @@ const upload_asset_github = (upload_url, caminho_arquivo, nome_arquivo) => {
 };
 
 /**
+ * Valida se o token atual consegue acessar o repositorio de releases.
+ * Falha cedo para nao incrementar versao nem iniciar build a toa.
+ * @returns {Promise<void>}
+ */
+const validar_token_github_release = async () => {
+    const resposta = await github_api('GET', `/repos/${GH_OWNER}/${GH_REPO}`);
+
+    if (!resposta || resposta.message || !resposta.full_name) {
+        const detalhe = resposta?.message ? ` Detalhe: ${resposta.message}` : '';
+        throw new Error(`GH_TOKEN_NITEC invalido, expirado ou sem acesso ao repositorio ${GH_OWNER}/${GH_REPO}.${detalhe}`);
+    }
+};
+
+/**
  * Busca a release mais recente do repositório pelo nome da tag.
  * @param {string} tag  Ex: 'v1.1.7'
  * @returns {Promise<object|null>}
@@ -209,6 +223,11 @@ const configurar_java = () => {
     console.log('══════════════════════════════════════\n');
 
     process.env.GH_TOKEN = GH_TOKEN;
+
+    sep();
+    info('PRE-CHECK — Validando token do GitHub para releases...');
+    await validar_token_github_release();
+    log('Token do GitHub validado.');
 
     // PASSO 1 — Versão
     sep();
