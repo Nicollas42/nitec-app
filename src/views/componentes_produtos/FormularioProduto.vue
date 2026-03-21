@@ -59,11 +59,22 @@
                             class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors" />
                     </div>
                     <div class="space-y-1.5">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Categoria</label>
-                        <select v-model="formulario_dados.categoria"
-                            class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors">
-                            <option v-for="c in categorias_opcoes" :key="c" :value="c">{{ c }}</option>
-                        </select>
+                        <div class="flex items-center justify-between">
+                            <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Categoria</label>
+                            <button type="button" @click="modal_categorias_visivel = true"
+                                class="text-[10px] font-black text-nitec_blue hover:underline tracking-widest uppercase">
+                                + Gerenciar
+                            </button>
+                        </div>
+                        <SelectPesquisavel
+                            :model-value="formulario_dados.categoria"
+                            :opcoes="opcoes_categoria"
+                            chave_valor="valor"
+                            chave_rotulo="label"
+                            placeholder="Pesquisar categoria..."
+                            texto_vazio="Nenhuma categoria encontrada."
+                            @update:model-value="formulario_dados.categoria = $event"
+                        />
                     </div>
                     <div class="space-y-1.5">
                         <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Unidade de Venda</label>
@@ -417,11 +428,70 @@
 
         </form>
     </section>
+
+    <!-- Modal: Gerenciamento de Categorias -->
+    <Teleport to="body">
+        <div v-if="modal_categorias_visivel"
+            class="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+            @click.self="modal_categorias_visivel = false">
+            <div class="bg-[var(--bg-card)] rounded-[2rem] border border-[var(--border-subtle)] shadow-2xl w-full max-w-md overflow-hidden">
+
+                <div class="px-6 py-5 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-black text-[var(--text-primary)]">Categorias de Produto</h3>
+                        <p class="text-[10px] font-bold text-[var(--text-muted)] mt-0.5 uppercase tracking-widest">Adicione ou remova categorias do catálogo</p>
+                    </div>
+                    <button type="button" @click="modal_categorias_visivel = false"
+                        class="h-9 w-9 flex items-center justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">✕</button>
+                </div>
+
+                <div class="p-6 space-y-4">
+                    <div class="flex gap-2">
+                        <input v-model="nova_categoria_input" type="text"
+                            :disabled="salvando_categoria"
+                            placeholder="Nome da nova categoria..."
+                            @keydown.enter.prevent="adicionar_categoria"
+                            class="flex-1 p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors" />
+                        <button type="button" @click="adicionar_categoria"
+                            :disabled="salvando_categoria || !nova_categoria_input.trim()"
+                            class="px-4 rounded-xl bg-nitec_blue text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 transition-colors">
+                            {{ salvando_categoria && categoria_processando_nome === nova_categoria_input.trim() ? 'Salvando...' : '+ Adicionar' }}
+                        </button>
+                    </div>
+
+                    <p v-if="carregando_categorias" class="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
+                        Carregando categorias do tenant...
+                    </p>
+
+                    <div class="max-h-72 overflow-y-auto space-y-1.5 pr-0.5">
+                        <div v-for="cat in categorias_opcoes" :key="cat"
+                            class="flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-page)] border transition-colors"
+                            :class="formulario_dados.categoria === cat ? 'border-nitec_blue/40 bg-blue-500/5' : 'border-[var(--border-subtle)]'">
+                            <span class="text-sm font-bold text-[var(--text-primary)] truncate">{{ cat }}</span>
+                            <div class="flex items-center gap-2 flex-none">
+                                <span v-if="cat === 'Geral'" class="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest px-2 py-0.5 bg-[var(--bg-card)] rounded-lg border border-[var(--border-subtle)]">padrão</span>
+                                <button v-else type="button" @click="remover_categoria(cat)"
+                                    class="h-6 w-6 flex items-center justify-center rounded-lg border border-red-500/20 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors text-xs flex-none">✕</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-6 pb-6">
+                    <button type="button" @click="modal_categorias_visivel = false"
+                        class="w-full py-3 rounded-xl bg-nitec_blue text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import SelectPesquisavel from '../componentes_analises/SelectPesquisavel.vue';
+import api_cliente from '../../servicos/api_cliente.js';
 
 const props = defineProps({
     carregando_produto: { type: Boolean, required: true },
@@ -461,13 +531,119 @@ const placeholder_nome = computed(() =>
         : 'Ex: Caipirinha de Limão, Porção de Calabresa'
 );
 
-// ─── Opções de campos ─────────────────────────────────────────────────────────
+// ─── Categorias com persistência em localStorage ──────────────────────────────
 
-const categorias_opcoes = [
+const CATEGORIAS_PADRAO = [
     'Geral', 'Cervejas', 'Drinks e Coquetéis', 'Destilados', 'Vinhos e Espumantes',
     'Bebidas Não Alcoólicas', 'Pratos Principais', 'Entradas e Petiscos',
     'Sobremesas', 'Lanches', 'Insumos de Bar', 'Descartáveis',
 ];
+
+const categorias_opcoes = ref([...CATEGORIAS_PADRAO]);
+const carregando_categorias = ref(false);
+const salvando_categoria = ref(false);
+const categoria_processando_nome = ref('');
+const modal_categorias_visivel = ref(false);
+const nova_categoria_input = ref('');
+
+const comparar_categoria = (a, b) =>
+    String(a || '').localeCompare(String(b || ''), 'pt-BR', { sensitivity: 'base' }) === 0;
+
+const ordenar_categorias = (categorias) =>
+    [...categorias].sort((a, b) => {
+        if (comparar_categoria(a, 'Geral')) return -1;
+        if (comparar_categoria(b, 'Geral')) return 1;
+        return String(a).localeCompare(String(b), 'pt-BR', { sensitivity: 'base' });
+    });
+
+const montar_lista_categorias = (categorias = []) => {
+    const categorias_unicas = [];
+
+    [...categorias, props.formulario_dados.categoria]
+        .map((categoria) => String(categoria || '').trim())
+        .filter(Boolean)
+        .forEach((categoria) => {
+            if (!categorias_unicas.some((item) => comparar_categoria(item, categoria))) {
+                categorias_unicas.push(categoria);
+            }
+        });
+
+    if (!categorias_unicas.some((categoria) => comparar_categoria(categoria, 'Geral'))) {
+        categorias_unicas.push('Geral');
+    }
+
+    return ordenar_categorias(categorias_unicas);
+};
+
+const sincronizar_categorias = (categorias = []) => {
+    categorias_opcoes.value = montar_lista_categorias(categorias);
+};
+
+const carregar_categorias = async ({ silencioso = false } = {}) => {
+    carregando_categorias.value = true;
+
+    try {
+        const resposta = await api_cliente.get('/produtos/categorias');
+        sincronizar_categorias(resposta.data?.categorias || []);
+    } catch (erro) {
+        sincronizar_categorias(CATEGORIAS_PADRAO);
+        if (!silencioso) {
+            alert(erro.response?.data?.mensagem || 'Erro ao carregar as categorias do tenant.');
+        }
+    } finally {
+        carregando_categorias.value = false;
+    }
+};
+
+const adicionar_categoria = async () => {
+    const nome = nova_categoria_input.value.trim();
+    if (!nome) return;
+
+    const categoria_existente = categorias_opcoes.value.find((categoria) => comparar_categoria(categoria, nome));
+    if (categoria_existente) {
+        props.formulario_dados.categoria = categoria_existente;
+        nova_categoria_input.value = '';
+        return;
+    }
+
+    salvando_categoria.value = true;
+    categoria_processando_nome.value = nome;
+
+    try {
+        await api_cliente.post('/produtos/categorias', { nome });
+        await carregar_categorias({ silencioso: true });
+        props.formulario_dados.categoria =
+            categorias_opcoes.value.find((categoria) => comparar_categoria(categoria, nome)) || nome;
+        nova_categoria_input.value = '';
+    } catch (erro) {
+        alert(erro.response?.data?.mensagem || 'Erro ao salvar a categoria.');
+    } finally {
+        salvando_categoria.value = false;
+        categoria_processando_nome.value = '';
+    }
+};
+
+const remover_categoria = async (cat) => {
+    if (cat === 'Geral') return;
+
+    if (!window.confirm(`Deseja remover a categoria "${cat}" deste tenant?`)) return;
+
+    salvando_categoria.value = true;
+    categoria_processando_nome.value = cat;
+
+    try {
+        await api_cliente.delete(`/produtos/categorias/${encodeURIComponent(cat)}`);
+        if (comparar_categoria(props.formulario_dados.categoria, cat)) {
+            props.formulario_dados.categoria = 'Geral';
+        }
+        await carregar_categorias({ silencioso: true });
+    } catch (erro) {
+        alert(erro.response?.data?.mensagem || 'Erro ao remover a categoria.');
+    } finally {
+        salvando_categoria.value = false;
+        categoria_processando_nome.value = '';
+    }
+};
 
 const unidades_opcoes = [
     { valor: 'UN', descricao: 'Unidade' },
@@ -528,6 +704,13 @@ const opcoes_fornecedor = computed(() =>
     props.lista_fornecedores.map((f) => ({
         id: f.id,
         label: [f.nome_fantasia, f.vendedor, f.cnpj].filter(Boolean).join(' | '),
+    }))
+);
+
+const opcoes_categoria = computed(() =>
+    categorias_opcoes.value.map((categoria) => ({
+        valor: categoria,
+        label: categoria,
     }))
 );
 
@@ -599,5 +782,26 @@ const resumo_margem_real = computed(() => {
         texto: custo > 0 ? (positivo ? `+${margem_real}%` : `${margem_real}%`) : '—',
         lucro_unitario: lucro.toFixed(2),
     };
+});
+
+watch(
+    () => props.formulario_dados.categoria,
+    () => {
+        sincronizar_categorias(categorias_opcoes.value);
+    },
+    { immediate: true }
+);
+
+watch(
+    modal_categorias_visivel,
+    (visivel) => {
+        if (visivel) {
+            carregar_categorias({ silencioso: true });
+        }
+    }
+);
+
+onMounted(() => {
+    carregar_categorias({ silencioso: true });
 });
 </script>

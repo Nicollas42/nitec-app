@@ -1,37 +1,70 @@
 <template>
     <div class="p-6 bg-[var(--bg-page)] h-full overflow-y-auto font-sans relative transition-colors duration-300">
-        <header class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 bg-[var(--bg-card)] p-6 rounded-3xl shadow-sm border border-[var(--border-subtle)] transition-colors duration-300">
-            <div>
-                <div class="flex items-center gap-3">
-                    <h1 class="text-2xl font-black text-[var(--text-primary)] tracking-tight">Inteligencia de Negocios</h1>
-                    <button @click="modal_config_visivel = true" class="text-[var(--text-muted)] hover:text-nitec_blue transition-colors" title="Configurar horario do turno">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+        <header class="mb-6 bg-[var(--bg-card)] rounded-3xl shadow-sm border border-[var(--border-subtle)] overflow-hidden transition-colors duration-300">
+
+            <!-- Faixa superior: título + botão de config -->
+            <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border-subtle)]">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Painel Analítico</p>
+                    <h1 class="text-xl font-black text-[var(--text-primary)] tracking-tight mt-0.5">Inteligência de Negócios</h1>
+                </div>
+                <button @click="modal_config_visivel = true"
+                        class="flex items-center gap-2 text-[var(--text-muted)] hover:text-nitec_blue bg-[var(--bg-page)] border border-[var(--border-subtle)] hover:border-nitec_blue/40 px-3 py-2 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest"
+                        title="Configurar horário do turno">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span class="hidden sm:inline">Virada do Turno</span>
+                </button>
+            </div>
+
+            <!-- Faixa inferior: filtros de período -->
+            <div class="flex flex-wrap items-center gap-2 px-6 py-3">
+
+                <!-- Botão voltar (mobile only) -->
+                <button @click="voltar_painel"
+                        class="lg:hidden h-[36px] px-4 bg-[var(--bg-page)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-card-hover)] text-[10px] font-black uppercase tracking-widest transition-all flex items-center">
+                    ← Voltar
+                </button>
+
+                <!-- Atalhos rápidos -->
+                <div class="flex items-center gap-1.5 bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-xl p-1">
+                    <button @click="definir_periodo('hoje')"
+                            class="px-3 h-[28px] rounded-lg text-[10px] font-black uppercase tracking-widest transition-all hover:bg-nitec_blue hover:text-white text-[var(--text-muted)]">
+                        Hoje
+                    </button>
+                    <button @click="definir_periodo('semana')"
+                            class="px-3 h-[28px] rounded-lg text-[10px] font-black uppercase tracking-widest transition-all hover:bg-nitec_blue hover:text-white text-[var(--text-muted)]">
+                        7 dias
+                    </button>
+                    <button @click="definir_periodo('mes')"
+                            class="px-3 h-[28px] rounded-lg text-[10px] font-black uppercase tracking-widest transition-all hover:bg-nitec_blue hover:text-white text-[var(--text-muted)]">
+                        30 dias
                     </button>
                 </div>
 
-                <div class="flex gap-2 mt-2">
-                    <button @click="definir_periodo('hoje')" class="px-3 py-1.5 bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10 hover:text-blue-500 text-[var(--text-muted)] transition-colors">Hoje</button>
-                    <button @click="definir_periodo('semana')" class="px-3 py-1.5 bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10 hover:text-blue-500 text-[var(--text-muted)] transition-colors">7 Dias</button>
-                    <button @click="definir_periodo('mes')" class="px-3 py-1.5 bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-500/10 hover:text-blue-500 text-[var(--text-muted)] transition-colors">30 Dias</button>
-                </div>
-            </div>
+                <!-- Separador -->
+                <span class="text-[var(--border-subtle)] hidden sm:block">|</span>
 
-            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto mt-4 lg:mt-0">
-                <button @click="voltar_painel" class="lg:hidden px-5 py-2.5 bg-[var(--bg-page)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-xl hover:bg-[var(--bg-card-hover)] text-xs font-black uppercase tracking-widest transition-all flex-1 shadow-sm h-[38px] flex items-center justify-center">
-                    Voltar
-                </button>
-
-                <div class="flex flex-1 items-center bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-xl px-4 py-2 gap-2 shadow-inner">
-                    <input type="date" v-model="data_inicio" @change="buscar_dados" class="bg-transparent text-xs font-black uppercase tracking-widest outline-none text-[var(--text-primary)] cursor-pointer w-full text-center" style="color-scheme: dark;">
-                    <span class="text-[var(--text-muted)] text-xs">-></span>
-                    <input type="date" v-model="data_fim" @change="buscar_dados" class="bg-transparent text-xs font-black uppercase tracking-widest outline-none text-[var(--text-primary)] cursor-pointer w-full text-center" style="color-scheme: dark;">
+                <!-- Seletor de datas customizado -->
+                <div class="flex items-center gap-2 bg-[var(--bg-page)] border border-[var(--border-subtle)] rounded-xl px-3 h-[36px] shadow-inner">
+                    <input type="date" v-model="data_inicio" @change="buscar_dados"
+                           class="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none text-[var(--text-primary)] cursor-pointer w-full text-center"
+                           style="color-scheme: dark;">
+                    <span class="text-[var(--text-muted)] text-[10px] font-black flex-shrink-0">→</span>
+                    <input type="date" v-model="data_fim" @change="buscar_dados"
+                           class="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none text-[var(--text-primary)] cursor-pointer w-full text-center"
+                           style="color-scheme: dark;">
                 </div>
 
-                <button @click="buscar_dados" class="bg-nitec_blue hover:bg-blue-700 text-white h-[38px] w-[38px] rounded-xl shadow-md transition-all flex items-center justify-center active:scale-95 flex-shrink-0" title="Pesquisar periodo">
-                    <span class="text-sm">🔍</span>
+                <!-- Botão buscar -->
+                <button @click="buscar_dados"
+                        class="bg-nitec_blue hover:bg-blue-700 text-white h-[36px] w-[36px] rounded-xl shadow-md transition-all flex items-center justify-center active:scale-95 flex-shrink-0"
+                        title="Aplicar filtro">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+                    </svg>
                 </button>
             </div>
         </header>
@@ -112,11 +145,15 @@
                 </div>
 
                 <div v-show="aba_ativa === 'estoque_sem_giro'">
-                    <TabelaEncalhados :encalhados="dados_dashboard.encalhados" />
+                    <TabelaEncalhados />
                 </div>
 
                 <div v-show="aba_ativa === 'equipe'">
                     <SecaoEquipe :equipe="dados_dashboard.equipe" />
+                </div>
+
+                <div v-show="aba_ativa === 'fornecedores'">
+                    <SecaoFornecedores />
                 </div>
 
                 <div v-show="aba_ativa === 'auditoria'">
@@ -232,6 +269,7 @@ import TabelaEncalhados from './componentes_analises/TabelaEncalhados.vue';
 import SecaoEquipe from './componentes_analises/SecaoEquipe.vue';
 import TabelaAuditoria from './componentes_analises/TabelaAuditoria.vue';
 import SecaoConsultasAgente from './componentes_analises/SecaoConsultasAgente.vue';
+import SecaoFornecedores from './componentes_analises/SecaoFornecedores.vue';
 
 const {
     carregando,

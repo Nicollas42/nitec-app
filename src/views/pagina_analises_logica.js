@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRouter } from 'vue-router';
 import api_cliente, { consultar_agente_ia } from '../servicos/api_cliente.js';
 import { useToastStore } from '../stores/toast_store.js';
@@ -18,6 +18,7 @@ export function useLogicaAnalises() {
         { id: 'estatisticas', label: 'Estatisticas' },
         { id: 'estoque_sem_giro', label: 'Estoque S/ Giro' },
         { id: 'equipe', label: 'Equipe' },
+        { id: 'fornecedores', label: 'Fornecedores' },
         { id: 'auditoria', label: 'Auditoria' },
         { id: 'consultas', label: 'Consultas' },
     ];
@@ -285,7 +286,15 @@ export function useLogicaAnalises() {
         return `${data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} as ${data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
     };
 
+    const ja_ativado = ref(false);
+
     onMounted(() => definir_periodo('hoje'));
+    onActivated(() => {
+        if (!ja_ativado.value) {
+            aba_ativa.value = 'estatisticas';
+            ja_ativado.value = true;
+        }
+    });
 
     return {
         carregando,

@@ -80,6 +80,22 @@ export function useLogicaDashboard() {
      * Verifica se há nova versão disponível para Android no GitHub.
      * Procura por um asset .apk na release mais recente.
      */
+    /**
+     * Prioriza o APK versionado da release para evitar baixar assets genÃ©ricos
+     * quando existir um arquivo com nome amigÃ¡vel publicado.
+     * @param {Array<{ name?: string, browser_download_url?: string }>} lista_assets
+     * @param {string} versao_release
+     * @returns {{ name?: string, browser_download_url?: string } | null}
+     */
+    const obter_asset_apk_da_release = (lista_assets = [], versao_release = '') => {
+        const nome_versionado = `NitecSystem-${versao_release}.apk`;
+        const asset_versionado = lista_assets.find((asset) => asset?.name === nome_versionado);
+
+        if (asset_versionado) return asset_versionado;
+
+        return lista_assets.find((asset) => asset?.name?.toLowerCase().endsWith('.apk')) || null;
+    };
+
     const checar_atualizacoes_android = async () => {
         estado_atualizacao.value = 'buscando';
         mensagem_status.value = 'Verificando atualizações...';
@@ -100,7 +116,7 @@ export function useLogicaDashboard() {
             const versao_github = release.tag_name.replace(/^v/, '');
 
             // Procura o APK nos assets da release
-            const asset_apk = release.assets?.find(a => a.name.endsWith('.apk'));
+            const asset_apk = obter_asset_apk_da_release(release.assets || [], versao_github);
 
             if (e_versao_mais_recente(versao_github, versao_atual.value) && asset_apk) {
                 versao_nova.value = versao_github;

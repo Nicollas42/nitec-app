@@ -65,22 +65,47 @@
                                 class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors" />
                         </div>
                         <div class="space-y-1.5">
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">CNPJ *</label>
+                            <div class="flex items-center justify-between">
+                                <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">CNPJ / CPF *</label>
+                                <span v-if="formulario_fornecedor.cnpj" class="text-[9px] font-black uppercase tracking-widest"
+                                    :class="validar_cnpj_cpf(formulario_fornecedor.cnpj) ? 'text-green-500' : 'text-red-500'">
+                                    {{ validar_cnpj_cpf(formulario_fornecedor.cnpj) ? '✓ Válido' : '✗ Inválido' }}
+                                </span>
+                            </div>
                             <input v-model="formulario_fornecedor.cnpj" type="text"
-                                placeholder="00.000.000/0000-00"
-                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors font-mono" />
+                                placeholder="00.000.000/0000-00 ou 000.000.000-00"
+                                maxlength="18"
+                                @blur="formatar_cnpj_ao_sair($event, formulario_fornecedor)"
+                                :class="cls_campo(formulario_fornecedor.cnpj, validar_cnpj_cpf)"
+                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border text-sm font-bold text-[var(--text-primary)] outline-none transition-colors font-mono" />
                         </div>
                         <div class="space-y-1.5">
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Telefone</label>
+                            <div class="flex items-center justify-between">
+                                <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Telefone</label>
+                                <span v-if="formulario_fornecedor.telefone" class="text-[9px] font-black uppercase tracking-widest"
+                                    :class="validar_telefone_br(formulario_fornecedor.telefone) ? 'text-green-500' : 'text-red-500'">
+                                    {{ validar_telefone_br(formulario_fornecedor.telefone) ? '✓ Válido' : '✗ Formato inválido' }}
+                                </span>
+                            </div>
                             <input v-model="formulario_fornecedor.telefone" type="text"
-                                placeholder="(84) 99999-9999"
-                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors" />
+                                placeholder="(00) 99999-9999"
+                                maxlength="16"
+                                @blur="formatar_tel_ao_sair($event, formulario_fornecedor)"
+                                :class="cls_campo(formulario_fornecedor.telefone, validar_telefone_br)"
+                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border text-sm font-bold text-[var(--text-primary)] outline-none transition-colors" />
                         </div>
                         <div class="space-y-1.5">
-                            <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">E-mail</label>
-                            <input v-model="formulario_fornecedor.email" type="email"
+                            <div class="flex items-center justify-between">
+                                <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">E-mail</label>
+                                <span v-if="formulario_fornecedor.email" class="text-[9px] font-black uppercase tracking-widest"
+                                    :class="validar_email_simples(formulario_fornecedor.email) ? 'text-green-500' : 'text-red-500'">
+                                    {{ validar_email_simples(formulario_fornecedor.email) ? '✓ Válido' : '✗ E-mail inválido' }}
+                                </span>
+                            </div>
+                            <input v-model="formulario_fornecedor.email" type="text"
                                 placeholder="vendas@fornecedor.com"
-                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border border-[var(--border-subtle)] text-sm font-bold text-[var(--text-primary)] outline-none focus:border-nitec_blue transition-colors" />
+                                :class="cls_campo(formulario_fornecedor.email, validar_email_simples)"
+                                class="w-full p-3 rounded-xl bg-[var(--bg-page)] border text-sm font-bold text-[var(--text-primary)] outline-none transition-colors" />
                         </div>
                         <div class="space-y-1.5">
                             <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Representante / Vendedor</label>
@@ -209,15 +234,15 @@
 
                 <div v-else class="overflow-x-auto">
                     <table class="min-w-full text-left">
-                        <thead class="border-b border-[var(--border-subtle)] bg-[var(--bg-page)]">
+                        <thead class="border-b border-[var(--border-subtle)] bg-[var(--bg-page)] sticky top-0 z-10">
                             <tr>
                                 <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Item</th>
                                 <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden md:table-cell">Categoria</th>
-                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden lg:table-cell">Código</th>
+                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden xl:table-cell">Código</th>
                                 <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden lg:table-cell">Validade</th>
-                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden md:table-cell">Custo Médio</th>
-                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Preço Venda</th>
-                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">Estoque</th>
+                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] hidden lg:table-cell text-right">Custo Médio</th>
+                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] text-right">Preço Venda</th>
+                                <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] text-center">Estoque</th>
                                 <th class="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] text-right">Ações</th>
                             </tr>
                         </thead>
@@ -253,7 +278,7 @@
                                         </span>
                                     </td>
 
-                                    <td class="px-5 py-4 hidden lg:table-cell text-[11px] font-mono text-[var(--text-muted)]">
+                                    <td class="px-5 py-4 hidden xl:table-cell text-[11px] font-mono text-[var(--text-muted)]">
                                         {{ produto.codigo_interno || '—' }}
                                     </td>
 
@@ -265,36 +290,41 @@
                                         <span v-else class="text-[11px] text-[var(--text-muted)] font-bold">—</span>
                                     </td>
 
-                                    <td class="px-5 py-4 hidden md:table-cell text-sm font-black text-red-400">
+                                    <td class="px-5 py-4 hidden lg:table-cell text-sm font-black text-right text-red-400">
                                         R$ {{ Number(produto.preco_custo_medio || 0).toFixed(2) }}
                                     </td>
 
-                                    <td class="px-5 py-4 text-sm font-black text-green-500">
+                                    <td class="px-5 py-4 text-sm font-black text-right text-green-500">
                                         R$ {{ Number(produto.preco_venda).toFixed(2) }}
                                     </td>
 
-                                    <td class="px-5 py-4">
+                                    <td class="px-5 py-4 text-center">
                                         <span class="inline-flex items-center px-3 py-1 rounded-lg border text-xs font-black"
                                             :class="produto.estoque_atual <= 0
                                                 ? 'bg-red-500/10 border-red-500/20 text-red-500'
-                                                : 'bg-[var(--bg-page)] border-[var(--border-subtle)] text-[var(--text-primary)]'">
+                                                : produto.estoque_atual <= 5
+                                                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                                                    : 'bg-[var(--bg-page)] border-[var(--border-subtle)] text-[var(--text-primary)]'">
                                             {{ produto.estoque_atual }} {{ produto.unidade_medida || 'un' }}
                                         </span>
                                     </td>
 
                                     <!-- Ações -->
                                     <td class="px-5 py-4">
-                                        <div class="flex flex-wrap justify-end gap-1.5">
+                                        <div class="flex items-center justify-end gap-1">
                                             <button @click="abrir_modal_edicao(produto)"
-                                                class="px-3 py-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] text-[10px] font-black uppercase text-[var(--text-primary)] hover:text-blue-500 hover:border-blue-500/30 transition-colors">
+                                                class="h-8 px-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] text-[10px] font-black uppercase text-[var(--text-muted)] hover:text-blue-500 hover:border-blue-500/30 transition-colors"
+                                                title="Editar produto">
                                                 Editar
                                             </button>
                                             <button @click="abrir_modal_entrada(produto)"
-                                                class="px-3 py-2 rounded-xl border border-blue-500/20 bg-blue-500/10 text-[10px] font-black uppercase text-blue-500 hover:bg-blue-600 hover:text-white transition-colors">
-                                                Entrada
+                                                class="h-8 px-3 rounded-xl border border-blue-500/20 bg-blue-500/10 text-[10px] font-black uppercase text-blue-500 hover:bg-blue-600 hover:text-white transition-colors"
+                                                title="Registrar entrada de estoque">
+                                                +&nbsp;Entrada
                                             </button>
                                             <button @click="abrir_modal_perda(produto)"
-                                                class="px-3 py-2 rounded-xl border border-red-500/20 bg-red-500/10 text-[10px] font-black uppercase text-red-500 hover:bg-red-500 hover:text-white transition-colors">
+                                                class="h-8 px-3 rounded-xl border border-orange-500/20 bg-orange-500/10 text-[10px] font-black uppercase text-orange-500 hover:bg-orange-500 hover:text-white transition-colors"
+                                                title="Registrar baixa de estoque">
                                                 Baixa
                                             </button>
                                             <button @click="excluir_produto(produto)"
@@ -395,6 +425,57 @@ import FormularioProduto from './componentes_produtos/FormularioProduto.vue';
 import ModalEntradaEstoque from './componentes_produtos/ModalEntradaEstoque.vue';
 import ModalPerdaEstoque from './componentes_produtos/ModalPerdaEstoque.vue';
 import { use_logica_produtos } from './pagina_produtos_logica.js';
+
+// ─── Validação do formulário de fornecedor ────────────────────────────────────
+
+const validar_cnpj_cpf = (valor) => {
+    const n = (valor || '').replace(/\D/g, '');
+    if (n.length === 11) {
+        if (/^(\d)\1+$/.test(n)) return false;
+        let s = 0; for (let i = 0; i < 9; i++) s += +n[i] * (10 - i);
+        const d1 = s % 11 < 2 ? 0 : 11 - s % 11;
+        s = 0; for (let i = 0; i < 10; i++) s += +n[i] * (11 - i);
+        const d2 = s % 11 < 2 ? 0 : 11 - s % 11;
+        return +n[9] === d1 && +n[10] === d2;
+    }
+    if (n.length === 14) {
+        if (/^(\d)\1+$/.test(n)) return false;
+        let s = 0, p = 2;
+        for (let i = 11; i >= 0; i--) { s += +n[i] * p; p = p === 9 ? 2 : p + 1; }
+        const d1 = s % 11 < 2 ? 0 : 11 - s % 11;
+        s = 0; p = 2;
+        for (let i = 12; i >= 0; i--) { s += +n[i] * p; p = p === 9 ? 2 : p + 1; }
+        const d2 = s % 11 < 2 ? 0 : 11 - s % 11;
+        return +n[12] === d1 && +n[13] === d2;
+    }
+    return false;
+};
+
+const validar_telefone_br = (valor) => {
+    const n = (valor || '').replace(/\D/g, '');
+    return n.length === 10 || n.length === 11;
+};
+
+const validar_email_simples = (valor) => !valor || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor);
+
+const cls_campo = (valor, fn) => {
+    if (!valor) return '';
+    return fn(valor)
+        ? 'border-green-500/40 bg-green-500/5 focus:border-green-500'
+        : 'border-red-500/40 bg-red-500/5 focus:border-red-500';
+};
+
+const formatar_cnpj_ao_sair = (e, formulario) => {
+    const n = e.target.value.replace(/\D/g, '');
+    if (n.length === 11) formulario.cnpj = n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    else if (n.length === 14) formulario.cnpj = n.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+};
+
+const formatar_tel_ao_sair = (e, formulario) => {
+    const n = e.target.value.replace(/\D/g, '').slice(0, 11);
+    if (n.length === 11) formulario.telefone = n.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    else if (n.length === 10) formulario.telefone = n.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+};
 
 const {
     aba_ativa,
