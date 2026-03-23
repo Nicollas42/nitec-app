@@ -39,15 +39,51 @@ html.dark {
     /* MODO ESCURO */
     --bg-page: #0f111a;        /* Fundo profundo e escuro quase preto azulado */
     --bg-card: #1e2230;        /* Fundos elevados ligeiramente mais claros */
-    --bg-card-hover: #262b3d;  
-    --border-subtle: #2d3348;  
-    
-    --text-primary: #f3f4f6;   
-    --text-muted: #9ca3af;     
-    
+    --bg-card-hover: #262b3d;
+    --border-subtle: #2d3348;
+
+    --text-primary: #f3f4f6;
+    --text-muted: #9ca3af;
+
     /* Scrollbars Dark */
     --sb-thumb: #374151;
     --sb-thumb-hover: #4b5563;
+}
+
+/* Névoa — off-white quente, menos ofuscante que o branco puro */
+html[data-tema="nevoa"] {
+    --bg-page: #f0ede8;
+    --bg-card: #faf8f5;
+    --bg-card-hover: #e8e3db;
+    --border-subtle: #d6cfc5;
+    --text-primary: #2c2825;
+    --text-muted: #7a736a;
+    --sb-thumb: #c5bdb3;
+    --sb-thumb-hover: #a8a098;
+}
+
+/* Ardósia — dark slate médio, nem muito escuro nem muito claro */
+html[data-tema="ardosia"] {
+    --bg-page: #232b3b;
+    --bg-card: #2d3748;
+    --bg-card-hover: #374151;
+    --border-subtle: #4a5568;
+    --text-primary: #e2e8f0;
+    --text-muted: #a0aec0;
+    --sb-thumb: #4a5568;
+    --sb-thumb-hover: #718096;
+}
+
+/* Crepúsculo — dark warm amber, tons de madeira escura */
+html[data-tema="crepusculo"] {
+    --bg-page: #1c1710;
+    --bg-card: #2a2218;
+    --bg-card-hover: #352c1f;
+    --border-subtle: #4a3d2c;
+    --text-primary: #f5e6c8;
+    --text-muted: #b0956e;
+    --sb-thumb: #4a3d2c;
+    --sb-thumb-hover: #6b5740;
 }
 
 /* ==========================================

@@ -95,6 +95,30 @@ export function useLogicaComandas() {
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     };
 
+    const calcular_total_item_historico = (item) => {
+        const preco_base = Number(item?.preco_unitario || 0);
+        const quantidade = Number(item?.quantidade || 0);
+        const extras = (item?.adicionais || []).reduce((soma, adicional) => {
+            return soma + (Number(adicional?.preco_unitario || 0) * Number(adicional?.quantidade || 1));
+        }, 0);
+
+        return quantidade * (preco_base + extras);
+    };
+
+    const descrever_adicionais_item = (item) => {
+        if (!item?.adicionais?.length) return [];
+
+        return item.adicionais.map((adicional) => {
+            const nome = adicional?.buscar_item_adicional?.nome || 'Adicional';
+            const quantidade = Number(adicional?.quantidade || 1);
+            const preco_total = Number(adicional?.preco_unitario || 0) * quantidade;
+            const prefixo_quantidade = quantidade > 1 ? `${quantidade}x ` : '';
+            const sufixo_preco = preco_total > 0 ? ` (+R$ ${preco_total.toFixed(2)})` : '';
+
+            return `${prefixo_quantidade}${nome}${sufixo_preco}`;
+        });
+    };
+
     const abrir_detalhes = async (comanda, acao) => {
         // Comanda ABERTA — navega direto, sem requisição
         if (comanda.status_comanda === 'aberta') {
@@ -166,7 +190,7 @@ export function useLogicaComandas() {
         filtro_status, tipo_exibicao, comandas_filtradas, termo_pesquisa_comanda,
         alterar_filtro  : (n) => filtro_status.value  = n,
         alterar_exibicao: (n) => tipo_exibicao.value  = n,
-        formatar_data, abrir_detalhes,
+        formatar_data, abrir_detalhes, calcular_total_item_historico, descrever_adicionais_item,
         voltar_painel: () => roteador.push('/painel-central'),
         modal_historico_visivel, comanda_selecionada,
         fechar_modal_historico: () => modal_historico_visivel.value = false,

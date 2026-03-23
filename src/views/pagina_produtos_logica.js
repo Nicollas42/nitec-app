@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
+import { useToastStore } from '../stores/toast_store.js';
 
 // ─── Fábricas de estado vazio ────────────────────────────────────────────────
 
@@ -31,15 +32,20 @@ const criar_formulario_fornecedor_vazio = () => ({
     status_fornecedor: 'ativo',
 });
 
+// ─── Estado de supressão do popstate (módulo, não reativo) ───────────────────
+let _suprimindo_popstate = false;
+
 // ─── Composable principal ────────────────────────────────────────────────────
 
 export function use_logica_produtos() {
     const roteador = useRouter();
     const loja_produtos = useProdutosStore();
+    const toast_global = useToastStore();
     const { lista_produtos } = storeToRefs(loja_produtos);
 
     // ── Estado de navegação ──────────────────────────────────────────────────
     const aba_ativa = ref('estoque');
+    const pilha_abas = ref([]);
     const termo_pesquisa = ref('');
     const filtro_fornecedor_id = ref('');
     const produto_expandido_ids = ref({});
@@ -82,6 +88,17 @@ export function use_logica_produtos() {
     // ── Listas carregadas do backend ─────────────────────────────────────────
     const lista_fornecedores = ref([]);
 
+    // ── Estado de adicionais ───────────────────────────────────────────────
+    const lista_grupos_adicionais = ref([]);
+    const grupo_em_edicao = ref(null);           // null = criar, object = editar
+    const input_nome_grupo = ref('');
+    const input_maximo_selecoes = ref(0);
+    const input_nome_item = ref('');
+    const input_preco_item = ref('');
+    const grupo_expandido = ref(null);           // id do grupo expandido
+    const item_em_edicao = ref(null);            // null = criar, object = editar
+    const mostrando_form_grupo = ref(false);     // controla visibilidade do form
+
     // ── Formulários reativos ─────────────────────────────────────────────────
 
     const formulario_dados = reactive({
@@ -96,6 +113,8 @@ export function use_logica_produtos() {
         fornecedores_vinculados: [],
         // Novo campo: tipo de item (orienta a UX sem mudar a estrutura do backend)
         tipo_item: 'comprado', // 'comprado' | 'fabricado'
+        grupos_adicionais_ids: [],
+        requer_cozinha: false,
     });
 
     const formulario_perda = reactive({
@@ -243,6 +262,8 @@ export function use_logica_produtos() {
         formulario_dados.tipo_item = 'comprado';
         formulario_dados.codigos_barras_adicionais = [];
         formulario_dados.fornecedores_vinculados = [];
+        formulario_dados.grupos_adicionais_ids = [];
+        formulario_dados.requer_cozinha = false;
     };
 
     const reiniciar_formulario_entrada = () => {
@@ -280,11 +301,52 @@ export function use_logica_produtos() {
 
     // ─── Navegação entre abas ─────────────────────────────────────────────────
 
-    const abrir_aba_estoque = () => { aba_ativa.value = 'estoque'; };
+    // Avança para uma nova aba e registra uma entrada no histórico do browser,
+    // para que o botão Voltar nativo do celular funcione corretamente.
+    const ir_para_aba_interna = (nova_aba) => {
+        pilha_abas.value.push(aba_ativa.value);
+        aba_ativa.value = nova_aba;
+        window.history.pushState({ sub_aba_produtos: nova_aba }, '');
+    };
+
+    // Volta um nível na pilha interna e sincroniza o histórico do browser.
+    // Chamado pelos botões visuais de cancelar / voltar.
+    const voltar_aba_um_nivel = () => {
+        if (pilha_abas.value.length > 0) {
+            aba_ativa.value = pilha_abas.value.pop();
+            _suprimindo_popstate = true;
+            window.history.go(-1);
+        } else {
+            roteador.back();
+        }
+    };
+
+    // Pula direto ao estoque, limpando toda a pilha e sincronizando o histórico.
+    const ir_diretamente_para_estoque = () => {
+        const passos = pilha_abas.value.length;
+        pilha_abas.value = [];
+        aba_ativa.value = 'estoque';
+        if (passos > 0) window.history.go(-passos);
+    };
+
+    // Chamado pelo listener popstate do componente (botão Voltar do celular).
+    const manejar_popstate_produtos = (evento) => {
+        if (_suprimindo_popstate) {
+            _suprimindo_popstate = false;
+            return;
+        }
+        if (evento.state && 'sub_aba_produtos' in evento.state) {
+            if (pilha_abas.value.length > 0) {
+                aba_ativa.value = pilha_abas.value.pop();
+            }
+        }
+    };
+
+    const abrir_aba_estoque = () => ir_diretamente_para_estoque();
 
     const abrir_aba_fornecedores = () => {
         contexto_modal_fornecedor.value = 'fornecedores';
-        aba_ativa.value = 'fornecedores';
+        ir_para_aba_interna('fornecedores');
     };
 
     const voltar_painel = () => roteador.push('/painel-central');
@@ -362,6 +424,10 @@ export function use_logica_produtos() {
                       custo_embalagem: fv.ultimo_preco_compra ?? '',
                   }))
                 : [];
+
+        formulario_dados.grupos_adicionais_ids =
+            Array.isArray(produto.grupos_adicionais_ids) ? [...produto.grupos_adicionais_ids] : [];
+        formulario_dados.requer_cozinha = !!produto.requer_cozinha;
     };
 
     const montar_payload_produto = () => {
@@ -394,6 +460,10 @@ export function use_logica_produtos() {
                 }))
                 .filter((cb) => cb.codigo_barras),
             fornecedores_vinculados: fornecedores,
+            grupos_adicionais_ids: formulario_dados.grupos_adicionais_ids
+                .map((id) => Number(id))
+                .filter(Boolean),
+            requer_cozinha: !!formulario_dados.requer_cozinha,
         };
     };
 
@@ -473,22 +543,22 @@ export function use_logica_produtos() {
         modo_edicao.value = false;
         id_edicao.value = null;
         reiniciar_formulario_produto();
-        await carregar_fornecedores();
-        aba_ativa.value = 'formulario_produto';
+        await Promise.all([carregar_fornecedores(), carregar_grupos_adicionais()]);
+        ir_para_aba_interna('formulario_produto');
     };
 
     const abrir_modal_edicao = async (produto) => {
         carregando_produto.value = true;
         modo_edicao.value = true;
         id_edicao.value = produto.id;
-        aba_ativa.value = 'formulario_produto';
+        ir_para_aba_interna('formulario_produto');
         try {
-            await carregar_fornecedores();
+            await Promise.all([carregar_fornecedores(), carregar_grupos_adicionais()]);
             const detalhes = await buscar_detalhes_produto(produto.id);
             preencher_formulario_produto(detalhes);
         } catch (erro) {
             alert(erro.response?.data?.mensagem || 'Erro ao carregar os detalhes do produto.');
-            aba_ativa.value = 'estoque';
+            ir_diretamente_para_estoque();
         } finally {
             carregando_produto.value = false;
         }
@@ -498,7 +568,7 @@ export function use_logica_produtos() {
         modo_edicao.value = false;
         id_edicao.value = null;
         reiniciar_formulario_produto();
-        aba_ativa.value = 'estoque';
+        voltar_aba_um_nivel();
     };
 
     const salvar_produto = async () => {
@@ -515,7 +585,7 @@ export function use_logica_produtos() {
             id_edicao.value = null;
             await loja_produtos.buscar_produtos(true);
             await carregar_fornecedores();
-            aba_ativa.value = 'estoque';
+            voltar_aba_um_nivel();
         } catch (erro) {
             alert(erro.response?.data?.mensagem || 'Erro ao salvar o produto.');
         } finally {
@@ -737,7 +807,7 @@ export function use_logica_produtos() {
         reiniciar_formulario_fornecedor();
         formulario_fornecedor_minimizado.value = false;
         if (contexto === 'entrada') modal_entrada.value = false;
-        aba_ativa.value = 'fornecedores';
+        ir_para_aba_interna('fornecedores');
     };
 
     const abrir_edicao_fornecedor = (fornecedor) => {
@@ -786,7 +856,7 @@ export function use_logica_produtos() {
                     idx = formulario_dados.fornecedores_vinculados.length - 1;
                 }
                 formulario_dados.fornecedores_vinculados[idx].fornecedor_id = novo_fornecedor.id;
-                aba_ativa.value = 'formulario_produto';
+                voltar_aba_um_nivel();
             } else {
                 aba_ativa.value = 'fornecedores';
             }
@@ -828,6 +898,155 @@ export function use_logica_produtos() {
         }
     };
 
+    // ─── Triagem de Cozinha ───────────────────────────────────────────────────
+
+    const abrir_aba_cozinha = () => {
+        ir_para_aba_interna('cozinha_triagem');
+    };
+
+    const alternar_requer_cozinha = async (produto_id, valor) => {
+        try {
+            await api_cliente.post(`/produtos/${produto_id}/requer-cozinha`, { requer_cozinha: valor });
+            const idx = lista_produtos.value.findIndex(p => p.id === produto_id);
+            if (idx !== -1) lista_produtos.value[idx].requer_cozinha = valor;
+        } catch (erro) {
+            toast_global.exibir_toast(erro.response?.data?.mensagem || 'Erro ao atualizar.', 'erro');
+        }
+    };
+
+    // ─── Adicionais (grupos + itens) ──────────────────────────────────────────
+
+    const abrir_aba_adicionais = () => {
+        ir_para_aba_interna('adicionais');
+        carregar_grupos_adicionais();
+    };
+
+    const carregar_grupos_adicionais = async () => {
+        try {
+            const resposta = await api_cliente.get('/grupos-adicionais');
+            lista_grupos_adicionais.value = resposta.data.grupos || resposta.data || [];
+        } catch (erro) {
+            console.error('Erro ao carregar grupos de adicionais:', erro);
+            toast_global.exibir_toast('Erro ao carregar grupos de adicionais.', 'erro');
+        }
+    };
+
+    const salvar_grupo = async () => {
+        if (!input_nome_grupo.value.trim()) {
+            toast_global.exibir_toast('Informe o nome do grupo.', 'erro');
+            return;
+        }
+        try {
+            const payload = {
+                nome: input_nome_grupo.value.trim(),
+                maximo_selecoes: Number(input_maximo_selecoes.value) || 0,
+            };
+            if (grupo_em_edicao.value) {
+                await api_cliente.put(`/grupos-adicionais/${grupo_em_edicao.value.id}`, payload);
+                toast_global.exibir_toast('Grupo atualizado com sucesso!', 'sucesso');
+            } else {
+                await api_cliente.post('/grupos-adicionais', payload);
+                toast_global.exibir_toast('Grupo criado com sucesso!', 'sucesso');
+            }
+            cancelar_edicao_grupo();
+            await carregar_grupos_adicionais();
+        } catch (erro) {
+            toast_global.exibir_toast(
+                erro.response?.data?.mensagem || 'Erro ao salvar grupo.',
+                'erro'
+            );
+        }
+    };
+
+    const excluir_grupo = async (id) => {
+        if (!window.confirm('Deseja realmente excluir este grupo e todos os seus itens?')) return;
+        try {
+            await api_cliente.delete(`/grupos-adicionais/${id}`);
+            toast_global.exibir_toast('Grupo excluído com sucesso!', 'sucesso');
+            if (grupo_expandido.value === id) grupo_expandido.value = null;
+            await carregar_grupos_adicionais();
+        } catch (erro) {
+            toast_global.exibir_toast(
+                erro.response?.data?.mensagem || 'Erro ao excluir grupo.',
+                'erro'
+            );
+        }
+    };
+
+    const abrir_edicao_grupo = (grupo) => {
+        grupo_em_edicao.value = grupo;
+        input_nome_grupo.value = grupo.nome || '';
+        input_maximo_selecoes.value = grupo.maximo_selecoes ?? 0;
+        mostrando_form_grupo.value = true;
+    };
+
+    const cancelar_edicao_grupo = (fechar = true) => {
+        grupo_em_edicao.value = null;
+        input_nome_grupo.value = '';
+        input_maximo_selecoes.value = 0;
+        if (fechar) mostrando_form_grupo.value = false;
+    };
+
+    const alternar_grupo_expandido = (id) => {
+        grupo_expandido.value = grupo_expandido.value === id ? null : id;
+        // Limpa form de item ao trocar de grupo
+        cancelar_edicao_item();
+    };
+
+    const salvar_item = async (grupo_id) => {
+        if (!input_nome_item.value.trim()) {
+            toast_global.exibir_toast('Informe o nome do item.', 'erro');
+            return;
+        }
+        try {
+            const payload = {
+                grupo_adicional_id: grupo_id,
+                nome: input_nome_item.value.trim(),
+                preco: Number(input_preco_item.value) || 0,
+            };
+            if (item_em_edicao.value) {
+                await api_cliente.put(`/itens-adicionais/${item_em_edicao.value.id}`, payload);
+                toast_global.exibir_toast('Item atualizado com sucesso!', 'sucesso');
+            } else {
+                await api_cliente.post(`/grupos-adicionais/${grupo_id}/itens`, payload);
+                toast_global.exibir_toast('Item adicionado com sucesso!', 'sucesso');
+            }
+            cancelar_edicao_item();
+            await carregar_grupos_adicionais();
+        } catch (erro) {
+            toast_global.exibir_toast(
+                erro.response?.data?.mensagem || 'Erro ao salvar item.',
+                'erro'
+            );
+        }
+    };
+
+    const excluir_item = async (id) => {
+        if (!window.confirm('Deseja realmente excluir este item adicional?')) return;
+        try {
+            await api_cliente.delete(`/itens-adicionais/${id}`);
+            toast_global.exibir_toast('Item excluído com sucesso!', 'sucesso');
+            await carregar_grupos_adicionais();
+        } catch (erro) {
+            toast_global.exibir_toast(
+                erro.response?.data?.mensagem || 'Erro ao excluir item.',
+                'erro'
+            );
+        }
+    };
+
+    const abrir_edicao_item = (item) => {
+        item_em_edicao.value = item;
+        input_nome_item.value = item.nome || '';
+        input_preco_item.value = item.preco ?? '';
+    };
+
+    const cancelar_edicao_item = () => {
+        item_em_edicao.value = null;
+        input_nome_item.value = '';
+        input_preco_item.value = '';
+    };
+
     // ─── Watches ──────────────────────────────────────────────────────────────
 
     watch(() => formulario_entrada.quantidade_comprada, recalcular_entrada);
@@ -851,6 +1070,7 @@ export function use_logica_produtos() {
 
     return {
         aba_ativa,
+        lista_produtos,
         produtos_filtrados,
         termo_pesquisa,
         filtro_fornecedor_id,
@@ -908,5 +1128,31 @@ export function use_logica_produtos() {
         salvando_fornecedor,
         fornecedor_excluindo_id,
         modo_edicao_fornecedor,
+        voltar_aba_um_nivel,
+        manejar_popstate_produtos,
+        // Adicionais
+        lista_grupos_adicionais,
+        grupo_em_edicao,
+        input_nome_grupo,
+        input_maximo_selecoes,
+        input_nome_item,
+        input_preco_item,
+        grupo_expandido,
+        item_em_edicao,
+        mostrando_form_grupo,
+        abrir_aba_adicionais,
+        carregar_grupos_adicionais,
+        salvar_grupo,
+        excluir_grupo,
+        abrir_edicao_grupo,
+        cancelar_edicao_grupo,
+        alternar_grupo_expandido,
+        salvar_item,
+        excluir_item,
+        abrir_edicao_item,
+        cancelar_edicao_item,
+        // Cozinha triagem
+        abrir_aba_cozinha,
+        alternar_requer_cozinha,
     };
 }

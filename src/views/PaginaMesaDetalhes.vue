@@ -17,13 +17,24 @@
                     </div>
                 </div>
                 
-                <div class="flex gap-3 w-full md:w-auto">
-                    <button @click="voltar_mapa" class="flex-1 md:flex-none px-6 py-3 bg-[var(--bg-page)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--bg-card-hover)] text-xs font-black uppercase tracking-widest transition-all">
-                        Voltar
-                    </button>
-                    <button @click="adicionar_novo_cliente" class="flex-1 md:flex-none px-6 py-3 bg-purple-500/10 text-purple-600 border border-purple-500/20 rounded-xl hover:bg-purple-500/20 text-xs font-black uppercase tracking-widest transition-all shadow-sm">
-                        ➕ Sub-Comanda
-                    </button>
+                <div class="flex flex-col gap-3 w-full md:w-auto">
+                    <!-- Total geral da mesa -->
+                    <div class="flex items-center justify-between bg-[var(--bg-page)] px-5 py-3 rounded-2xl border border-[var(--border-subtle)]">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Total da Mesa</span>
+                        <span class="text-2xl font-black text-[var(--text-primary)] tracking-tighter ml-6">R$ {{ total_geral.toFixed(2) }}</span>
+                    </div>
+                    <!-- Botões de ação -->
+                    <div class="flex gap-2 w-full">
+                        <button @click="voltar_mapa" class="flex-1 md:flex-none px-5 py-3 bg-[var(--bg-page)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-xl hover:bg-[var(--bg-card-hover)] text-xs font-black uppercase tracking-widest transition-all">
+                            Voltar
+                        </button>
+                        <button @click="adicionar_novo_cliente" class="flex-1 md:flex-none px-5 py-3 bg-purple-500/10 text-purple-600 border border-purple-500/20 rounded-xl hover:bg-purple-500/20 text-xs font-black uppercase tracking-widest transition-all shadow-sm">
+                            ➕ Sub-Comanda
+                        </button>
+                        <button @click="pagar_tudo" class="flex-1 md:flex-none px-5 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95">
+                            💳 Cobrar Tudo
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -77,10 +88,24 @@
                             
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex flex-col">
-                                    <span class="font-black text-[var(--text-primary)] text-sm leading-tight">{{ item.buscar_produto.nome_produto }}</span>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-black text-[var(--text-primary)] text-sm leading-tight">{{ item.buscar_produto.nome_produto }}</span>
+                                        <span v-if="item.status_cozinha"
+                                            class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full"
+                                            :class="{
+                                                'bg-red-100 text-red-600': item.status_cozinha === 'pendente',
+                                                'bg-amber-100 text-amber-600': item.status_cozinha === 'em_preparacao',
+                                                'bg-green-100 text-green-600': item.status_cozinha === 'finalizado',
+                                            }">
+                                            {{ item.status_cozinha === 'pendente' ? 'Fila' : item.status_cozinha === 'em_preparacao' ? 'Preparando' : 'Pronto ✓' }}
+                                        </span>
+                                    </div>
+                                    <p v-if="item.adicionais && item.adicionais.length > 0" class="text-[9px] text-nitec_blue font-bold mt-0.5 leading-tight">
+                                        <template v-for="(ad, idx) in item.adicionais" :key="ad.id">{{ idx > 0 ? ', ' : '' }}{{ (ad.quantidade || 1) > 1 ? (ad.quantidade || 1) + 'x ' : '' }}+ {{ ad.buscar_item_adicional?.nome || 'Adicional' }}<template v-if="Number(ad.preco_unitario) > 0"> (R$ {{ (Number(ad.preco_unitario) * (ad.quantidade || 1)).toFixed(2) }})</template></template>
+                                    </p>
                                     <span class="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest mt-0.5">R$ {{ Number(item.preco_unitario).toFixed(2) }} unid.</span>
                                 </div>
-                                <span class="font-black text-[var(--text-primary)] text-base tracking-tight">R$ {{ (item.quantidade * item.preco_unitario).toFixed(2) }}</span>
+                                <span class="font-black text-[var(--text-primary)] text-base tracking-tight">R$ {{ (item.quantidade * (Number(item.preco_unitario) + (item.adicionais || []).reduce((s, a) => s + (Number(a.preco_unitario) || 0) * (a.quantidade || 1), 0))).toFixed(2) }}</span>
                             </div>
                             
                             <div class="flex items-center justify-between mt-1 pt-2 border-t border-[var(--border-subtle)]">
@@ -167,13 +192,13 @@
 
 <script setup>
 import { useLogicaMesaDetalhes } from './pagina_mesa_detalhes_logica.js';
-const { 
-    dados_mesa, voltar_mapa, abrir_pdv_para_comanda, 
-    adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente, 
-    fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade, 
+const {
+    dados_mesa, voltar_mapa, total_geral, pagar_tudo, abrir_pdv_para_comanda,
+    adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
+    fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
     remover_item_consumido, fechar_conta_comanda, item_processando,
-    modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento, 
-    confirmar_cancelamento, cancelando 
+    modal_cancelamento_visivel, form_cancelamento, abrir_modal_cancelamento,
+    confirmar_cancelamento, cancelando
 } = useLogicaMesaDetalhes();
 </script>
 

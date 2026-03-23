@@ -22,10 +22,12 @@ export function use_logica_pdv() {
     const itens_ja_lancados = ref([]); 
     const acoes_pendentes_db = ref([]); 
     
-    const id_comanda_vinculada = ref(null);
-    const id_comanda_pagamento = ref(null);
-    const id_mesa_atual = ref(null); // 🟢 Mesa vinculada à comanda (para o QR Sync)
-    const valor_desconto = ref('');
+    const id_comanda_vinculada  = ref(null);
+    const id_comanda_pagamento  = ref(null);
+    const id_mesa_atual         = ref(null);
+    const ids_pagamento_total   = ref([]); // pagamento de TODAS as comandas da mesa de uma vez
+    const total_mesa_externo    = ref(0);  // valor total passado via query param
+    const valor_desconto        = ref('');
     const processando_finalizacao = ref(false); 
 
     // 🟢 Controle UI (Mobile)
@@ -35,6 +37,11 @@ export function use_logica_pdv() {
     const categoria_selecionada = ref('todas');
     const produtos_fixados = ref(JSON.parse(localStorage.getItem('nitec_pdv_fixados') || '[]'));
     const avisos_excedente_emitidos = ref({});
+
+    // Modal de adicionais
+    const modal_adicionais_visivel = ref(false);
+    const produto_adicionais_temp = ref(null);     // produto selecionado temporariamente
+    const selecao_adicionais_temp = ref({});        // { item_adicional_id: qtd }
 
     /**
      * Retorna todos os codigos pesquisaveis do produto para uso no PDV.
@@ -77,10 +84,27 @@ export function use_logica_pdv() {
             : Date.now().toString(36) + Math.random().toString(36).substring(2);
     };
 
-    const categorias_unicas = computed(() => {
-        const cats = loja_produtos.lista_produtos.map(p => p.categoria).filter(Boolean);
-        return ['todas', ...new Set(cats)];
-    });
+    // Categorias vindas da tabela categorias_produtos (via API), com fallback para
+    // as categorias dos próprios produtos caso a API falhe.
+    const categorias_unicas = ref(['todas']);
+
+    const carregar_categorias = async () => {
+        try {
+            const resposta = await api_cliente.get('/produtos/categorias');
+            const lista = resposta.data?.categorias || [];
+            // Ordena: 'Geral' primeiro, restante em ordem alfabética
+            const ordenadas = [...lista].sort((a, b) => {
+                if (a === 'Geral') return -1;
+                if (b === 'Geral') return 1;
+                return a.localeCompare(b);
+            });
+            categorias_unicas.value = ['todas', ...ordenadas];
+        } catch {
+            // Fallback: extrai das categorias já carregadas nos produtos
+            const cats = loja_produtos.lista_produtos.map(p => p.categoria).filter(Boolean);
+            categorias_unicas.value = ['todas', ...new Set(cats)];
+        }
+    };
 
     const alternar_fixacao = (id_produto) => {
         if (produtos_fixados.value.includes(id_produto)) {
@@ -198,11 +222,13 @@ export function use_logica_pdv() {
             }
 
             // 4. Agrupa produtos iguais (Resolve linhas duplicadas no carrinho)
+            // Chave inclui adicionais para não fundir itens com extras diferentes
             const mapa_agrupado = {};
             for (const it of itens_oficiais) {
-                const p_id = String(it.produto_id);
-                if (!mapa_agrupado[p_id]) mapa_agrupado[p_id] = { ...it, quantidade: Number(it.quantidade) };
-                else mapa_agrupado[p_id].quantidade += Number(it.quantidade);
+                const ads = (it.adicionais || []).map(a => `${a.item_adicional_id}:${a.quantidade||1}`).sort().join(',');
+                const chave = `${it.produto_id}_${ads}`;
+                if (!mapa_agrupado[chave]) mapa_agrupado[chave] = { ...it, quantidade: Number(it.quantidade) };
+                else mapa_agrupado[chave].quantidade += Number(it.quantidade);
             }
 
             itens_ja_lancados.value = Object.values(mapa_agrupado).map(i => ({
@@ -210,10 +236,16 @@ export function use_logica_pdv() {
                 produto_id: i.produto_id,
                 nome_produto: i.buscar_produto?.nome_produto || `Produto #${i.produto_id}`,
                 quantidade: i.quantidade,
-                preco_venda: i.preco_unitario
+                preco_venda: i.preco_unitario,
+                adicionais: (i.adicionais || []).map(a => ({
+                    id: a.item_adicional_id,
+                    nome: a.buscar_item_adicional?.nome || `#${a.item_adicional_id}`,
+                    preco_unitario: Number(a.preco_unitario) || 0,
+                    quantidade: a.quantidade || 1,
+                })),
             }));
 
-        } catch(e) { 
+        } catch(e) {
             console.error("Falha total ao buscar comanda (Nuvem e Local):", e);
             
             // 5. MODO SOBREVIVÊNCIA EXTREMA: A Nuvem e o PC falharam.
@@ -263,14 +295,18 @@ export function use_logica_pdv() {
     };
 
     watch(() => rota_atual.query, (novaQuery) => {
-        id_comanda_vinculada.value = novaQuery.comanda || null;
+        id_comanda_vinculada.value = novaQuery.comanda  || null;
         id_comanda_pagamento.value = novaQuery.pagamento || null;
-        id_mesa_atual.value = null;
-        carrinho_venda.value = [];
+        ids_pagamento_total.value  = novaQuery.pagamento_total
+            ? String(novaQuery.pagamento_total).split(',').filter(Boolean)
+            : [];
+        total_mesa_externo.value   = novaQuery.total_mesa ? Number(novaQuery.total_mesa) : 0;
+        id_mesa_atual.value        = null;
+        carrinho_venda.value       = [];
         avisos_excedente_emitidos.value = {};
-        itens_ja_lancados.value = [];
-        acoes_pendentes_db.value = []; 
-        valor_desconto.value = '';
+        itens_ja_lancados.value    = [];
+        acoes_pendentes_db.value   = [];
+        valor_desconto.value       = '';
 
         // Extrai mesa_id do comanda_id offline (ex: "off_5" → mesa 5)
         const comanda_id = novaQuery.comanda || novaQuery.pagamento;
@@ -281,7 +317,55 @@ export function use_logica_pdv() {
         if (id_comanda_pagamento.value || id_comanda_vinculada.value) {
             recarregar_dados_comanda();
         }
+
+        if (ids_pagamento_total.value.length > 0) {
+            recarregar_dados_total_mesa();
+        }
     }, { immediate: true });
+
+    // Busca os itens de TODAS as comandas da mesa e os mescla num único carrinho de pagamento.
+    // Espelha o comportamento de recarregar_dados_comanda, mas para múltiplos IDs.
+    const recarregar_dados_total_mesa = async () => {
+        const ids = ids_pagamento_total.value;
+        if (!ids.length) return;
+
+        try {
+            const respostas = await Promise.all(ids.map(id => api_cliente.get(`/buscar-comanda/${id}`)));
+            const todos_itens = respostas.flatMap(res => res.data.dados.listar_itens || []);
+
+            // Agrupa produtos iguais somando quantidades (chave inclui adicionais)
+            const mapa = {};
+            for (const it of todos_itens) {
+                const ads = (it.adicionais || []).map(a => `${a.item_adicional_id}:${a.quantidade||1}`).sort().join(',');
+                const chave = `${it.produto_id}_${ads}`;
+                if (!mapa[chave]) mapa[chave] = { ...it, quantidade: Number(it.quantidade) };
+                else mapa[chave].quantidade += Number(it.quantidade);
+            }
+
+            itens_ja_lancados.value = Object.values(mapa).map(i => ({
+                id_item_comanda: i.id,
+                produto_id     : i.produto_id,
+                nome_produto   : i.buscar_produto?.nome_produto || `Produto #${i.produto_id}`,
+                quantidade     : i.quantidade,
+                preco_venda    : i.preco_unitario,
+                adicionais     : (i.adicionais || []).map(a => ({
+                    id: a.item_adicional_id,
+                    nome: a.buscar_item_adicional?.nome || `#${a.item_adicional_id}`,
+                    preco_unitario: Number(a.preco_unitario) || 0,
+                    quantidade: a.quantidade || 1,
+                })),
+            }));
+
+            // Recalcula o total real (mais preciso que o total_mesa passado via URL)
+            total_mesa_externo.value = itens_ja_lancados.value.reduce((acc, i) => {
+                const extras = (i.adicionais || []).reduce((s, a) => s + (a.preco_unitario || 0) * (a.quantidade || 1), 0);
+                return acc + i.quantidade * (i.preco_venda + extras);
+            }, 0);
+        } catch (e) {
+            console.error('[pagar_tudo] Erro ao carregar itens das comandas:', e);
+            toast_global.exibir_toast('Erro ao carregar itens da mesa.', 'erro');
+        }
+    };
 
     const alterar_quantidade_db = (id_item_comanda, acao) => {
         const item = itens_ja_lancados.value.find(i => i.id_item_comanda === id_item_comanda);
@@ -300,11 +384,43 @@ export function use_logica_pdv() {
     };
 
     const adicionar_ao_carrinho = (p) => {
-        const item = carrinho_venda.value.find(i => i.id === p.id);
+        // Se o produto tem grupos de adicionais, abre o modal
+        if (p.tem_adicionais && p.grupos_adicionais && p.grupos_adicionais.length > 0) {
+            produto_adicionais_temp.value = p;
+            selecao_adicionais_temp.value = {};
+            modal_adicionais_visivel.value = true;
+            return;
+        }
+
+        // Produto sem adicionais — comportamento original
+        _inserir_no_carrinho(p, []);
+    };
+
+    /**
+     * Gera uma chave única para o item no carrinho baseada no produto + adicionais selecionados.
+     * Permite que o mesmo produto com adicionais diferentes fique em linhas separadas.
+     */
+    const _gerar_chave_carrinho = (produto_id, adicionais) => {
+        if (!adicionais || adicionais.length === 0) return String(produto_id);
+        const sorted = [...adicionais].sort((a, b) => a.id - b.id).map(a => `${a.id}:${a.qtd}`).join(',');
+        return `${produto_id}|${sorted}`;
+    };
+
+    const _inserir_no_carrinho = (p, adicionais_selecionados) => {
+        const chave = _gerar_chave_carrinho(p.id, adicionais_selecionados);
+        const item = carrinho_venda.value.find(i => (i._chave_carrinho || String(i.id)) === chave);
         const estoque_atual = obter_estoque_numerico(p);
 
-        if (item) item.quantidade += 1;
-        else carrinho_venda.value.push({ ...p, quantidade: 1 });
+        if (item) {
+            item.quantidade += 1;
+        } else {
+            carrinho_venda.value.push({
+                ...p,
+                quantidade: 1,
+                adicionais: adicionais_selecionados,
+                _chave_carrinho: chave,
+            });
+        }
 
         const quantidade_atual = quantidade_selecionada(p.id);
         if (quantidade_atual > estoque_atual) {
@@ -314,6 +430,52 @@ export function use_logica_pdv() {
             }
         } else {
             limpar_aviso_excedente(p.id);
+        }
+    };
+
+    const confirmar_adicionais = () => {
+        const p = produto_adicionais_temp.value;
+        if (!p) return;
+
+        const adicionais = [];
+        for (const grupo of (p.grupos_adicionais || [])) {
+            for (const item of (grupo.itens || [])) {
+                const qtd = selecao_adicionais_temp.value[item.id] || 0;
+                if (qtd > 0) {
+                    adicionais.push({ id: item.id, nome: item.nome, preco: Number(item.preco), qtd });
+                }
+            }
+        }
+
+        _inserir_no_carrinho(p, adicionais);
+        modal_adicionais_visivel.value = false;
+        produto_adicionais_temp.value = null;
+    };
+
+    const cancelar_adicionais = () => {
+        modal_adicionais_visivel.value = false;
+        produto_adicionais_temp.value = null;
+    };
+
+    const total_preview_adicionais = computed(() => {
+        const p = produto_adicionais_temp.value;
+        if (!p) return 0;
+        let soma = Number(p.preco_venda) || 0;
+        for (const grupo of (p.grupos_adicionais || [])) {
+            for (const item of (grupo.itens || [])) {
+                const qtd = selecao_adicionais_temp.value[item.id] || 0;
+                soma += Number(item.preco) * qtd;
+            }
+        }
+        return soma;
+    });
+
+    const alterar_qtd_adicional = (item_id, acao) => {
+        const atual = selecao_adicionais_temp.value[item_id] || 0;
+        if (acao === 'incrementar') {
+            selecao_adicionais_temp.value = { ...selecao_adicionais_temp.value, [item_id]: atual + 1 };
+        } else if (acao === 'decrementar' && atual > 0) {
+            selecao_adicionais_temp.value = { ...selecao_adicionais_temp.value, [item_id]: atual - 1 };
         }
     };
 
@@ -344,13 +506,44 @@ export function use_logica_pdv() {
         }
     };
 
+    const em_modo_pagar_tudo = computed(() => ids_pagamento_total.value.length > 0);
+
+    /**
+     * Calcula o preço unitário total de um item (base + adicionais).
+     */
+    const _preco_unitario_com_adicionais = (item) => {
+        const base = Number(item.preco_venda) || 0;
+        const extras = (item.adicionais || []).reduce((s, a) => s + (Number(a.preco) || 0) * (a.qtd || 1), 0);
+        return base + extras;
+    };
+
     const subtotal_comanda = computed(() => {
-        const soma_novos = carrinho_venda.value.reduce((acc, i) => acc + (i.preco_venda * i.quantidade), 0);
-        const soma_antigos = itens_ja_lancados.value.reduce((acc, i) => acc + (i.preco_venda * i.quantidade), 0);
+        if (em_modo_pagar_tudo.value) return total_mesa_externo.value;
+        const soma_novos = carrinho_venda.value.reduce((acc, i) => acc + (_preco_unitario_com_adicionais(i) * i.quantidade), 0);
+        const soma_antigos = itens_ja_lancados.value.reduce((acc, i) => {
+            const base = Number(i.preco_venda) || 0;
+            const extras = (i.adicionais || []).reduce((s, a) => s + (Number(a.preco_unitario) || 0) * (a.quantidade || 1), 0);
+            return acc + (base + extras) * i.quantidade;
+        }, 0);
         return soma_novos + soma_antigos;
     });
 
     const valor_final_comanda = computed(() => Math.max(0, subtotal_comanda.value - (Number(valor_desconto.value) || 0)));
+
+    /**
+     * Mapeia os itens do carrinho para o payload da API, incluindo adicionais.
+     */
+    const _mapear_itens_payload = () => carrinho_venda.value.map(i => {
+        const item_payload = { produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda };
+        if (i.adicionais && i.adicionais.length > 0) {
+            item_payload.adicionais = i.adicionais.filter(a => (a.qtd || 0) > 0).map(a => ({
+                item_adicional_id: a.id,
+                quantidade: a.qtd || 1,
+                preco_unitario: Number(a.preco) || 0,
+            }));
+        }
+        return item_payload;
+    });
 
     const sincronizar_pendencias_bd = async () => {
         for (const tarefa of acoes_pendentes_db.value) {
@@ -389,13 +582,31 @@ export function use_logica_pdv() {
         const data_atual = new Date().toISOString();
         const tenant_id = localStorage.getItem('nitec_tenant_id');
 
+        // 0. PAGAMENTO TOTAL DA MESA (todas as comandas de uma vez)
+        if (em_modo_pagar_tudo.value) {
+            try {
+                const desconto_por_comanda = (Number(valor_desconto.value) || 0) / ids_pagamento_total.value.length;
+                for (const id of ids_pagamento_total.value) {
+                    const uuid_pgto = gerarUUID();
+                    const payload_p = { data_hora_fechamento: data_atual, desconto: desconto_por_comanda, uuid_operacao: uuid_pgto };
+                    await api_cliente.post(`/fechar-comanda/${id}`, payload_p);
+                }
+                loja_mesas.buscar_mesas(true);
+                roteador.push('/mapa-mesas');
+                toast_global.exibir_toast("Mesa fechada com sucesso!", "sucesso");
+            } catch (e) {
+                toast_global.exibir_toast(e.response?.data?.mensagem || "Erro ao fechar a mesa.", "erro");
+            } finally { processando_finalizacao.value = false; }
+            return;
+        }
+
         // 1. PAGAMENTO DE CONTA
         if (id_comanda_pagamento.value) {
             try {
                 if (typeof sincronizar_pendencias_bd === 'function') await sincronizar_pendencias_bd(); 
                 await registrar_entradas_forcadas();
                 if (carrinho_venda.value.length > 0) {
-                    const payload_add = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: gerarUUID() };
+                    const payload_add = { itens: _mapear_itens_payload(), uuid_operacao: gerarUUID() };
                     await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_pagamento.value}`, payload_add);
                 }
                 const uuid_pgto = gerarUUID();
@@ -430,7 +641,7 @@ export function use_logica_pdv() {
                 }
                 await registrar_entradas_forcadas();
                 const uuid_add = gerarUUID();
-                const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
+                const payload = { itens: _mapear_itens_payload(), uuid_operacao: uuid_add };
                 
                 // Tenta enviar via API (Se a VPS falhar, o interceptor manda para o Servidor Local)
                 await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_vinculada.value}`, payload);
@@ -450,7 +661,7 @@ export function use_logica_pdv() {
                 }
                 if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_add = gerarUUID();
-                    const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), uuid_operacao: uuid_add };
+                    const payload = { itens: _mapear_itens_payload(), uuid_operacao: uuid_add };
                     
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/adicionar-itens-comanda/${id_comanda_vinculada.value}`, metodo: 'POST', payload_venda: payload, uuid_operacao: uuid_add });
                     
@@ -474,7 +685,7 @@ export function use_logica_pdv() {
         // 3. VENDA BALCÃO AVULSA
         } else {
             const uuid_balcao = gerarUUID();
-            const payload = { itens: carrinho_venda.value.map(i => ({ produto_id: i.id, quantidade: i.quantidade, preco_unitario: i.preco_venda })), desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_balcao };
+            const payload = { itens: _mapear_itens_payload(), desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_balcao };
             try {
                 await registrar_entradas_forcadas();
                 await api_cliente.post('/venda-balcao', payload);
@@ -499,7 +710,10 @@ export function use_logica_pdv() {
         }
     };
 
-    onMounted(() => loja_produtos.buscar_produtos());
+    onMounted(async () => {
+        await loja_produtos.buscar_produtos();
+        carregar_categorias();
+    });
 
     return {
         produtos_vitrine, categorias_unicas, termo_pesquisa, categoria_selecionada, 
@@ -507,9 +721,14 @@ export function use_logica_pdv() {
         carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
         adicionar_ao_carrinho, remover_do_carrinho, alterar_quantidade_novo,
         quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
-        subtotal_comanda, valor_final_comanda, valor_desconto, 
-        id_comanda_vinculada, id_comanda_pagamento, 
+        subtotal_comanda, valor_final_comanda, valor_desconto,
+        id_comanda_vinculada, id_comanda_pagamento,
+        em_modo_pagar_tudo, ids_pagamento_total, total_mesa_externo, 
         carrinho_expandido, // 🟢 Estado de UI mobile exportado
         processar_acao_principal, voltar_painel: () => roteador.push('/painel-central'),
+        // Modal de adicionais
+        modal_adicionais_visivel, produto_adicionais_temp, selecao_adicionais_temp,
+        confirmar_adicionais, cancelar_adicionais, total_preview_adicionais, alterar_qtd_adicional,
+        _preco_unitario_com_adicionais,
     };
 }

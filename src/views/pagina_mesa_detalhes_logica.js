@@ -1,4 +1,4 @@
-import { ref, reactive, onMounted, onActivated, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onActivated, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useProdutosStore } from '../stores/produtos_store.js';
@@ -340,20 +340,47 @@ export function useLogicaMesaDetalhes() {
 
     const voltar_mapa = () => roteador.push('/mapa-mesas');
 
+    const total_geral = computed(() => {
+        if (!dados_mesa.value?.listar_comandas) return 0;
+        return dados_mesa.value.listar_comandas.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
+    });
+
+    const pagar_tudo = () => {
+        const comandas = dados_mesa.value?.listar_comandas || [];
+        if (comandas.length === 0) return;
+        if (comandas.length === 1) {
+            fechar_conta_comanda(comandas[0].id);
+            return;
+        }
+        const ids_str   = comandas.map(c => c.id).join(',');
+        const total_str = total_geral.value.toFixed(2);
+        roteador.push(`/pdv-caixa?pagamento_total=${ids_str}&total_mesa=${total_str}`);
+    };
+
+    const marcar_cozinha_vista = async () => {
+        const id_mesa = rota_atual.params.id_mesa;
+        if (!id_mesa) return;
+        try {
+            await api_cliente.post(`/cozinha/marcar-visto/${id_mesa}`);
+        } catch (_) { /* silencioso */ }
+    };
+
     onMounted(() => {
         carregar_dados_completos();
         iniciar_polling_offline();
+        marcar_cozinha_vista();
     });
 
     onActivated(() => {
         carregar_dados_completos();
         iniciar_polling_offline();
+        marcar_cozinha_vista();
     });
 
     onUnmounted(() => parar_polling_offline());
 
     return {
-        dados_mesa, carregando, voltar_mapa, abrir_pdv_para_comanda,
+        dados_mesa, carregando, voltar_mapa, total_geral, pagar_tudo, abrir_pdv_para_comanda,
         adicionar_novo_cliente, modal_cliente_visivel, input_novo_cliente,
         fechar_modal_cliente, confirmar_novo_cliente, alterar_quantidade,
         remover_item_consumido, fechar_conta_comanda,

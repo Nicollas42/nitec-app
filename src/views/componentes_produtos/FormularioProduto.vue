@@ -124,6 +124,43 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Requer Cozinha -->
+                <div class="flex items-center justify-between py-3 px-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)]">
+                    <div>
+                        <p class="text-sm font-bold text-[var(--text-primary)]">Passa pela cozinha</p>
+                        <p class="text-[11px] font-bold text-[var(--text-muted)] mt-0.5">Item entra no painel da cozinha ao ser pedido</p>
+                    </div>
+                    <div @click="formulario_dados.requer_cozinha = !formulario_dados.requer_cozinha"
+                        class="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
+                        :class="formulario_dados.requer_cozinha ? 'bg-orange-500' : 'bg-[var(--border-subtle)]'">
+                        <span class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+                            :class="formulario_dados.requer_cozinha ? 'translate-x-5' : 'translate-x-0'"></span>
+                    </div>
+                </div>
+
+                <!-- Grupos de Adicionais -->
+                <div v-if="lista_grupos_adicionais.length > 0" class="space-y-2">
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Grupos de Adicionais</label>
+                        <p class="text-[11px] font-bold text-[var(--text-muted)] mt-0.5">
+                            Vincule os grupos de adicionais disponíveis para este produto
+                        </p>
+                    </div>
+                    <div class="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] p-3 space-y-1.5">
+                        <label v-for="grupo in lista_grupos_adicionais" :key="grupo.id"
+                            class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--bg-card)] transition-colors cursor-pointer">
+                            <input type="checkbox"
+                                :value="grupo.id"
+                                v-model="formulario_dados.grupos_adicionais_ids"
+                                class="flex-none h-4 w-4 rounded accent-blue-600" />
+                            <span class="text-sm font-bold text-[var(--text-primary)]">
+                                {{ grupo.nome }}
+                                <span class="text-[var(--text-muted)] font-normal">({{ (grupo.itens || []).length }} {{ (grupo.itens || []).length === 1 ? 'item' : 'itens' }})</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <!-- ── PASSO 2: Fornecedores (só para "comprado") ── -->
@@ -498,6 +535,7 @@ const props = defineProps({
     modo_edicao: { type: Boolean, required: true },
     formulario_dados: { type: Object, required: true },
     lista_fornecedores: { type: Array, required: true },
+    lista_grupos_adicionais: { type: Array, default: () => [] },
     salvando: { type: Boolean, required: true },
 });
 

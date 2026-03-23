@@ -40,6 +40,12 @@ const rotas_do_aplicativo = [
                 meta: { permissao_necessaria: 'acessar_mesas' }
             },
             {
+                path: '/cozinha',
+                name: 'painel_cozinha',
+                component: () => import('../views/PaginaCozinha.vue'),
+                meta: { permissao_necessaria: 'acessar_cozinha' }
+            },
+            {
                 path: '/comandas',
                 name: 'gestao_comandas',
                 component: () => import('../views/PaginaComandas.vue'),

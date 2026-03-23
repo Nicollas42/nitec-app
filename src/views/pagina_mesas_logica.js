@@ -2,14 +2,29 @@ import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
 import { useMesasStore } from '../stores/mesas_store.js';
+import { useComandasStore } from '../stores/comandas_store.js';
 import { useToastStore } from '../stores/toast_store.js';
 import { obter_servidor_cacheado } from '../servicos/descoberta_rede.js';
 import { db } from '../banco_local/db.js';
 
 export function useLogicaMesas() {
-    const roteador   = useRouter();
-    const loja_mesas = useMesasStore();
-    const toast_global = useToastStore();
+    const roteador      = useRouter();
+    const loja_mesas    = useMesasStore();
+    const loja_comandas = useComandasStore();
+    const toast_global  = useToastStore();
+
+    // Mapa: mesa_id → { count, total } das comandas abertas
+    const info_por_mesa = computed(() => {
+        const mapa = {};
+        for (const c of loja_comandas.lista_comandas) {
+            if (c.status_comanda !== 'aberta') continue;
+            const chave = String(c.mesa_id);
+            if (!mapa[chave]) mapa[chave] = { count: 0, total: 0 };
+            mapa[chave].count++;
+            mapa[chave].total += Number(c.valor_total || 0);
+        }
+        return mapa;
+    });
 
     const carregando       = ref(false);
     const termo_pesquisa   = ref('');
@@ -21,6 +36,18 @@ export function useLogicaMesas() {
     const modal_visivel    = ref(false);
     const mesa_em_abertura = ref(null);
     const input_nome_cliente = ref('');
+
+    const grade_colunas = ref(Number(localStorage.getItem('nitec_mesas_colunas') || 5));
+    const grade_linhas  = ref(Number(localStorage.getItem('nitec_mesas_linhas')  || 0)); // 0 = sem limite
+    const modal_grade   = ref(false);
+
+    const salvar_grade = (cols, rows) => {
+        grade_colunas.value = Math.max(1, Math.min(20, cols));
+        grade_linhas.value  = Math.max(0, Math.min(20, rows));
+        localStorage.setItem('nitec_mesas_colunas', grade_colunas.value);
+        localStorage.setItem('nitec_mesas_linhas',  grade_linhas.value);
+        modal_grade.value = false;
+    };
 
     let intervalo_polling = null;
 
@@ -43,7 +70,7 @@ export function useLogicaMesas() {
 
     const carregar_dados = async () => {
         carregando.value = true;
-        await loja_mesas.buscar_mesas();
+        await Promise.all([loja_mesas.buscar_mesas(), loja_comandas.buscar_comandas()]);
         carregando.value = false;
     };
 
@@ -163,6 +190,7 @@ export function useLogicaMesas() {
 
     onActivated(() => {
         loja_mesas.buscar_mesas(true);
+        loja_comandas.buscar_comandas(true);
         iniciar_polling_offline();
     });
 
@@ -175,6 +203,8 @@ export function useLogicaMesas() {
         selecionar_mesa, iniciar_venda_balcao, voltar_painel,
         modal_visivel, modal_nova_mesa,
         mesa_em_abertura, input_nome_cliente, fechar_modal,
-        confirmar_abertura_comanda, mesa_carregando
+        confirmar_abertura_comanda, mesa_carregando,
+        info_por_mesa,
+        grade_colunas, grade_linhas, modal_grade, salvar_grade,
     };
 }

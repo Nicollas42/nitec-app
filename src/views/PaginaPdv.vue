@@ -6,7 +6,7 @@
 
                 <div class="flex justify-between items-center">
                     <h1 class="text-xl md:text-2xl font-black text-[var(--text-primary)] tracking-tight uppercase italic">
-                        {{ id_comanda_pagamento ? '💳 Pagamento de Conta' : (id_comanda_vinculada ? '📥 Lançar na Mesa' : 'Venda Balcão') }}
+                        {{ em_modo_pagar_tudo ? '💳 Pagamento Total da Mesa' : id_comanda_pagamento ? '💳 Pagamento de Conta' : (id_comanda_vinculada ? '📥 Lançar na Mesa' : 'Venda Balcão') }}
                     </h1>
                     <button @click="voltar_painel" class="md:hidden px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card-hover)] text-sm font-bold transition-all shadow-sm">Voltar</button>
                 </div>
@@ -31,9 +31,9 @@
                 </div>
 
                 <div v-for="produto in produtos_vitrine" :key="produto.id" class="relative group h-28">
-                    <button @click="id_comanda_pagamento ? null : adicionar_ao_carrinho(produto)" 
+                    <button @click="(id_comanda_pagamento || em_modo_pagar_tudo) ? null : adicionar_ao_carrinho(produto)"
                             :class="[
-                                id_comanda_pagamento ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-nitec_blue hover:shadow-md active:scale-95',
+                                (id_comanda_pagamento || em_modo_pagar_tudo) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:border-nitec_blue hover:shadow-md active:scale-95',
                                 quantidade_selecionada(produto.id) > 0 ? 'opacity-80 border-nitec_blue/40 bg-nitec_blue/5' : '',
                                 tem_excedente(produto) ? 'border-orange-400 bg-orange-500/10 opacity-90' : ''
                             ]"
@@ -75,7 +75,7 @@
                  class="bg-[var(--bg-page)]/80 backdrop-blur-md border-b border-[var(--border-subtle)] p-4 text-center shrink-0 rounded-t-3xl md:rounded-none cursor-pointer md:cursor-default flex justify-between items-center md:block">
                 
                 <h2 class="text-xs font-black text-[var(--text-primary)] uppercase tracking-widest text-center flex-1">
-                    {{ id_comanda_pagamento ? 'Resumo da Conta' : 'Carrinho Atual' }}
+                    {{ (em_modo_pagar_tudo || id_comanda_pagamento) ? 'Resumo da Conta' : 'Carrinho Atual' }}
                     <span v-if="carrinho_venda.length > 0 && !carrinho_expandido" class="md:hidden ml-2 bg-nitec_blue text-white px-2 py-0.5 rounded-full text-[10px]">{{ carrinho_venda.length }} itens</span>
                 </h2>
                 
@@ -91,17 +91,20 @@
                     <p class="text-[10px] font-bold uppercase tracking-widest">Carrinho Vazio</p>
                 </div>
                 
-                <div v-for="item in itens_ja_lancados" :key="'db_'+item.id_item_comanda" 
+                <div v-for="item in itens_ja_lancados" :key="'db_'+item.id_item_comanda"
                      class="flex flex-col border border-purple-500/20 py-2 group px-2 relative bg-[var(--bg-page)] rounded-xl mb-1 shadow-sm">
-                    
+
                     <div class="flex justify-between items-start mb-1">
                         <div>
                             <p class="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5"><span class="text-[10px] text-purple-500" title="Já gravado">☁️</span> {{ item.nome_produto }}</p>
+                            <p v-if="item.adicionais && item.adicionais.length > 0" class="text-[9px] text-nitec_blue font-bold mt-0.5 leading-tight">
+                                <template v-for="(ad, idx) in item.adicionais" :key="ad.id">{{ idx > 0 ? ', ' : '' }}{{ ad.quantidade > 1 ? ad.quantidade + 'x ' : '' }}+ {{ ad.nome }}<template v-if="ad.preco_unitario > 0"> (R$ {{ (ad.preco_unitario * ad.quantidade).toFixed(2) }})</template></template>
+                            </p>
                             <p class="text-[10px] text-[var(--text-muted)] font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-500">R$ {{ Number(item.preco_venda).toFixed(2) }}</span></p>
                         </div>
-                        <span class="text-sm font-black text-[var(--text-primary)]">R$ {{ (item.quantidade * item.preco_venda).toFixed(2) }}</span>
+                        <span class="text-sm font-black text-[var(--text-primary)]">R$ {{ (item.quantidade * (Number(item.preco_venda) + (item.adicionais || []).reduce((s, a) => s + (a.preco_unitario || 0) * (a.quantidade || 1), 0))).toFixed(2) }}</span>
                     </div>
-                    
+
                     <div class="flex items-center justify-between mt-1">
                         <div class="flex items-center bg-[var(--bg-card)] rounded-md border border-[var(--border-subtle)] shadow-sm">
                             <button @click="alterar_quantidade_db(item.id_item_comanda, 'decrementar')" class="w-6 h-6 flex items-center justify-center text-[var(--text-primary)] hover:text-red-500 font-black">-</button>
@@ -114,15 +117,18 @@
                     </div>
                 </div>
 
-                <div v-for="(item, indice) in carrinho_venda" :key="'novo_'+indice" 
+                <div v-for="(item, indice) in carrinho_venda" :key="'novo_'+indice"
                      class="flex flex-col border border-green-500/20 py-2 group px-2 relative bg-[var(--bg-page)] rounded-xl mb-1 shadow-sm">
-                    
+
                     <div class="flex justify-between items-start mb-1">
                         <div>
                             <p class="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5"><span class="text-[10px] text-green-500">🆕</span> {{ item.nome_produto }}</p>
-                            <p class="text-[10px] text-[var(--text-muted)] font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-500">R$ {{ Number(item.preco_venda).toFixed(2) }}</span></p>
+                            <p v-if="item.adicionais && item.adicionais.length > 0" class="text-[9px] text-nitec_blue font-bold mt-0.5 leading-tight">
+                                <template v-for="(ad, idx) in item.adicionais" :key="ad.id">{{ idx > 0 ? ', ' : '' }}{{ ad.qtd > 1 ? ad.qtd + 'x ' : '' }}+ {{ ad.nome }}<template v-if="ad.preco > 0"> (R$ {{ (ad.preco * ad.qtd).toFixed(2) }})</template></template>
+                            </p>
+                            <p class="text-[10px] text-[var(--text-muted)] font-bold mt-0.5">{{ item.quantidade }}x <span class="text-green-500">R$ {{ _preco_unitario_com_adicionais(item).toFixed(2) }}</span></p>
                         </div>
-                        <span class="text-sm font-black text-[var(--text-primary)]">R$ {{ (item.quantidade * item.preco_venda).toFixed(2) }}</span>
+                        <span class="text-sm font-black text-[var(--text-primary)]">R$ {{ (item.quantidade * _preco_unitario_com_adicionais(item)).toFixed(2) }}</span>
                     </div>
 
                     <div class="flex items-center justify-between mt-1">
@@ -159,19 +165,79 @@
                     </span>
                 </div>
                 
-                <button @click="processar_acao_principal" :disabled="processando_finalizacao" :class="id_comanda_pagamento ? 'bg-green-600 hover:bg-green-500' : 'bg-nitec_blue hover:bg-blue-500'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10">
+                <button @click="processar_acao_principal" :disabled="processando_finalizacao" :class="(id_comanda_pagamento || em_modo_pagar_tudo) ? 'bg-green-600 hover:bg-green-500' : 'bg-nitec_blue hover:bg-blue-500'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10">
                     <template v-if="processando_finalizacao">
                         <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         A PROCESSAR...
                     </template>
                     <template v-else>
-                        <template v-if="id_comanda_pagamento"><span>💳</span> Confirmar Pagamento</template>
+                        <template v-if="em_modo_pagar_tudo"><span>💳</span> Confirmar Pagamento Total</template>
+                        <template v-else-if="id_comanda_pagamento"><span>💳</span> Confirmar Pagamento</template>
                         <template v-else-if="id_comanda_vinculada"><span>📥</span> Atualizar Comanda</template>
                         <template v-else><span>💸</span> Venda Balcão</template>
                     </template>
                 </button>
             </div>
         </section>
+        <!-- Modal de Adicionais -->
+        <div v-if="modal_adicionais_visivel && produto_adicionais_temp" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-[var(--bg-card)] w-full max-w-md rounded-3xl shadow-2xl border border-[var(--border-subtle)] flex flex-col max-h-[85vh]">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-[var(--border-subtle)] flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 class="text-sm font-black text-[var(--text-primary)]">{{ produto_adicionais_temp.nome_produto }}</h2>
+                        <p class="text-[10px] text-[var(--text-muted)] font-bold mt-0.5">Base: R$ {{ Number(produto_adicionais_temp.preco_venda).toFixed(2) }}</p>
+                    </div>
+                    <button @click="cancelar_adicionais" class="text-[var(--text-muted)] hover:text-red-500 font-bold text-xl px-2">&times;</button>
+                </div>
+
+                <!-- Grupos e itens -->
+                <div class="flex-1 overflow-y-auto p-5 space-y-5">
+                    <div v-for="grupo in produto_adicionais_temp.grupos_adicionais" :key="grupo.id">
+                        <div class="flex items-center gap-2 mb-3">
+                            <h3 class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">{{ grupo.nome }}</h3>
+                            <span v-if="grupo.maximo_selecoes > 0" class="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-500 text-[9px] font-black">
+                                max {{ grupo.maximo_selecoes }}
+                            </span>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <div v-for="item in grupo.itens" :key="item.id"
+                                class="flex items-center justify-between p-3 rounded-xl border transition-colors"
+                                :class="(selecao_adicionais_temp[item.id] || 0) > 0
+                                    ? 'border-nitec_blue/40 bg-nitec_blue/5'
+                                    : 'border-[var(--border-subtle)] bg-[var(--bg-page)]'">
+                                <div>
+                                    <span class="text-xs font-bold text-[var(--text-primary)]">{{ item.nome }}</span>
+                                    <span class="ml-2 text-xs font-black" :class="Number(item.preco) > 0 ? 'text-green-500' : 'text-[var(--text-muted)]'">
+                                        {{ Number(item.preco) > 0 ? '+R$ ' + Number(item.preco).toFixed(2) : 'Grátis' }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center bg-[var(--bg-card)] rounded-lg border border-[var(--border-subtle)] shadow-sm">
+                                    <button @click="alterar_qtd_adicional(item.id, 'decrementar')"
+                                        class="w-8 h-8 flex items-center justify-center text-[var(--text-primary)] hover:text-red-500 font-black text-sm">-</button>
+                                    <span class="w-6 text-center text-xs font-black text-[var(--text-primary)]">{{ selecao_adicionais_temp[item.id] || 0 }}</span>
+                                    <button @click="alterar_qtd_adicional(item.id, 'incrementar')"
+                                        class="w-8 h-8 flex items-center justify-center text-[var(--text-primary)] hover:text-nitec_blue font-black text-sm">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer com total e botão -->
+                <div class="px-5 py-4 border-t border-[var(--border-subtle)] shrink-0">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Total por unidade:</span>
+                        <span class="text-lg font-black text-nitec_blue">R$ {{ total_preview_adicionais.toFixed(2) }}</span>
+                    </div>
+                    <button @click="confirmar_adicionais"
+                        class="w-full py-3.5 bg-nitec_blue text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-colors shadow-sm active:scale-95">
+                        Adicionar ao Carrinho
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -185,7 +251,11 @@ const {
     adicionar_ao_carrinho, remover_do_carrinho, 
     subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
     quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
-    id_comanda_vinculada, id_comanda_pagamento, carrinho_expandido, processar_acao_principal, voltar_painel,
+    id_comanda_vinculada, id_comanda_pagamento, em_modo_pagar_tudo,
+    carrinho_expandido, processar_acao_principal, voltar_painel,
+    modal_adicionais_visivel, produto_adicionais_temp, selecao_adicionais_temp,
+    confirmar_adicionais, cancelar_adicionais, total_preview_adicionais, alterar_qtd_adicional,
+    _preco_unitario_com_adicionais,
 } = use_logica_pdv();
 </script>
 

@@ -7,11 +7,16 @@
                 <p class="text-sm text-[var(--text-muted)] mt-1">Gestão de salão e comandas em tempo real.</p>
             </div>
             
-            <div class="flex gap-3 w-full md:w-auto">
-                <button @click="voltar_painel" class="md:hidden px-5 py-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card-hover)] text-sm font-bold transition-all flex-1">
+            <div class="flex gap-2 w-full md:w-auto">
+                <button @click="voltar_painel" class="md:hidden px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card-hover)] text-sm font-bold transition-all flex-1">
                     Voltar
                 </button>
-                <button @click="modal_nova_mesa = true" class="px-5 py-2.5 bg-nitec_blue text-white rounded-lg hover:bg-blue-600 text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
+                <button @click="abrir_modal_grade"
+                        class="px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-card-hover)] text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2">
+                    ⊞ <span class="hidden sm:inline">Grade</span>
+                    <span class="text-[10px] font-black text-nitec_blue">{{ grade_colunas }}×{{ grade_linhas || '∞' }}</span>
+                </button>
+                <button @click="modal_nova_mesa = true" class="px-4 py-2.5 bg-nitec_blue text-white rounded-lg hover:bg-blue-600 text-sm font-bold shadow-sm transition-all flex items-center justify-center gap-2 flex-1 md:flex-none">
                     <span>➕</span> Nova Mesa
                 </button>
             </div>
@@ -19,41 +24,52 @@
 
         <main class="area_principal flex flex-col gap-6 flex-1">
             
-            <section class="secao_balcao shrink-0">
-                <button @click="iniciar_venda_balcao" class="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] p-5 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-blue-500/10 text-nitec_blue rounded-xl flex items-center justify-center text-xl font-black group-hover:scale-110 transition-transform">
-                            🛒
-                        </div>
-                        <div class="text-left">
-                            <h2 class="text-base font-black text-[var(--text-primary)] uppercase tracking-tight">Venda Balcão (Caixa Rápido)</h2>
-                            <p class="text-xs text-[var(--text-muted)] font-medium mt-0.5">Lançamento direto sem vincular a uma mesa.</p>
-                        </div>
-                    </div>
-                    <span class="text-nitec_blue font-bold text-sm hidden sm:block bg-blue-500/10 px-3 py-1 rounded-lg group-hover:bg-blue-500/20 transition-colors">Iniciar &rarr;</span>
-                </button>
-            </section>
             
             <section class="secao_grelha_mesas flex-1">
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-6">
-                    <button v-for="mesa in lista_mesas" :key="mesa.id" @click="selecionar_mesa(mesa)" 
-                            class="p-5 rounded-2xl transition-all transform active:scale-95 bg-[var(--bg-card)] relative flex flex-col items-start justify-between h-32 group border"
-                            :class="mesa.status_mesa === 'livre' ? 'border-[var(--border-subtle)] hover:border-green-500 shadow-sm hover:shadow-md' : 'border-red-500/50 bg-red-500/5 shadow-sm opacity-95'">
-                        
-                        <div class="w-full flex justify-between items-center mb-2">
-                            <span class="w-3 h-3 rounded-full shadow-sm" :class="mesa.status_mesa === 'livre' ? 'bg-green-500' : 'bg-red-500 animate-pulse'"></span>
-                            <svg v-if="mesa_carregando === mesa.id" class="animate-spin h-5 w-5 text-nitec_blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <div class="grid gap-2 pb-6"
+                     :style="`grid-template-columns: repeat(${grade_colunas}, minmax(0, 1fr))`">
+                    <button v-for="mesa in (grade_linhas > 0 ? lista_mesas.slice(0, grade_colunas * grade_linhas) : lista_mesas)" :key="mesa.id" @click="selecionar_mesa(mesa)"
+                            class="p-2.5 rounded-xl transition-all transform active:scale-95 bg-[var(--bg-card)] relative flex flex-col items-start justify-between group border min-h-[4.5rem]"
+                            :class="[
+                                mesa.status_mesa === 'livre'
+                                    ? 'border-[var(--border-subtle)] hover:border-green-500 shadow-sm hover:shadow-md'
+                                    : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao
+                                        ? 'border-green-500 bg-green-500/10 shadow-sm animate-pulse'
+                                        : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente
+                                            ? 'border-amber-500 bg-amber-500/5 shadow-sm animate-pulse'
+                                            : 'border-red-500/40 bg-red-500/5 shadow-sm'
+                            ]">
+
+                        <!-- Status dot + spinner -->
+                        <div class="w-full flex justify-between items-center mb-1">
+                            <span class="w-2 h-2 rounded-full flex-shrink-0"
+                                :class="mesa.status_mesa === 'livre' ? 'bg-green-500'
+                                    : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao ? 'bg-green-500 animate-ping'
+                                    : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente ? 'bg-amber-500 animate-ping'
+                                    : 'bg-red-500 animate-pulse'"></span>
+                            <svg v-if="mesa_carregando === mesa.id" class="animate-spin h-3.5 w-3.5 text-nitec_blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                         </div>
-                        
-                        <div class="text-left w-full mt-auto">
-                            <h3 class="text-lg font-black text-[var(--text-primary)] leading-tight truncate">{{ mesa.nome_mesa }}</h3>
-                            <p class="text-[10px] uppercase font-bold tracking-widest mt-1" :class="mesa.status_mesa === 'livre' ? 'text-[var(--text-muted)]' : 'text-red-500'">
-                                {{ mesa.status_mesa === 'livre' ? 'Disponível' : 'Ocupada' }}
+
+                        <!-- Nome -->
+                        <p class="text-xs font-black text-[var(--text-primary)] leading-tight truncate w-full">{{ mesa.nome_mesa }}</p>
+
+                        <!-- Info de comandas (só quando ocupada) -->
+                        <template v-if="mesa.status_mesa !== 'livre' && info_por_mesa[String(mesa.id)]">
+                            <p class="text-[9px] font-bold text-red-500 mt-0.5 leading-tight">
+                                {{ info_por_mesa[String(mesa.id)].count }} cmd
                             </p>
-                        </div>
+                            <p class="text-[9px] font-black text-[var(--text-primary)] leading-tight">
+                                R$ {{ info_por_mesa[String(mesa.id)].total.toFixed(2) }}
+                            </p>
+                        </template>
+                        <template v-else>
+                            <p class="text-[9px] uppercase font-bold tracking-wider mt-0.5" :class="mesa.status_mesa === 'livre' ? 'text-[var(--text-muted)]' : 'text-red-500'">
+                                {{ mesa.status_mesa === 'livre' ? 'livre' : 'ocupada' }}
+                            </p>
+                        </template>
                     </button>
                 </div>
             </section>
@@ -94,14 +110,104 @@
                 </div>
             </div>
         </div>
+
+        <!-- Modal Configuração de Grade -->
+        <div v-if="modal_grade" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div class="bg-[var(--bg-card)] w-full max-w-sm p-6 rounded-3xl shadow-2xl border border-[var(--border-subtle)]">
+                <div class="flex justify-between items-center mb-5">
+                    <h2 class="text-base font-black text-[var(--text-primary)] uppercase tracking-widest">⊞ Configurar Grade</h2>
+                    <button @click="modal_grade = false" class="text-[var(--text-muted)] hover:text-red-500 font-bold text-xl">×</button>
+                </div>
+
+                <div class="flex flex-col gap-5">
+                    <!-- Colunas -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Colunas (X)</label>
+                            <span class="text-xl font-black text-nitec_blue">{{ grade_colunas_temp }}</span>
+                        </div>
+                        <input type="range" v-model.number="grade_colunas_temp" min="1" max="20" step="1"
+                               class="w-full h-2 rounded-full accent-blue-600 cursor-pointer">
+                        <div class="flex justify-between text-[9px] font-bold text-[var(--text-muted)] mt-1">
+                            <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
+                        </div>
+                    </div>
+
+                    <!-- Linhas -->
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Linhas (Y)</label>
+                            <span class="text-xl font-black text-nitec_blue">{{ grade_linhas_temp === 0 ? '∞' : grade_linhas_temp }}</span>
+                        </div>
+                        <input type="range" v-model.number="grade_linhas_temp" min="0" max="20" step="1"
+                               class="w-full h-2 rounded-full accent-blue-600 cursor-pointer">
+                        <div class="flex justify-between text-[9px] font-bold text-[var(--text-muted)] mt-1">
+                            <span>∞</span><span>5</span><span>10</span><span>15</span><span>20</span>
+                        </div>
+                        <p class="text-[10px] text-[var(--text-muted)] font-bold mt-1.5">0 = sem limite (todas as mesas)</p>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="bg-[var(--bg-page)] rounded-2xl border border-[var(--border-subtle)] p-4 text-center">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-1">Prévia</p>
+                        <p class="text-3xl font-black text-[var(--text-primary)]">{{ grade_colunas_temp }} × {{ grade_linhas_temp || '∞' }}</p>
+                        <p class="text-[10px] font-bold text-[var(--text-muted)] mt-0.5">
+                            {{ grade_linhas_temp > 0 ? `máx ${grade_colunas_temp * grade_linhas_temp} mesas visíveis` : 'todas as mesas' }}
+                        </p>
+                    </div>
+
+                    <!-- Presets rápidos -->
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mb-2">Presets rápidos</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="p in [{c:4,l:3},{c:5,l:4},{c:6,l:0},{c:8,l:0},{c:10,l:0}]" :key="`${p.c}x${p.l}`"
+                                    @click="grade_colunas_temp = p.c; grade_linhas_temp = p.l"
+                                    class="px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-colors"
+                                    :class="grade_colunas_temp===p.c && grade_linhas_temp===p.l
+                                        ? 'bg-nitec_blue text-white border-nitec_blue'
+                                        : 'border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-nitec_blue hover:text-nitec_blue bg-[var(--bg-page)]'">
+                                {{ p.c }}×{{ p.l || '∞' }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3 pt-2 border-t border-[var(--border-subtle)]">
+                        <button @click="modal_grade = false"
+                                class="flex-1 py-3 rounded-xl border border-[var(--border-subtle)] text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] transition-colors">
+                            Cancelar
+                        </button>
+                        <button @click="salvar_grade(grade_colunas_temp, grade_linhas_temp)"
+                                class="flex-[2] py-3 rounded-xl bg-nitec_blue text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity shadow-sm">
+                            Aplicar Grade
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { useLogicaMesas } from './pagina_mesas_logica.js';
-const { 
-    lista_mesas, input_nome_mesa, adicionar_nova_mesa, selecionar_mesa, 
-    iniciar_venda_balcao, voltar_painel, modal_visivel, modal_nova_mesa, 
-    mesa_em_abertura, input_nome_cliente, fechar_modal, confirmar_abertura_comanda, mesa_carregando 
+import { useCozinhaPolling } from '../composables/useCozinhaPolling.js';
+
+const {
+    lista_mesas, input_nome_mesa, adicionar_nova_mesa, selecionar_mesa,
+    iniciar_venda_balcao, voltar_painel, modal_visivel, modal_nova_mesa,
+    mesa_em_abertura, input_nome_cliente, fechar_modal, confirmar_abertura_comanda, mesa_carregando,
+    info_por_mesa,
+    grade_colunas, grade_linhas, modal_grade, salvar_grade,
 } = useLogicaMesas();
+
+const grade_colunas_temp = ref(5);
+const grade_linhas_temp  = ref(0);
+const abrir_modal_grade = () => {
+    grade_colunas_temp.value = grade_colunas.value;
+    grade_linhas_temp.value  = grade_linhas.value;
+    modal_grade.value = true;
+};
+
+// ── Status da cozinha por mesa (polling + sons) ───────────────────────────────
+const { status_por_mesa: status_cozinha_mesas } = useCozinhaPolling();
 </script>

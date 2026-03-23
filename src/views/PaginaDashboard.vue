@@ -14,7 +14,8 @@
             </button>
         </div>
 
-        <header class="barra_topo bg-nitec_dark text-white p-4 lg:p-5 flex justify-between items-center shadow-lg z-40">
+        <div class="relative z-40">
+        <header v-show="!header_minimizado" class="barra_topo bg-nitec_dark text-white px-4 lg:px-5 py-2.5 flex justify-between items-center">
             <div class="logo_secao flex items-center gap-3">
                 <h1 class="texto_logo text-xl lg:text-2xl font-black tracking-tighter uppercase text-nitec_blue cursor-pointer" @click="ir_para('/painel-central')">NitecSystem</h1>
                 
@@ -56,16 +57,46 @@
                     <p class="cargo_user text-[10px] text-nitec_blue font-bold uppercase tracking-widest">{{ auth_store.usuario_logado?.tipo_usuario }}</p>
                 </div>
 
-                <!-- 🟢 TOGGLE DARK MODE -->
-                <button @click="tema_store.alternar_tema()" class="text-xl hover:scale-110 transition-transform px-2" :title="tema_store.modo_escuro ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'">
-                    {{ tema_store.modo_escuro ? '☀️' : '🌙' }}
-                </button>
+                <!-- 🟢 SELETOR DE TEMAS -->
+                <div class="relative">
+                    <button @click="seletor_tema_aberto = !seletor_tema_aberto"
+                            class="text-xl hover:scale-110 transition-transform px-2"
+                            :title="'Tema: ' + tema_store.tema_info.nome">
+                        {{ tema_store.tema_info.icone }}
+                    </button>
+                    <div v-if="seletor_tema_aberto"
+                         class="absolute right-0 top-full mt-2 bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl shadow-2xl p-2 flex flex-col gap-1 z-[200] min-w-[160px]"
+                         @mouseleave="seletor_tema_aberto = false">
+                        <button v-for="tema in tema_store.temas" :key="tema.id"
+                                @click="tema_store.selecionar_tema(tema.id); seletor_tema_aberto = false"
+                                class="flex items-center gap-3 px-4 py-2.5 rounded-xl text-left text-xs font-black uppercase tracking-widest transition-colors hover:bg-[var(--bg-card-hover)]"
+                                :class="tema_store.tema_atual === tema.id ? 'bg-nitec_blue/10 text-nitec_blue border border-nitec_blue/20' : 'text-[var(--text-primary)]'">
+                            <span class="text-base">{{ tema.icone }}</span>
+                            {{ tema.nome }}
+                        </button>
+                    </div>
+                </div>
 
                 <button @click="sair" class="botao_sair text-red-400 hover:text-red-500 hover:bg-red-500/20 p-2 rounded-xl transition-all">
                     <span class="text-xl block">🚪</span>
                 </button>
             </div>
         </header>
+
+        <!-- Faixa de toggle — sempre visível, colapsa/expande o header acima -->
+        <div class="bg-nitec_dark flex justify-center items-center py-[3px] border-t border-white/5 shadow-sm">
+            <button @click="alternar_header"
+                    class="group flex items-center gap-1.5 px-5 py-0.5 rounded-full hover:bg-white/10 transition-all text-white/30 hover:text-white/60">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 transition-transform duration-300"
+                     :class="header_minimizado ? '' : 'rotate-180'">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+                <span class="text-[9px] font-black uppercase tracking-widest hidden sm:inline">
+                    {{ header_minimizado ? 'mostrar' : 'ocultar' }}
+                </span>
+            </button>
+        </div>
+        </div><!-- /z-40 wrapper -->
 
         <div class="hidden md:flex bg-[var(--bg-card)] border-b border-[var(--border-subtle)] px-6 pt-4 gap-2 shadow-sm z-30 overflow-x-auto transition-colors duration-300">
             <button v-if="tem_permissao('acessar_pdv')" @click="ir_para('/pdv-caixa')" 
@@ -78,10 +109,15 @@
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>🪑</span> Mesas
             </button>
-            <button v-if="tem_permissao('acessar_comandas')" @click="ir_para('/comandas')" 
+            <button v-if="tem_permissao('acessar_comandas')" @click="ir_para('/comandas')"
                     :class="rota_atual.path.includes('/comandas') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>📝</span> Comandas
+            </button>
+            <button v-if="tem_permissao('acessar_cozinha')" @click="ir_para('/cozinha')"
+                    :class="rota_atual.path.includes('/cozinha') ? 'bg-[var(--bg-page)] text-orange-500 border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                <span>🍳</span> Cozinha
             </button>
             <button v-if="tem_permissao('gerenciar_produtos')" @click="ir_para('/produtos')" 
                     :class="rota_atual.path.includes('/produtos') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
@@ -125,6 +161,9 @@
                 </button>
                 <button v-if="tem_permissao('acessar_comandas')" @click="ir_para('/comandas')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📝</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Comandas</h3>
+                </button>
+                <button v-if="tem_permissao('acessar_cozinha')" @click="ir_para('/cozinha')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-orange-500/30 flex flex-col items-center">
+                    <span class="text-4xl mb-2">🍳</span><h3 class="font-black text-orange-500 uppercase text-sm">Cozinha</h3>
                 </button>
                 <button v-if="tem_permissao('gerenciar_produtos')" @click="ir_para('/produtos')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📦</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Produtos</h3>
@@ -268,14 +307,18 @@ import { useToastStore } from '../stores/toast_store.js';
 import { useTemaStore } from '../stores/tema_store.js';
 import GeradorQrOffline from './componentes_mesa_caixa/GeradorQrOffline.vue';
 import LeitorQrOffline from './componentes_mesa_caixa/LeitorQrOffline.vue';
-import { useRouter } from 'vue-router';
 import BannerServidorLocal from './componentes_mesa_caixa/BannerServidorLocal.vue';
 
-const toast_store = useToastStore(); 
+const toast_store = useToastStore();
 const auth_store = useAuthStore();
-const string_tema = useTemaStore(); // Usaremos 'tema_store' abaixo
+const string_tema = useTemaStore();
 const tema_store = string_tema;
-const roteador = useRouter();
+
+const header_minimizado = ref(localStorage.getItem('nitec_header_min') === '1');
+const alternar_header = () => {
+    header_minimizado.value = !header_minimizado.value;
+    localStorage.setItem('nitec_header_min', header_minimizado.value ? '1' : '0');
+};
 
 const { 
     nome_cliente, em_modo_suporte, ir_para, sair, encerrar_suporte,
@@ -283,7 +326,7 @@ const {
     progresso, versao_nova, status_erro, tem_atualizacao_nova, historico_versoes, carregando_historico,
     abrir_modal_atualizacoes, fechar_modal, checar_atualizacoes, 
     baixar_atualizacao, instalar_atualizacao, baixar_versao_antiga, obter_link_executavel,
-    esta_offline, rota_atual, isAndroid,
+    esta_offline, rota_atual,
 } = useLogicaDashboard();
 
 // 🟢 Estado local dos dois modais QR (simétricos e independentes)
@@ -307,6 +350,8 @@ const tem_permissao = (permissao) => {
 const ao_sincronizar_sucesso = () => {
     fechar_modal_leitor();
 };
+
+const seletor_tema_aberto = ref(false);
 </script>
 
 <style scoped>

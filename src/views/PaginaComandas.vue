@@ -156,12 +156,19 @@
                 <div class="p-8 flex-1 overflow-y-auto max-h-[50vh] custom-scrollbar">
                     <div class="space-y-4">
                         <div v-if="comanda_selecionada.listar_itens.length === 0" class="text-center py-4 text-xs text-[var(--text-muted)] italic">Nenhum item consumido nesta conta.</div>
-                        <div v-for="item in comanda_selecionada.listar_itens" :key="item.id" class="flex justify-between items-center bg-[var(--bg-page)] p-3 rounded-xl border border-[var(--border-subtle)]">
-                            <p class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-tight flex items-center gap-2">
-                                <span class="bg-[var(--bg-card)] px-2 py-1 rounded-md text-[10px] border border-[var(--border-subtle)] text-[var(--text-muted)]">{{ item.quantidade }}x</span>
-                                {{ item.buscar_produto.nome_produto }}
-                            </p>
-                            <p class="text-xs font-black text-[var(--text-primary)]">R$ {{ (item.quantidade * item.preco_unitario).toFixed(2) }}</p>
+                        <div v-for="item in comanda_selecionada.listar_itens" :key="item.id" class="flex justify-between items-start gap-4 bg-[var(--bg-page)] p-3 rounded-xl border border-[var(--border-subtle)]">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-tight flex items-center gap-2">
+                                    <span class="bg-[var(--bg-card)] px-2 py-1 rounded-md text-[10px] border border-[var(--border-subtle)] text-[var(--text-muted)]">{{ item.quantidade }}x</span>
+                                    <span class="truncate">{{ item.buscar_produto.nome_produto }}</span>
+                                </p>
+                                <div v-if="item.adicionais && item.adicionais.length" class="mt-2 space-y-1 pl-11">
+                                    <p v-for="(adicional, indice_adicional) in descrever_adicionais_item(item)" :key="`${item.id}-adicional-${indice_adicional}`" class="text-[11px] font-bold text-[var(--text-muted)] leading-relaxed">
+                                        + {{ adicional }}
+                                    </p>
+                                </div>
+                            </div>
+                            <p class="shrink-0 text-xs font-black text-[var(--text-primary)]">R$ {{ calcular_total_item_historico(item).toFixed(2) }}</p>
                         </div>
                     </div>
                     
@@ -197,7 +204,8 @@
 import { useLogicaComandas } from './pagina_comandas_logica.js';
 const { 
     filtro_status, tipo_exibicao, comandas_filtradas, alterar_filtro, alterar_exibicao, formatar_data,
-    abrir_detalhes, voltar_painel, modal_historico_visivel, comanda_selecionada, fechar_modal_historico, reabrir_comanda, reabrindo,termo_pesquisa_comanda
+    abrir_detalhes, voltar_painel, modal_historico_visivel, comanda_selecionada, fechar_modal_historico, reabrir_comanda, reabrindo,termo_pesquisa_comanda,
+    calcular_total_item_historico, descrever_adicionais_item
 } = useLogicaComandas();
 </script>
 
