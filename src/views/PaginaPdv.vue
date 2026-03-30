@@ -164,6 +164,21 @@
                         R$ {{ valor_final_comanda.toFixed(2) }}
                     </span>
                 </div>
+
+                <!-- 💳 Seletor de forma de pagamento (apenas em modo pagamento) -->
+                <div v-if="id_comanda_pagamento || em_modo_pagar_tudo || !id_comanda_vinculada" class="mb-4">
+                    <p class="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-2">Forma de Pagamento:</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button v-for="metodo in [{ valor: 'dinheiro', emoji: '💵', label: 'Dinheiro' }, { valor: 'pix', emoji: '📲', label: 'Pix' }, { valor: 'debito', emoji: '💳', label: 'Débito' }, { valor: 'credito', emoji: '💳', label: 'Crédito' }]" :key="metodo.valor"
+                            @click="forma_pagamento = metodo.valor"
+                            :class="forma_pagamento === metodo.valor
+                                ? 'border-nitec_blue bg-nitec_blue/10 text-nitec_blue'
+                                : 'border-[var(--border-subtle)] bg-[var(--bg-page)] text-[var(--text-muted)] hover:border-nitec_blue/50'"
+                            class="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-[11px] font-black uppercase tracking-wider transition-all active:scale-95">
+                            <span>{{ metodo.emoji }}</span> {{ metodo.label }}
+                        </button>
+                    </div>
+                </div>
                 
                 <button @click="processar_acao_principal" :disabled="processando_finalizacao" :class="(id_comanda_pagamento || em_modo_pagar_tudo) ? 'bg-green-600 hover:bg-green-500' : 'bg-nitec_blue hover:bg-blue-500'" class="w-full text-white font-black text-sm py-4 rounded-xl shadow-md transition-all active:scale-95 uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-white/10">
                     <template v-if="processando_finalizacao">
@@ -249,7 +264,7 @@ const {
     produtos_fixados, alternar_fixacao,
     carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
     adicionar_ao_carrinho, remover_do_carrinho, 
-    subtotal_comanda, valor_final_comanda, valor_desconto, alterar_quantidade_novo,
+    subtotal_comanda, valor_final_comanda, valor_desconto, forma_pagamento, alterar_quantidade_novo,
     quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
     id_comanda_vinculada, id_comanda_pagamento, em_modo_pagar_tudo,
     carrinho_expandido, processar_acao_principal, voltar_painel,

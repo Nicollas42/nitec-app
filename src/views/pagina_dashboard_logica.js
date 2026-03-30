@@ -223,7 +223,7 @@ export function useLogicaDashboard() {
     };
 
     const sair = async () => {
-        if (!confirm("Deseja realmente sair do sistema?")) return;
+        if (!(await confirm("Deseja realmente sair do sistema?"))) return;
         parar_sincronizacao_de_fundo(); 
         await limpar_dados_locais_completos();
         loja_autenticacao.encerrar_sessao();

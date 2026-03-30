@@ -142,6 +142,7 @@
                     <TabelaCurvaABC :visivel="visibilidade.curva_abc" @alternar="alternar_visibilidade('curva_abc')" :produtos="dados_dashboard.ranking_produtos" />
                     <SecaoComparador :visivel="visibilidade.comparador" @alternar="alternar_visibilidade('comparador')" :dados_por_hora="dados_dashboard.produtos_por_hora" :produtos_disponiveis="dados_dashboard.ranking_produtos" v-model:produtosSelecionados="produtos_comparador" />
                     <SecaoDescontos :visivel="visibilidade.descontos" @alternar="alternar_visibilidade('descontos')" :dados_descontos="dados_dashboard.descontos_cronologicos" />
+                    <SecaoFormasPagamento :visivel="visibilidade.formas_pagamento" @alternar="alternar_visibilidade('formas_pagamento')" :dados_formas="dados_dashboard.vendas_por_forma_pagamento" />
                 </div>
 
                 <div v-show="aba_ativa === 'estoque_sem_giro'">
@@ -265,6 +266,7 @@ import TabelaRankingMesas from './componentes_analises/TabelaRankingMesas.vue';
 import TabelaCurvaABC from './componentes_analises/TabelaCurvaABC.vue';
 import SecaoComparador from './componentes_analises/SecaoComparador.vue';
 import SecaoDescontos from './componentes_analises/SecaoDescontos.vue';
+import SecaoFormasPagamento from './componentes_analises/SecaoFormasPagamento.vue';
 import TabelaEncalhados from './componentes_analises/TabelaEncalhados.vue';
 import SecaoEquipe from './componentes_analises/SecaoEquipe.vue';
 import TabelaAuditoria from './componentes_analises/TabelaAuditoria.vue';

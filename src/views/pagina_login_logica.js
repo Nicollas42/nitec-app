@@ -69,7 +69,7 @@ export function useLogicaLogin() {
             return;
         }
 
-        const confirmacao = confirm(`Deseja enviar um link de recuperação para ${email_input.value} na loja "${loja}"?`);
+        const confirmacao = await confirm(`Deseja enviar um link de recuperação para ${email_input.value} na loja "${loja}"?`);
         if (!confirmacao) return;
 
         try {

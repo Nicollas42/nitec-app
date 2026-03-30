@@ -86,13 +86,29 @@
                                     </div>
                                 </div>
 
-                                <button
-                                    v-if="evento.tipo_evento === 'venda'"
-                                    @click="$emit('abrir-recibo', evento)"
-                                    class="opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-card)] border border-[var(--border-subtle)] text-nitec_blue hover:bg-[var(--bg-page)] hover:border-blue-500/50 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm shrink-0"
-                                >
-                                    Ver Recibo
-                                </button>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <!-- Badge forma de pagamento (apenas vendas com forma registrada) -->
+                                    <span
+                                        v-if="evento.tipo_evento === 'venda' && evento.comanda_raw?.forma_pagamento"
+                                        class="px-2 py-1 rounded-md font-black uppercase tracking-widest text-[9px] border shrink-0"
+                                        :class="{
+                                            'bg-green-500/10 text-green-600 border-green-500/20': evento.comanda_raw.forma_pagamento === 'dinheiro',
+                                            'bg-blue-500/10 text-blue-600 border-blue-500/20':   evento.comanda_raw.forma_pagamento === 'pix',
+                                            'bg-amber-500/10 text-amber-600 border-amber-500/20': evento.comanda_raw.forma_pagamento === 'debito',
+                                            'bg-purple-500/10 text-purple-600 border-purple-500/20': evento.comanda_raw.forma_pagamento === 'credito',
+                                        }"
+                                    >
+                                        {{ { dinheiro: '💵 Dinheiro', pix: '📲 Pix', debito: '💳 Débito', credito: '💳 Crédito' }[evento.comanda_raw.forma_pagamento] }}
+                                    </span>
+
+                                    <button
+                                        v-if="evento.tipo_evento === 'venda'"
+                                        @click="$emit('abrir-recibo', evento)"
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-card)] border border-[var(--border-subtle)] text-nitec_blue hover:bg-[var(--bg-page)] hover:border-blue-500/50 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm shrink-0"
+                                    >
+                                        Ver Recibo
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>

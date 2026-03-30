@@ -257,7 +257,7 @@ export function useLogicaMesaDetalhes() {
         if (String(id_item_comanda).startsWith('offline_item_'))
             return toast_global.exibir_toast("⚠️ Item offline — sincronize antes de remover.", "aviso");
 
-        if (!confirm("Deseja cancelar estes itens? Eles voltarão para o estoque.")) return;
+        if (!(await confirm("Deseja cancelar estes itens? Eles voltarão para o estoque."))) return;
         item_processando.value = id_item_comanda;
         const uuid    = gerarUUID();
         const payload = { uuid_operacao: uuid };

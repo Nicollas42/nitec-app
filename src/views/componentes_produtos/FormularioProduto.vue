@@ -664,7 +664,7 @@ const adicionar_categoria = async () => {
 const remover_categoria = async (cat) => {
     if (cat === 'Geral') return;
 
-    if (!window.confirm(`Deseja remover a categoria "${cat}" deste tenant?`)) return;
+    if (!(await window.confirm(`Deseja remover a categoria "${cat}" deste tenant?`))) return;
 
     salvando_categoria.value = true;
     categoria_processando_nome.value = cat;

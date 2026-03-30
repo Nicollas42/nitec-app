@@ -604,7 +604,7 @@ export function use_logica_produtos() {
             ? `"${produto.nome_produto}" tem ${produto.estoque_atual} unidade(s) em estoque. Ao excluir, o histórico será preservado mas o produto sairá da listagem. Confirma?`
             : `Deseja realmente excluir "${produto.nome_produto}"?`;
 
-        if (!window.confirm(mensagem)) return;
+        if (!(await window.confirm(mensagem))) return;
 
         produto_excluindo_id.value = produto.id;
         try {
@@ -872,7 +872,7 @@ export function use_logica_produtos() {
     };
 
     const excluir_fornecedor = async (fornecedor) => {
-        if (!window.confirm(`Deseja realmente excluir o fornecedor "${fornecedor.nome_fantasia}"?`)) return;
+        if (!(await window.confirm(`Deseja realmente excluir o fornecedor "${fornecedor.nome_fantasia}"?`))) return;
 
         fornecedor_excluindo_id.value = fornecedor.id;
         try {
@@ -959,7 +959,7 @@ export function use_logica_produtos() {
     };
 
     const excluir_grupo = async (id) => {
-        if (!window.confirm('Deseja realmente excluir este grupo e todos os seus itens?')) return;
+        if (!(await window.confirm('Deseja realmente excluir este grupo e todos os seus itens?'))) return;
         try {
             await api_cliente.delete(`/grupos-adicionais/${id}`);
             toast_global.exibir_toast('Grupo excluído com sucesso!', 'sucesso');
@@ -1022,7 +1022,7 @@ export function use_logica_produtos() {
     };
 
     const excluir_item = async (id) => {
-        if (!window.confirm('Deseja realmente excluir este item adicional?')) return;
+        if (!(await window.confirm('Deseja realmente excluir este item adicional?'))) return;
         try {
             await api_cliente.delete(`/itens-adicionais/${id}`);
             toast_global.exibir_toast('Item excluído com sucesso!', 'sucesso');

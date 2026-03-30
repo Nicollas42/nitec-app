@@ -126,7 +126,7 @@ export function useAdminEstabelecimentos() {
     };
 
     const alternar_status = async (id) => {
-        if(!confirm("Deseja alterar o status de acesso deste cliente?")) return;
+        if(!(await confirm("Deseja alterar o status de acesso deste cliente?"))) return;
         try {
             const resposta = await api_cliente.put(`/admin/alternar-status-bar/${id}`);
             alert(resposta.data.mensagem);
@@ -137,7 +137,7 @@ export function useAdminEstabelecimentos() {
     };
 
     const excluir_cliente = async (id) => {
-        const confirmacao = confirm(`⚠️ ATENÇÃO EXTREMA!\n\nVocê está prestes a EXCLUIR PERMANENTEMENTE o cliente '${id}'.\nIsso apagará o banco de dados dele e todas as informações. \n\nDeseja realmente continuar?`);
+        const confirmacao = await confirm(`⚠️ ATENÇÃO EXTREMA!\n\nVocê está prestes a EXCLUIR PERMANENTEMENTE o cliente '${id}'.\nIsso apagará o banco de dados dele e todas as informações. \n\nDeseja realmente continuar?`);
         if(!confirmacao) return;
 
         try {

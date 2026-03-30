@@ -28,7 +28,8 @@ export function use_logica_pdv() {
     const ids_pagamento_total   = ref([]); // pagamento de TODAS as comandas da mesa de uma vez
     const total_mesa_externo    = ref(0);  // valor total passado via query param
     const valor_desconto        = ref('');
-    const processando_finalizacao = ref(false); 
+    const forma_pagamento       = ref('dinheiro');
+    const processando_finalizacao = ref(false);
 
     // 🟢 Controle UI (Mobile)
     const carrinho_expandido = ref(false);
@@ -307,6 +308,7 @@ export function use_logica_pdv() {
         itens_ja_lancados.value    = [];
         acoes_pendentes_db.value   = [];
         valor_desconto.value       = '';
+        forma_pagamento.value      = 'dinheiro';
 
         // Extrai mesa_id do comanda_id offline (ex: "off_5" → mesa 5)
         const comanda_id = novaQuery.comanda || novaQuery.pagamento;
@@ -574,8 +576,13 @@ export function use_logica_pdv() {
     const processar_acao_principal = async () => {
         if (processando_finalizacao.value) return;
 
-        if (carrinho_venda.value.length === 0 && acoes_pendentes_db.value.length === 0 && !id_comanda_pagamento.value) {
+        if (carrinho_venda.value.length === 0 && acoes_pendentes_db.value.length === 0 && !id_comanda_pagamento.value && !em_modo_pagar_tudo.value) {
             return toast_global.exibir_toast("Nenhuma alteração foi feita.", "erro");
+        }
+
+        const eh_pagamento = em_modo_pagar_tudo.value || !!id_comanda_pagamento.value || !id_comanda_vinculada.value;
+        if (eh_pagamento && !forma_pagamento.value) {
+            return toast_global.exibir_toast("Selecione a forma de pagamento.", "erro");
         }
 
         processando_finalizacao.value = true;
@@ -588,7 +595,7 @@ export function use_logica_pdv() {
                 const desconto_por_comanda = (Number(valor_desconto.value) || 0) / ids_pagamento_total.value.length;
                 for (const id of ids_pagamento_total.value) {
                     const uuid_pgto = gerarUUID();
-                    const payload_p = { data_hora_fechamento: data_atual, desconto: desconto_por_comanda, uuid_operacao: uuid_pgto };
+                    const payload_p = { data_hora_fechamento: data_atual, desconto: desconto_por_comanda, forma_pagamento: forma_pagamento.value, uuid_operacao: uuid_pgto };
                     await api_cliente.post(`/fechar-comanda/${id}`, payload_p);
                 }
                 loja_mesas.buscar_mesas(true);
@@ -610,7 +617,7 @@ export function use_logica_pdv() {
                     await api_cliente.post(`/adicionar-itens-comanda/${id_comanda_pagamento.value}`, payload_add);
                 }
                 const uuid_pgto = gerarUUID();
-                const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
+                const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, forma_pagamento: forma_pagamento.value, uuid_operacao: uuid_pgto };
                 const res = await api_cliente.post(`/fechar-comanda/${id_comanda_pagamento.value}`, payload_pagamento);
                 loja_mesas.buscar_mesas(true); 
                 roteador.push('/mapa-mesas');
@@ -622,7 +629,7 @@ export function use_logica_pdv() {
                 }
                 if (!e.response || e.response.status >= 500 || e.response.status === 404) { 
                     const uuid_pgto = gerarUUID();
-                    const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_pgto };
+                    const payload_pagamento = { data_hora_fechamento: data_atual, desconto: Number(valor_desconto.value) || 0, forma_pagamento: forma_pagamento.value, uuid_operacao: uuid_pgto };
                     await db.vendas_pendentes.add({ tenant_id, data_venda: data_atual, valor_total: valor_final_comanda.value, url_destino: `/fechar-comanda/${id_comanda_pagamento.value}`, metodo: 'POST', payload_venda: payload_pagamento, uuid_operacao: uuid_pgto });
                     toast_global.exibir_toast("⚠️ Servidor indisponível: Pagamento salvo no PC!", "aviso");
                     roteador.push('/mapa-mesas');
@@ -685,7 +692,7 @@ export function use_logica_pdv() {
         // 3. VENDA BALCÃO AVULSA
         } else {
             const uuid_balcao = gerarUUID();
-            const payload = { itens: _mapear_itens_payload(), desconto: Number(valor_desconto.value) || 0, uuid_operacao: uuid_balcao };
+            const payload = { itens: _mapear_itens_payload(), desconto: Number(valor_desconto.value) || 0, forma_pagamento: forma_pagamento.value, uuid_operacao: uuid_balcao };
             try {
                 await registrar_entradas_forcadas();
                 await api_cliente.post('/venda-balcao', payload);
@@ -721,7 +728,7 @@ export function use_logica_pdv() {
         carrinho_venda, itens_ja_lancados, alterar_quantidade_db, remover_item_db, processando_finalizacao,
         adicionar_ao_carrinho, remover_do_carrinho, alterar_quantidade_novo,
         quantidade_selecionada, estoque_disponivel_visual, quantidade_excedente, tem_excedente,
-        subtotal_comanda, valor_final_comanda, valor_desconto,
+        subtotal_comanda, valor_final_comanda, valor_desconto, forma_pagamento,
         id_comanda_vinculada, id_comanda_pagamento,
         em_modo_pagar_tudo, ids_pagamento_total, total_mesa_externo, 
         carrinho_expandido, // 🟢 Estado de UI mobile exportado

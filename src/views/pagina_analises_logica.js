@@ -32,6 +32,7 @@ export function useLogicaAnalises() {
         evolucao_vendas: true,
         categorias: true,
         descontos: true,
+        formas_pagamento: true,
     });
 
     const produtos_comparador = ref([]);
