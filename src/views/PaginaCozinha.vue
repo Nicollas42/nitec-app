@@ -2,13 +2,21 @@
     <div class="min-h-screen bg-[var(--bg-page)] p-3 sm:p-6">
         <!-- Cabeçalho -->
         <header class="flex items-center justify-between mb-6">
-            <div>
-                <h1 class="text-2xl font-black text-[var(--text-primary)] tracking-tight">Cozinha</h1>
-                <p class="text-sm text-[var(--text-muted)] mt-1">
-                    Painel de preparo —
-                    <span v-if="total_pendentes > 0" class="text-red-500 font-black">{{ total_pendentes }} pendente{{ total_pendentes > 1 ? 's' : '' }}</span>
-                    <span v-else class="text-green-500 font-black">tudo em dia</span>
-                </p>
+            <div class="flex items-center gap-3">
+                <button @click="roteador.push('/painel-central')"
+                        class="md:hidden flex items-center justify-center h-9 w-9 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors flex-shrink-0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-black text-[var(--text-primary)] tracking-tight">Cozinha</h1>
+                    <p class="text-sm text-[var(--text-muted)] mt-1">
+                        Painel de preparo —
+                        <span v-if="total_pendentes > 0" class="text-red-500 font-black">{{ total_pendentes }} pendente{{ total_pendentes > 1 ? 's' : '' }}</span>
+                        <span v-else class="text-green-500 font-black">tudo em dia</span>
+                    </p>
+                </div>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-[10px] text-[var(--text-muted)] font-bold">atualiza em {{ contador_refresh }}s</span>
@@ -99,7 +107,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import api_cliente from '../servicos/api_cliente.js';
+
+const roteador = useRouter();
 
 const mesas = ref([]);
 const carregando = ref(false);

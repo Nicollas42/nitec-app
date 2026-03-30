@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { db } from './banco_local/db.js';
 import { useRouter } from 'vue-router';
 import { useTemaStore } from './stores/tema_store.js';
@@ -11,7 +11,27 @@ import { useTemaStore } from './stores/tema_store.js';
 const roteador = useRouter();
 const tema = useTemaStore(); // Injeta a store e aplica o tema automaticamente no boot
 
+// ── Interceptor do botão Voltar nativo do Android ─────────────────────────────
+/**
+ * Previne que o botão "Voltar" nativo do Android (ou gesto de swipe) feche
+ * o aplicativo quando o usuário estiver em uma rota sem histórico anterior.
+ * Ao detectar um popstate sem estado Vue anterior, reinsere uma entrada no
+ * histórico e redireciona para o painel central.
+ */
+const manejar_voltar_android = () => {
+    // Empurra uma nova entrada para sempre haver um "voltar" capturável
+    window.history.pushState({ nitec_app: true }, '', window.location.href);
+    // Se já estiver no painel central, não navega (evita loop)
+    if (roteador.currentRoute.value.path !== '/painel-central') {
+        roteador.back();
+    }
+};
+
 onMounted(async () => {
+    // 🛡️ Injetar entrada inicial no histórico para o Android ter algo para "voltar"
+    window.history.pushState({ nitec_app: true }, '', window.location.href);
+    window.addEventListener('popstate', manejar_voltar_android);
+
     // 🟢 1. TRAVA ANTI-ZUMBI: Executa antes de qualquer outra coisa
     // O sessionStorage morre quando o App fecha. Se não houver 'app_ligado', é um boot fresco.
     if (!sessionStorage.getItem('nitec_app_booted')) {
@@ -51,6 +71,10 @@ onMounted(async () => {
             return; 
         }
     }
+});
+
+onUnmounted(() => {
+    window.removeEventListener('popstate', manejar_voltar_android);
 });
 
 // --- VACINAS DO PWA (Foco de Inputs) ---

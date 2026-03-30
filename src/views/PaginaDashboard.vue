@@ -150,7 +150,7 @@
             </button>
         </div>
 
-        <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col md:overflow-hidden overflow-y-auto transition-colors duration-300">
+        <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col overflow-y-auto transition-colors duration-300">
             
             <div v-if="rota_atual.path === '/painel-central'" class="md:hidden p-4 grid grid-cols-2 gap-4 shrink-0">
                 <button v-if="tem_permissao('acessar_pdv')" @click="ir_para('/pdv-caixa')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
