@@ -78,6 +78,8 @@ export const useMesasStore = defineStore('mesas_store', () => {
             nome_mesa,
             status_mesa       : 'livre',
             capacidade_pessoas: 4,
+            solicitando_atendimento: false,
+            solicitacao_detalhes   : null,
             is_temp           : true
         };
 

@@ -87,6 +87,64 @@
                     </div>
                 </div>
 
+                <div class="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-page)] p-4">
+                    <div class="flex flex-col lg:flex-row gap-4 lg:items-center">
+                        <div class="w-full lg:w-52 aspect-[4/3] rounded-[1.5rem] border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden shadow-sm">
+                            <img
+                                v-if="foto_produto_preview"
+                                :src="foto_produto_preview"
+                                alt="Preview da foto do produto"
+                                class="w-full h-full object-cover"
+                            />
+                            <div v-else class="w-full h-full flex flex-col items-center justify-center text-center px-4">
+                                <p class="text-3xl leading-none">IMG</p>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] mt-3">Sem foto</p>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 space-y-3">
+                            <div>
+                                <p class="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Foto do Produto</p>
+                                <h4 class="text-sm font-black text-[var(--text-primary)] mt-1">Imagem usada no cardapio digital</h4>
+                                <p class="text-[11px] font-bold text-[var(--text-muted)] mt-1">
+                                    A foto fica armazenada na VPS, separada por tenant, e aparece nos produtos do cardapio.
+                                </p>
+                            </div>
+
+                            <input
+                                ref="inputFotoProduto"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/jpg"
+                                class="hidden"
+                                @change="processar_foto_produto"
+                            />
+
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    @click="abrir_seletor_foto_produto"
+                                    class="px-4 py-2.5 rounded-xl bg-nitec_blue text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-colors"
+                                >
+                                    {{ foto_produto_preview ? 'Trocar Foto' : 'Adicionar Foto' }}
+                                </button>
+                                <button
+                                    v-if="foto_produto_preview"
+                                    type="button"
+                                    @click="remover_foto_produto"
+                                    class="px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-colors"
+                                >
+                                    Remover Foto
+                                </button>
+                            </div>
+
+                            <p class="text-[10px] font-bold uppercase tracking-widest"
+                                :class="formulario_dados.foto_produto_arquivo ? 'text-emerald-600' : 'text-[var(--text-muted)]'">
+                                {{ formulario_dados.foto_produto_arquivo ? 'Nova foto pronta para envio' : 'PNG, JPG ou WEBP • ate 5 MB' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Código interno + aliases -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1.5">
@@ -526,7 +584,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import SelectPesquisavel from '../componentes_analises/SelectPesquisavel.vue';
 import api_cliente from '../../servicos/api_cliente.js';
 
@@ -568,6 +626,45 @@ const placeholder_nome = computed(() =>
         ? 'Ex: Cerveja Heineken Long Neck 330ml'
         : 'Ex: Caipirinha de Limão, Porção de Calabresa'
 );
+
+const inputFotoProduto = ref(null);
+
+const foto_produto_preview = computed(() => props.formulario_dados.foto_produto_url || '');
+
+const liberar_preview_blob = () => {
+    if (typeof props.formulario_dados.foto_produto_url === 'string' && props.formulario_dados.foto_produto_url.startsWith('blob:')) {
+        URL.revokeObjectURL(props.formulario_dados.foto_produto_url);
+    }
+};
+
+const abrir_seletor_foto_produto = () => {
+    inputFotoProduto.value?.click();
+};
+
+const processar_foto_produto = (evento) => {
+    const arquivo = evento.target?.files?.[0];
+    if (!arquivo) return;
+
+    liberar_preview_blob();
+    props.formulario_dados.foto_produto_arquivo = arquivo;
+    props.formulario_dados.foto_produto_url = URL.createObjectURL(arquivo);
+    props.formulario_dados.remover_foto_produto = false;
+
+    if (inputFotoProduto.value) {
+        inputFotoProduto.value.value = '';
+    }
+};
+
+const remover_foto_produto = () => {
+    liberar_preview_blob();
+    props.formulario_dados.foto_produto_arquivo = null;
+    props.formulario_dados.foto_produto_url = '';
+    props.formulario_dados.remover_foto_produto = true;
+
+    if (inputFotoProduto.value) {
+        inputFotoProduto.value.value = '';
+    }
+};
 
 // ─── Categorias com persistência em localStorage ──────────────────────────────
 
@@ -841,5 +938,9 @@ watch(
 
 onMounted(() => {
     carregar_categorias({ silencioso: true });
+});
+
+onBeforeUnmount(() => {
+    liberar_preview_blob();
 });
 </script>

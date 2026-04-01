@@ -89,11 +89,122 @@ html[data-tema="crepusculo"] {
 /* ==========================================
    ESTILOS GLOBAIS
    ========================================== */
+html,
+body,
+#app {
+    min-height: 100%;
+}
+
 body {
     background-color: var(--bg-page);
     color: var(--text-primary);
     transition: background-color 0.3s ease, color 0.3s ease;
     @apply overflow-hidden font-sans antialiased;
+}
+
+body.nitec-cardapio-publico {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+#app.nitec-cardapio-publico {
+    min-height: 100vh;
+}
+
+/* ==========================================
+   ANIMAÇÕES CARDÁPIO PREMIUM
+   ========================================== */
+
+/* Shimmer — skeleton loading */
+@keyframes cardapio-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+.cardapio-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 37%, #f0f0f0 63%);
+    background-size: 800px 100%;
+    animation: cardapio-shimmer 1.4s ease infinite;
+    border-radius: 1rem;
+}
+
+/* Pulse ring — FAB com itens selecionados */
+@keyframes cardapio-pulse-ring {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    70%  { transform: scale(1.6); opacity: 0;   }
+    100% { transform: scale(1.6); opacity: 0;   }
+}
+.cardapio-pulse-ring::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--cardapio-primary, #0F766E);
+    animation: cardapio-pulse-ring 1.8s ease-out infinite;
+    pointer-events: none;
+}
+
+/* Fade-up stagger — entrada dos cards */
+@keyframes cardapio-fade-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+.cardapio-fade-up {
+    animation: cardapio-fade-up 0.4s ease both;
+}
+
+/* Badge bounce — ao adicionar item */
+@keyframes cardapio-badge-bounce {
+    0%, 100% { transform: scale(1);   }
+    40%       { transform: scale(1.35); }
+    60%       { transform: scale(0.9);  }
+}
+.cardapio-badge-bounce {
+    animation: cardapio-badge-bounce 0.4s ease;
+}
+
+/* Gradient text animado */
+@keyframes cardapio-gradient-move {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+}
+.cardapio-gradient-text {
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: cardapio-gradient-move 4s ease infinite;
+}
+
+/* Shimmer de botão CTA */
+@keyframes cardapio-shimmer-btn {
+    0%   { left: -120%; }
+    100% { left: 120%;  }
+}
+.cardapio-btn-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+.cardapio-btn-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,0.22) 50%, transparent 80%);
+    animation: cardapio-shimmer-btn 2.5s ease infinite;
+}
+
+/* Dot status pulsante */
+@keyframes cardapio-dot-pulse {
+    0%, 100% { opacity: 1;   transform: scale(1);   }
+    50%        { opacity: 0.5; transform: scale(0.75); }
+}
+.cardapio-dot-pulse {
+    animation: cardapio-dot-pulse 1.6s ease-in-out infinite;
 }
 
 /* Scrollbar Customizada Global */
@@ -131,4 +242,4 @@ body {
 }
 .input-padrao::placeholder {
     color: var(--text-muted);
-}
+}

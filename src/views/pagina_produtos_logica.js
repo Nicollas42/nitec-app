@@ -115,6 +115,9 @@ export function use_logica_produtos() {
         tipo_item: 'comprado', // 'comprado' | 'fabricado'
         grupos_adicionais_ids: [],
         requer_cozinha: false,
+        foto_produto_url: '',
+        foto_produto_arquivo: null,
+        remover_foto_produto: false,
     });
 
     const formulario_perda = reactive({
@@ -252,6 +255,7 @@ export function use_logica_produtos() {
     // ─── Reinicializadores ────────────────────────────────────────────────────
 
     const reiniciar_formulario_produto = () => {
+        liberar_preview_foto_produto();
         formulario_dados.nome_produto = '';
         formulario_dados.codigo_interno = '';
         formulario_dados.unidade_medida = 'UN';
@@ -264,6 +268,9 @@ export function use_logica_produtos() {
         formulario_dados.fornecedores_vinculados = [];
         formulario_dados.grupos_adicionais_ids = [];
         formulario_dados.requer_cozinha = false;
+        formulario_dados.foto_produto_url = '';
+        formulario_dados.foto_produto_arquivo = null;
+        formulario_dados.remover_foto_produto = false;
     };
 
     const reiniciar_formulario_entrada = () => {
@@ -393,6 +400,7 @@ export function use_logica_produtos() {
      * Derivado do tipo_item: se for 'fabricado', limpa fornecedores ao salvar.
      */
     const preencher_formulario_produto = (produto) => {
+        liberar_preview_foto_produto();
         formulario_dados.nome_produto = produto.nome_produto || '';
         formulario_dados.codigo_interno = produto.codigo_interno || '';
         formulario_dados.unidade_medida = produto.unidade_medida || 'UN';
@@ -428,6 +436,15 @@ export function use_logica_produtos() {
         formulario_dados.grupos_adicionais_ids =
             Array.isArray(produto.grupos_adicionais_ids) ? [...produto.grupos_adicionais_ids] : [];
         formulario_dados.requer_cozinha = !!produto.requer_cozinha;
+        formulario_dados.foto_produto_url = produto.foto_produto_url || '';
+        formulario_dados.foto_produto_arquivo = null;
+        formulario_dados.remover_foto_produto = false;
+    };
+
+    const liberar_preview_foto_produto = () => {
+        if (typeof formulario_dados.foto_produto_url === 'string' && formulario_dados.foto_produto_url.startsWith('blob:')) {
+            URL.revokeObjectURL(formulario_dados.foto_produto_url);
+        }
     };
 
     const montar_payload_produto = () => {
@@ -464,7 +481,21 @@ export function use_logica_produtos() {
                 .map((id) => Number(id))
                 .filter(Boolean),
             requer_cozinha: !!formulario_dados.requer_cozinha,
+            remover_foto_produto: !!formulario_dados.remover_foto_produto,
         };
+    };
+
+    const montar_form_data_produto = () => {
+        const payload = montar_payload_produto();
+        const form_data = new FormData();
+
+        form_data.append('payload_json', JSON.stringify(payload));
+
+        if (formulario_dados.foto_produto_arquivo instanceof File) {
+            form_data.append('foto_produto_arquivo', formulario_dados.foto_produto_arquivo);
+        }
+
+        return form_data;
     };
 
     const validar_formulario_produto = () => {
@@ -575,11 +606,16 @@ export function use_logica_produtos() {
         if (!validar_formulario_produto()) return;
         salvando.value = true;
         try {
-            const payload = montar_payload_produto();
+            const payload = montar_form_data_produto();
+            const opcoes_requisicao = {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            };
             if (modo_edicao.value) {
-                await api_cliente.post(`/produtos/editar/${id_edicao.value}`, payload);
+                await api_cliente.post(`/produtos/editar/${id_edicao.value}`, payload, opcoes_requisicao);
             } else {
-                await api_cliente.post('/cadastrar-produto', payload);
+                await api_cliente.post('/cadastrar-produto', payload, opcoes_requisicao);
             }
             modo_edicao.value = false;
             id_edicao.value = null;

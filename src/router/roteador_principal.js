@@ -10,6 +10,12 @@ const rotas_do_aplicativo = [
     { path: '/', redirect: '/login' },
     { path: '/login', name: 'rota_login', component: PaginaLogin, meta: { requer_auth: false } },
     { path: '/redefinir-senha', name: 'redefinir_senha', component: RedefinirSenha, meta: { requer_auth: false } },
+    {
+        path: '/cardapio/mesa/:id_mesa',
+        name: 'cardapio_cliente_publico',
+        component: () => import('../views/PaginaCardapioCliente.vue'),
+        meta: { requer_auth: false }
+    },
     
     {
         path: '/app',
@@ -68,6 +74,12 @@ const rotas_do_aplicativo = [
                 name: 'gestao_analises',
                 component: () => import('../views/PaginaAnalises.vue'),
                 meta: { permissao_necessaria: 'ver_analises' }
+            },
+            {
+                path: '/cardapio-admin',
+                name: 'gestao_cardapio_admin',
+                component: () => import('../views/PaginaCardapioAdmin.vue'),
+                meta: { permissao_necessaria: 'gerenciar_cardapio' }
             },
             {
                 path: '/permissoes',

@@ -3,35 +3,41 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted } from 'vue';
 import { db } from './banco_local/db.js';
 import { useRouter } from 'vue-router';
 import { useTemaStore } from './stores/tema_store.js';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 
 const roteador = useRouter();
 const tema = useTemaStore(); // Injeta a store e aplica o tema automaticamente no boot
 
-// ── Interceptor do botão Voltar nativo do Android ─────────────────────────────
+// ── Botão Voltar nativo do Android (Capacitor) ─────────────────────────────────
 /**
- * Previne que o botão "Voltar" nativo do Android (ou gesto de swipe) feche
- * o aplicativo quando o usuário estiver em uma rota sem histórico anterior.
- * Ao detectar um popstate sem estado Vue anterior, reinsere uma entrada no
- * histórico e redireciona para o painel central.
+ * O botão "Voltar" físico/gesto do Android em Capacitor NÃO dispara popstate.
+ * Capacitor intercepta nativamente e dispara o evento 'backButton'.
+ * 
+ * Comportamento:
+ *  - Em sub-telas (/analises, /mesas...): volta para a rota anterior do Vue Router.
+ *  - No painel central ou login: MINIMIZA o app (envia para 2º plano, não fecha).
  */
-const manejar_voltar_android = () => {
-    // Empurra uma nova entrada para sempre haver um "voltar" capturável
-    window.history.pushState({ nitec_app: true }, '', window.location.href);
-    // Se já estiver no painel central, não navega (evita loop)
-    if (roteador.currentRoute.value.path !== '/painel-central') {
-        roteador.back();
-    }
-};
+if (Capacitor.isNativePlatform()) {
+    CapApp.addListener('backButton', () => {
+        const rota = roteador.currentRoute.value.path;
+        const rotas_inicio = ['/', '/login', '/redefinir-senha', '/painel-central'];
+
+        if (rotas_inicio.includes(rota)) {
+            // Minimiza sem fechar — padrão Android para tela inicial de apps
+            CapApp.minimizeApp();
+        } else {
+            // Comportamento natural: volta para a rota anterior no histórico Vue
+            roteador.back();
+        }
+    });
+}
 
 onMounted(async () => {
-    // 🛡️ Injetar entrada inicial no histórico para o Android ter algo para "voltar"
-    window.history.pushState({ nitec_app: true }, '', window.location.href);
-    window.addEventListener('popstate', manejar_voltar_android);
-
     // 🟢 1. TRAVA ANTI-ZUMBI: Executa antes de qualquer outra coisa
     // O sessionStorage morre quando o App fecha. Se não houver 'app_ligado', é um boot fresco.
     if (!sessionStorage.getItem('nitec_app_booted')) {
@@ -73,21 +79,20 @@ onMounted(async () => {
     }
 });
 
-onUnmounted(() => {
-    window.removeEventListener('popstate', manejar_voltar_android);
-});
-
 // --- VACINAS DO PWA (Foco de Inputs) ---
-window.addEventListener('click', (evento) => {
-    if (evento.target.tagName === 'INPUT' || evento.target.tagName === 'TEXTAREA') {
-        window.focus(); 
-        evento.target.focus(); 
-    }
-});
+// Mantidas apenas no app nativo. Em web publica, isto atrapalha scroll e foco.
+if (Capacitor.isNativePlatform()) {
+    window.addEventListener('click', (evento) => {
+        if (evento.target.tagName === 'INPUT' || evento.target.tagName === 'TEXTAREA') {
+            window.focus();
+            evento.target.focus();
+        }
+    });
 
-window.addEventListener('focus', () => {
-    if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
-        document.activeElement.blur();
-    }
-});
+    window.addEventListener('focus', () => {
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+            document.activeElement.blur();
+        }
+    });
+}
 </script>

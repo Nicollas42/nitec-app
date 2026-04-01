@@ -349,9 +349,15 @@
                 </div>
                 <div v-for="(produto, idx) in lista_produtos" :key="produto.id"
                     class="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors">
-                    <div>
-                        <p class="text-sm font-bold text-[var(--text-primary)]">{{ produto.nome_produto }}</p>
-                        <p class="text-[11px] text-[var(--text-muted)] font-bold mt-0.5">{{ produto.categoria }}</p>
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="h-11 w-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] overflow-hidden flex-none">
+                            <img v-if="produto.foto_produto_url" :src="produto.foto_produto_url" :alt="produto.nome_produto" class="w-full h-full object-cover" />
+                            <div v-else class="w-full h-full flex items-center justify-center text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">IMG</div>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-[var(--text-primary)] truncate">{{ produto.nome_produto }}</p>
+                            <p class="text-[11px] text-[var(--text-muted)] font-bold mt-0.5 truncate">{{ produto.categoria }}</p>
+                        </div>
                     </div>
                     <label class="flex items-center gap-2 cursor-pointer select-none">
                         <span class="text-[10px] font-black uppercase tracking-widest"
@@ -447,8 +453,12 @@
                                                 </svg>
                                             </button>
                                             <div v-else class="flex-none h-7 w-7 rounded-lg border border-dashed border-[var(--border-subtle)]"></div>
-                                            <div>
-                                                <p class="text-sm font-black text-[var(--text-primary)]">{{ produto.nome_produto }}</p>
+                                            <div class="h-11 w-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-page)] overflow-hidden flex-none">
+                                                <img v-if="produto.foto_produto_url" :src="produto.foto_produto_url" :alt="produto.nome_produto" class="w-full h-full object-cover" />
+                                                <div v-else class="w-full h-full flex items-center justify-center text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)]">IMG</div>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-black text-[var(--text-primary)] truncate">{{ produto.nome_produto }}</p>
                                                 <p v-if="produto_tem_detalhamento_fornecedor(produto)"
                                                     class="text-[10px] font-bold text-blue-500 mt-0.5">
                                                     {{ produto.estoque_por_fornecedor.length }} lote{{ produto.estoque_por_fornecedor.length !== 1 ? 's' : '' }}

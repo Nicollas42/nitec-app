@@ -134,6 +134,11 @@
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
                 <span>📈</span> Análises
             </button>
+            <button v-if="tem_permissao('gerenciar_cardapio')" @click="ir_para('/cardapio-admin')"
+                    :class="rota_atual.path.includes('/cardapio-admin') ? 'bg-[var(--bg-page)] text-emerald-600 border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
+                    class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
+                <span>🍽️</span> Cardápio
+            </button>
             <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" 
                     :class="rota_atual.path.includes('/permissoes') ? 'bg-[var(--bg-page)] text-nitec_blue border-[var(--border-subtle)] border-b-0' : 'bg-transparent text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-card-hover)]'"
                     class="px-6 py-3 rounded-t-xl font-black uppercase text-xs tracking-wider border-t-2 border-l-2 border-r-2 transition-all flex items-center gap-2">
@@ -150,7 +155,7 @@
             </button>
         </div>
 
-        <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col overflow-y-auto transition-colors duration-300">
+        <main class="conteudo_principal flex-1 bg-[var(--bg-page)] flex flex-col overflow-y-auto min-h-0 transition-colors duration-300">
             
             <div v-if="rota_atual.path === '/painel-central'" class="md:hidden p-4 grid grid-cols-2 gap-4 shrink-0">
                 <button v-if="tem_permissao('acessar_pdv')" @click="ir_para('/pdv-caixa')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
@@ -173,6 +178,9 @@
                 </button>
                 <button v-if="tem_permissao('ver_analises')" @click="ir_para('/analises')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">📈</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Análises</h3>
+                </button>
+                <button v-if="tem_permissao('gerenciar_cardapio')" @click="ir_para('/cardapio-admin')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-emerald-500/20 flex flex-col items-center">
+                    <span class="text-4xl mb-2">🍽️</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Cardápio</h3>
                 </button>
                 <button v-if="['admin_master', 'dono'].includes(auth_store.usuario_logado?.tipo_usuario)" @click="ir_para('/permissoes')" class="bg-[var(--bg-card)] p-6 rounded-2xl shadow-sm border border-[var(--border-subtle)] flex flex-col items-center">
                     <span class="text-4xl mb-2">🔐</span><h3 class="font-black text-[var(--text-primary)] uppercase text-sm">Permissões</h3>
@@ -199,7 +207,7 @@
                 </button>
             </div>
 
-            <div class="flex-1 w-full h-full relative">
+            <div class="flex-1 w-full min-h-0 relative">
                 <router-view v-slot="{ Component }">
                     <keep-alive>
                         <component :is="Component" />
@@ -355,18 +363,25 @@ const seletor_tema_aberto = ref(false);
 </script>
 
 <style scoped>
-/* 📱 Otimização para Mobile em Paisagem (Landscape) */
-@media (max-width: 1024px) and (orientation: landscape) {
+/* ── Mobile portrait: garante altura dinâmica e scroll natural ── */
+@media (max-width: 767px) {
+    .painel_principal {
+        height: 100dvh;
+    }
+}
+
+/* ── Mobile landscape (phones): tela curta em orientação horizontal ── */
+/* max-height:600px discrimina phones (≤428px tall) de tablets (≥768px tall) */
+@media (orientation: landscape) and (max-height: 600px) {
     .barra_topo {
         display: none !important;
     }
-    
+
     .painel_principal {
-        height: 100vh;
-        height: -webkit-fill-available;
+        /* 100svh (small viewport height) desconsidera a barra do browser */
+        height: 100svh;
     }
 
-    /* Garante que o conteúdo ocupe o espaço do header removido */
     .conteudo_principal {
         margin-top: 0;
     }
