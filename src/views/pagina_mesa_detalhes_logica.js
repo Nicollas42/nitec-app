@@ -24,6 +24,7 @@ export function useLogicaMesaDetalhes() {
     const cancelando = ref(false);
     const resolvendo_atendimento = ref(false);
     const resolvendo_individual = ref(null);
+    const processando_aprovacao = ref(null);
     const form_cancelamento = reactive({
         comanda_id: null,
         motivo_cancelamento: 'Erro de Digitacao / Lancamento',
@@ -129,8 +130,12 @@ export function useLogicaMesaDetalhes() {
 
         if (exibir_loader || !dados_mesa.value) carregando.value = true;
 
-        const dados_cache = montar_dados_do_cache(id_mesa);
-        if (dados_cache) dados_mesa.value = dados_cache;
+        // Cache só na PRIMEIRA carga (evita tela em branco). Durante polling,
+        // mantemos o estado atual e fazemos merge in-place via aplicar_dados_oficiais.
+        if (!dados_mesa.value) {
+            const dados_cache = montar_dados_do_cache(id_mesa);
+            if (dados_cache) dados_mesa.value = dados_cache;
+        }
 
         try {
             const resposta = await api_cliente.get(`/detalhes-mesa/${id_mesa}`);
@@ -452,9 +457,18 @@ export function useLogicaMesaDetalhes() {
 
     const voltar_mapa = () => roteador.push('/mapa-mesas');
 
+    const comandas_pendentes = computed(() => {
+        if (!dados_mesa.value?.listar_comandas) return [];
+        return dados_mesa.value.listar_comandas.filter((c) => c.status_comanda === 'pendente');
+    });
+
+    const comandas_abertas = computed(() => {
+        if (!dados_mesa.value?.listar_comandas) return [];
+        return dados_mesa.value.listar_comandas.filter((c) => c.status_comanda === 'aberta');
+    });
+
     const total_geral = computed(() => {
-        if (!dados_mesa.value?.listar_comandas) return 0;
-        return dados_mesa.value.listar_comandas.reduce((acc, comanda) => acc + Number(comanda.valor_total || 0), 0);
+        return comandas_abertas.value.reduce((acc, comanda) => acc + Number(comanda.valor_total || 0), 0);
     });
 
     const pagar_tudo = () => {
@@ -478,6 +492,59 @@ export function useLogicaMesaDetalhes() {
         } catch (_) {
             /* silencioso */
         }
+    };
+
+    const aprovar_comanda = async (id_comanda) => {
+        processando_aprovacao.value = id_comanda;
+        try {
+            await api_cliente.post(`/comandas/${id_comanda}/aprovar`);
+            await carregar_dados_completos(false);
+            await loja_mesas.buscar_mesas(true);
+            toast_global.exibir_toast('Comanda aprovada!', 'sucesso');
+        } catch (erro) {
+            console.error(erro);
+            toast_global.exibir_toast('Nao foi possivel aprovar a comanda.', 'erro');
+        } finally {
+            processando_aprovacao.value = null;
+        }
+    };
+
+    const aprovar_todas_pendentes = async () => {
+        const id_mesa = rota_atual.params.id_mesa;
+        if (!id_mesa) return;
+
+        processando_aprovacao.value = 'todas';
+        try {
+            await api_cliente.post(`/mesas/${id_mesa}/aprovar-todas-pendentes`);
+            await carregar_dados_completos(false);
+            await loja_mesas.buscar_mesas(true);
+            toast_global.exibir_toast('Todas as comandas pendentes aprovadas!', 'sucesso');
+        } catch (erro) {
+            console.error(erro);
+            toast_global.exibir_toast('Nao foi possivel aprovar as comandas.', 'erro');
+        } finally {
+            processando_aprovacao.value = null;
+        }
+    };
+
+    const rejeitar_comanda = async (id_comanda) => {
+        processando_aprovacao.value = id_comanda;
+        try {
+            await api_cliente.post(`/comandas/${id_comanda}/rejeitar`);
+            await carregar_dados_completos(false);
+            await loja_mesas.buscar_mesas(true);
+            toast_global.exibir_toast('Comanda rejeitada.', 'sucesso');
+        } catch (erro) {
+            console.error(erro);
+            toast_global.exibir_toast('Nao foi possivel rejeitar a comanda.', 'erro');
+        } finally {
+            processando_aprovacao.value = null;
+        }
+    };
+
+    const formatar_cpf_mascarado = (cpf) => {
+        if (!cpf || cpf.length !== 11) return cpf || '';
+        return `***.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-**`;
     };
 
     onMounted(() => {
@@ -522,5 +589,12 @@ export function useLogicaMesaDetalhes() {
         resolver_atendimento_individual,
         resolvendo_individual,
         formatar_data_hora,
+        comandas_pendentes,
+        comandas_abertas,
+        processando_aprovacao,
+        aprovar_comanda,
+        aprovar_todas_pendentes,
+        rejeitar_comanda,
+        formatar_cpf_mascarado,
     };
 }

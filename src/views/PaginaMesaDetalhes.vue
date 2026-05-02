@@ -90,6 +90,77 @@
                 </div>
             </section>
 
+            <section
+                v-if="comandas_pendentes.length"
+                class="mb-5 rounded-[2rem] border border-amber-500/25 bg-gradient-to-r from-amber-500/10 via-orange-500/8 to-yellow-500/8 p-5 shadow-sm"
+            >
+                <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-amber-500/25 shrink-0">
+                            ⏳
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.35em] text-amber-700">Aguardando Aprovacao</p>
+                            <h2 class="text-xl font-black text-[var(--text-primary)] mt-1">
+                                {{ comandas_pendentes.length }} cliente(s) aguardando
+                            </h2>
+                            <p class="text-[11px] font-bold text-amber-600 mt-1">
+                                Clientes que escanearam o QR Code e solicitaram entrada.
+                            </p>
+                        </div>
+                    </div>
+
+                    <button
+                        v-if="comandas_pendentes.length > 1"
+                        @click="aprovar_todas_pendentes"
+                        :disabled="processando_aprovacao === 'todas'"
+                        class="px-5 py-3 rounded-xl bg-emerald-600 text-white text-xs font-black uppercase tracking-widest shadow-sm hover:bg-emerald-700 disabled:opacity-60 transition-colors shrink-0"
+                    >
+                        {{ processando_aprovacao === 'todas' ? 'Aprovando...' : `Aprovar Todos (${comandas_pendentes.length})` }}
+                    </button>
+                </div>
+
+                <div class="flex flex-col gap-3">
+                    <div
+                        v-for="comanda in comandas_pendentes"
+                        :key="'pend-' + comanda.id"
+                        class="rounded-[1.5rem] bg-white/70 border border-white/60 p-4 flex flex-col sm:flex-row sm:items-center gap-4"
+                    >
+                        <div class="flex items-center gap-3 flex-1 min-w-0">
+                            <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 text-lg font-black shrink-0">
+                                {{ (comanda.buscar_cliente?.nome_cliente || '?').charAt(0).toUpperCase() }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-black text-slate-800 truncate">
+                                    {{ comanda.buscar_cliente?.nome_cliente || 'Cliente' }}
+                                </p>
+                                <p class="text-[10px] font-bold text-slate-500 mt-0.5">
+                                    CPF: {{ formatar_cpf_mascarado(comanda.buscar_cliente?.cpf) }}
+                                    <span v-if="comanda.buscar_cliente?.telefone"> · {{ comanda.buscar_cliente.telefone }}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button
+                                @click="aprovar_comanda(comanda.id)"
+                                :disabled="processando_aprovacao === comanda.id"
+                                class="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-emerald-600 disabled:opacity-60 transition-colors"
+                            >
+                                {{ processando_aprovacao === comanda.id ? '...' : 'Aprovar' }}
+                            </button>
+                            <button
+                                @click="rejeitar_comanda(comanda.id)"
+                                :disabled="processando_aprovacao === comanda.id"
+                                class="px-4 py-2.5 rounded-xl border border-rose-500/30 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-500/10 disabled:opacity-60 transition-colors"
+                            >
+                                Rejeitar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <header class="shrink-0 flex flex-col md:flex-row justify-between items-start md:items-center bg-[var(--bg-card)] p-6 rounded-[2rem] shadow-sm border border-[var(--border-subtle)] mb-8 gap-4 transition-colors duration-300">
                 <div class="flex items-center gap-4">
                     <div class="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 text-2xl font-black shadow-inner">
@@ -125,7 +196,7 @@
 
             <main class="flex-1 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 items-start pb-6">
                 <article
-                    v-for="comanda in dados_mesa.listar_comandas"
+                    v-for="comanda in comandas_abertas"
                     :key="comanda.id"
                     class="bg-[var(--bg-card)] p-6 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[var(--border-subtle)] flex flex-col relative group transition-colors duration-300"
                 >
@@ -139,6 +210,10 @@
                             </span>
                             <p class="text-sm text-[var(--text-muted)] mt-1 font-medium">
                                 Cliente: <span class="font-black text-[var(--text-primary)]">{{ comanda.buscar_cliente?.nome_cliente || 'Nao informado' }}</span>
+                            </p>
+                            <p class="text-[10px] font-bold text-[var(--text-muted)] mt-0.5 opacity-80" v-if="comanda.buscar_cliente">
+                                <span v-if="comanda.buscar_cliente.cpf">CPF: {{ formatar_cpf_mascarado(comanda.buscar_cliente.cpf) }}</span>
+                                <span v-if="comanda.buscar_cliente.telefone"> · Tel: {{ comanda.buscar_cliente.telefone }}</span>
                             </p>
                         </div>
 
@@ -315,6 +390,13 @@ const {
     resolver_atendimento_individual,
     resolvendo_individual,
     formatar_data_hora,
+    comandas_pendentes,
+    comandas_abertas,
+    processando_aprovacao,
+    aprovar_comanda,
+    aprovar_todas_pendentes,
+    rejeitar_comanda,
+    formatar_cpf_mascarado,
 } = useLogicaMesaDetalhes();
 
 // Normaliza solicitacao_detalhes para sempre ser um array de pedidos

@@ -211,6 +211,7 @@
                             <span class="text-[var(--text-muted)]">•</span>
                             <span v-if="comanda_selecionada.buscar_cliente || comanda_selecionada.nome_cliente" class="text-blue-500 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded flex items-center gap-1">
                                 <span>👤</span> {{ comanda_selecionada.buscar_cliente?.nome_cliente || comanda_selecionada.nome_cliente }}
+                                <span v-if="comanda_selecionada.buscar_cliente?.telefone" class="opacity-70 ml-1">· {{ comanda_selecionada.buscar_cliente.telefone }}</span>
                             </span>
                             <span v-else class="text-purple-500 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded flex items-center gap-1">
                                 <span>👥</span> CONTA GERAL

@@ -32,11 +32,19 @@ export function useLogicaMesas() {
         const mapa = {};
 
         for (const comanda of loja_comandas.lista_comandas) {
-            if (comanda.status_comanda !== 'aberta') continue;
+            // Conta as abertas para os totalizadores financeiros da tela
+            // E sinaliza as pendentes (aguardando aprovação do garçom)
+            if (comanda.status_comanda !== 'aberta' && comanda.status_comanda !== 'pendente') continue;
+
             const chave = String(comanda.mesa_id);
-            if (!mapa[chave]) mapa[chave] = { count: 0, total: 0 };
-            mapa[chave].count += 1;
-            mapa[chave].total += Number(comanda.valor_total || 0);
+            if (!mapa[chave]) mapa[chave] = { count: 0, total: 0, tem_pendente: false };
+
+            if (comanda.status_comanda === 'pendente') {
+                mapa[chave].tem_pendente = true;
+            } else if (comanda.status_comanda === 'aberta') {
+                mapa[chave].count += 1;
+                mapa[chave].total += Number(comanda.valor_total || 0);
+            }
         }
 
         return mapa;
@@ -129,7 +137,12 @@ export function useLogicaMesas() {
     };
 
     const selecionar_mesa = (mesa_clicada) => {
-        if (mesa_clicada.status_mesa === 'livre') {
+        const pendencia_comanda = info_por_mesa.value[String(mesa_clicada.id)]?.tem_pendente;
+        const pendencia_chamado = mesa_clicada.solicitando_atendimento;
+
+        // Só exibe o modal de "Iniciar Mesa" se estiver livre e rigorosamente SEM pendências.
+        // Se ela tem um cliente aguardando aprovação, pula o modal e entra nos detalhes.
+        if (mesa_clicada.status_mesa === 'livre' && !pendencia_comanda && !pendencia_chamado) {
             mesa_em_abertura.value = mesa_clicada;
             input_nome_cliente.value = '';
             modal_visivel.value = true;

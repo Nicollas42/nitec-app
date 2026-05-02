@@ -48,13 +48,15 @@
                         :class="[
                             mesa.solicitando_atendimento
                                 ? 'border-violet-500 bg-violet-500/10 shadow-[0_0_24px_rgba(139,92,246,0.22)] animate-pulse'
-                                : mesa.status_mesa === 'livre'
-                                    ? 'border-[var(--border-subtle)] hover:border-green-500 shadow-sm hover:shadow-md'
-                                    : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao
-                                        ? 'border-green-500 bg-green-500/10 shadow-sm animate-pulse'
-                                        : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente
-                                            ? 'border-amber-500 bg-amber-500/5 shadow-sm animate-pulse'
-                                            : 'border-red-500/40 bg-red-500/5 shadow-sm'
+                                : info_por_mesa[String(mesa.id)]?.tem_pendente
+                                    ? 'border-sky-500 bg-sky-500/10 shadow-[0_0_24px_rgba(14,165,233,0.22)] animate-pulse'
+                                    : mesa.status_mesa === 'livre'
+                                        ? 'border-[var(--border-subtle)] hover:border-green-500 shadow-sm hover:shadow-md'
+                                        : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao
+                                            ? 'border-green-500 bg-green-500/10 shadow-sm animate-pulse'
+                                            : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente
+                                                ? 'border-amber-500 bg-amber-500/5 shadow-sm animate-pulse'
+                                                : 'border-red-500/40 bg-red-500/5 shadow-sm'
                         ]"
                     >
                         <div class="w-full flex justify-between items-center mb-1">
@@ -62,13 +64,15 @@
                                 class="w-2 h-2 rounded-full flex-shrink-0"
                                 :class="mesa.solicitando_atendimento
                                     ? 'bg-violet-500 animate-ping'
-                                    : mesa.status_mesa === 'livre'
-                                        ? 'bg-green-500'
-                                        : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao
-                                            ? 'bg-green-500 animate-ping'
-                                            : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente
-                                                ? 'bg-amber-500 animate-ping'
-                                                : 'bg-red-500 animate-pulse'"
+                                    : info_por_mesa[String(mesa.id)]?.tem_pendente
+                                        ? 'bg-sky-500 animate-ping'
+                                        : mesa.status_mesa === 'livre'
+                                            ? 'bg-green-500'
+                                            : status_cozinha_mesas[String(mesa.id)]?.tem_finalizado_nao_visto && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente && !status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao
+                                                ? 'bg-green-500 animate-ping'
+                                                : status_cozinha_mesas[String(mesa.id)]?.tem_em_preparacao && !status_cozinha_mesas[String(mesa.id)]?.tem_pendente
+                                                    ? 'bg-amber-500 animate-ping'
+                                                    : 'bg-red-500 animate-pulse'"
                             ></span>
                             <svg v-if="mesa_carregando === mesa.id" class="animate-spin h-3.5 w-3.5 text-nitec_blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -83,6 +87,12 @@
                                 class="text-[9px] font-black uppercase tracking-widest text-violet-600 mt-1"
                             >
                                 Solicitando atendimento
+                            </p>
+                            <p
+                                v-else-if="info_por_mesa[String(mesa.id)]?.tem_pendente"
+                                class="text-[9px] font-black uppercase tracking-widest text-sky-500 mt-1"
+                            >
+                                Aguardando Aprovacao
                             </p>
                             <template v-else-if="mesa.status_mesa !== 'livre' && info_por_mesa[String(mesa.id)]">
                                 <p class="text-[9px] font-bold text-red-500 mt-0.5 leading-tight">

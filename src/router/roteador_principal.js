@@ -16,6 +16,14 @@ const rotas_do_aplicativo = [
         component: () => import('../views/PaginaCardapioCliente.vue'),
         meta: { requer_auth: false }
     },
+    {
+        // URL de sessão individual: gerada após o login/cadastro do cliente.
+        // O :token_cliente é um UUID único por comanda — permite auto-restauração da sessão.
+        path: '/cardapio/mesa/:id_mesa/s/:token_cliente',
+        name: 'cardapio_cliente_sessao',
+        component: () => import('../views/PaginaCardapioCliente.vue'),
+        meta: { requer_auth: false }
+    },
     
     {
         path: '/app',

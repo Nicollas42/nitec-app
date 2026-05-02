@@ -1,17 +1,14 @@
 <template>
-    <div :style="estilo_cardapio" class="cardapio-page min-h-dvh overflow-x-hidden text-slate-50">
-
-        <!-- Fundo aurora -->
-        <div class="pointer-events-none fixed inset-0 overflow-hidden">
+    <div :style="estilo_cardapio" class="cardapio-page h-dvh flex flex-col overflow-hidden text-slate-50">
+        <div class="pointer-events-none fixed inset-0 overflow-hidden -z-10">
             <div class="aurora aurora-primary"></div>
             <div class="aurora aurora-accent"></div>
         </div>
 
-        <!-- Toast de feedback -->
         <transition name="toast">
             <div
                 v-if="feedback?.mensagem"
-                class="fixed right-4 top-4 z-50 max-w-[calc(100vw-2rem)] rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-xl"
+                class="fixed right-4 top-4 z-[60] max-w-[calc(100vw-2rem)] rounded-2xl border px-4 py-3 shadow-2xl backdrop-blur-xl"
                 :class="classes_feedback"
             >
                 <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Aviso</p>
@@ -19,481 +16,524 @@
             </div>
         </transition>
 
-        <!-- Loading skeleton -->
-        <section v-if="carregando_inicial" class="relative z-10 space-y-4 p-4 pt-6">
-            <div class="shell p-6">
-                <div class="cardapio-skeleton h-6 w-32 rounded-full"></div>
-                <div class="cardapio-skeleton mt-4 h-8 w-full max-w-xs rounded-xl"></div>
-                <div class="cardapio-skeleton mt-3 h-4 w-full rounded-lg"></div>
-                <div class="cardapio-skeleton mt-6 h-12 w-full rounded-2xl"></div>
-            </div>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div v-for="i in 4" :key="i" class="cardapio-skeleton h-64 rounded-[2rem]"></div>
+        <section v-if="carregando_inicial" class="flex-1 flex items-center justify-center p-6">
+            <div class="shell p-8 text-center">
+                <div class="spinner mx-auto mb-4"></div>
+                <p class="text-xs font-black uppercase tracking-[0.3em] opacity-80">Carregando cardapio...</p>
             </div>
         </section>
 
-        <!-- Erro -->
-        <section v-else-if="erro_carregamento" class="relative z-10 flex min-h-dvh items-center justify-center p-6">
+        <section v-else-if="erro_carregamento" class="flex-1 flex items-center justify-center p-6">
             <div class="shell max-w-md p-8 text-center">
-                <p class="text-[10px] font-black uppercase tracking-[0.35em] text-rose-300">Erro ao carregar</p>
-                <h1 class="mt-4 text-2xl font-black text-white">{{ erro_carregamento }}</h1>
+                <p class="text-[10px] font-black uppercase tracking-[0.35em] text-rose-300">Erro</p>
+                <h1 class="mt-4 text-xl font-black">{{ erro_carregamento }}</h1>
                 <button
                     type="button"
                     class="cta mt-6 inline-flex items-center justify-center rounded-full px-6 py-3 text-xs font-black uppercase tracking-[0.28em] text-slate-950"
-                    @click="recarregar_pagina"
+                    @click="() => location.reload()"
                 >
                     Tentar novamente
                 </button>
             </div>
         </section>
 
-        <!-- Conteúdo principal -->
         <template v-else>
-
-            <!-- Header fixo -->
-            <header class="header-app fixed left-0 right-0 top-0 z-20">
-                <div class="flex items-center justify-between gap-3 px-4 py-3">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <div class="logo-box shrink-0">
-                            <img v-if="config.logo_url" :src="config.logo_url" :alt="config.nome_exibicao" class="h-full w-full object-cover" />
-                            <span v-else class="text-xs font-black uppercase tracking-wider text-white">M</span>
-                        </div>
-                        <div class="min-w-0">
-                            <h1 class="truncate text-sm font-black text-white leading-tight">{{ config.nome_exibicao }}</h1>
-                            <p class="text-[10px] font-bold text-slate-400">{{ mesa_label }}</p>
-                        </div>
-                    </div>
-
-                    <div class="flex shrink-0 items-center gap-2">
-                        <span v-if="tem_sessao" class="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-black text-white sm:flex">
-                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-                            {{ cliente_label }}
-                        </span>
-                        <span v-if="carregando_comanda" class="text-[10px] font-bold text-slate-500">↻</span>
-                    </div>
-                </div>
-
-                <!-- Tabs principais -->
-                <div class="flex border-b border-white/8 px-4">
-                    <button
-                        type="button"
-                        class="main-tab"
-                        :class="aba_ativa === 'cardapio' ? 'main-tab-active' : ''"
-                        @click="aba_ativa = 'cardapio'"
-                    >
-                        ◫ Cardápio
-                    </button>
-                    <button
-                        type="button"
-                        class="main-tab"
-                        :class="aba_ativa === 'comanda' ? 'main-tab-active' : ''"
-                        :disabled="!tem_sessao"
-                        @click="tem_sessao ? (aba_ativa = 'comanda') : null"
-                    >
-                        ≣ Comanda
-                        <span v-if="total_itens_comanda && tem_sessao" class="badge-counter ml-1">{{ total_itens_comanda }}</span>
-                    </button>
-                </div>
-
-                <!-- Faixa de categorias (apenas na aba cardápio) -->
-                <transition name="fade-strip">
-                    <div
-                        v-if="aba_ativa === 'cardapio' && produtos_por_categoria_filtrados.length"
-                        class="category-strip-bar overflow-x-auto px-4 py-2"
-                    >
-                        <div class="flex gap-2">
+            <section v-if="pdfs.length > 1 && !modo_tela_cheia_mobile" class="relative z-10 shrink-0 px-3 pt-3 sm:px-6 sm:pt-6">
+                <div class="tabs-shell shell mx-auto max-w-5xl p-2">
+                    <nav class="overflow-x-auto scrollbar-none">
+                        <div class="flex min-w-max gap-2">
                             <button
-                                v-for="(grupo, i) in produtos_por_categoria_filtrados"
-                                :key="grupo.categoria"
-                                :id="`cat-pill-${i}`"
+                                v-for="pdf in pdfs"
+                                :key="pdf.id"
                                 type="button"
-                                class="category-pill whitespace-nowrap"
-                                :class="i === indice_pagina_atual ? 'category-pill-active' : ''"
-                                @click="mudar_para_categoria(i)"
+                                class="tab-btn rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.24em] whitespace-nowrap transition-all sm:text-[11px]"
+                                :class="pdf.id === pdf_ativo_id ? 'tab-active' : 'tab-inactive'"
+                                @click="selecionar_pdf(pdf.id)"
                             >
-                                <span>{{ emoji_categoria(grupo.categoria) }}</span>
-                                <span>{{ grupo.categoria }}</span>
-                                <span class="text-[9px] opacity-50">{{ grupo.produtos.length }}</span>
+                                {{ pdf.nome_cardapio }}
+                            </button>
+                        </div>
+                    </nav>
+                </div>
+            </section>
+
+            <main class="relative z-10 flex-1 min-h-0 px-3 py-3 sm:px-6 sm:py-6" :class="{ 'px-0 py-0': modo_tela_cheia_mobile }">
+                <div
+                    v-if="!pdfs.length"
+                    class="shell mx-auto flex h-full w-full max-w-md items-center justify-center p-8 text-center"
+                >
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.35em] opacity-60">Sem cardapio</p>
+                        <h2 class="mt-3 text-lg font-black">Nenhum PDF foi publicado ainda</h2>
+                        <p class="mt-2 text-xs font-bold opacity-80">
+                            Peca ao estabelecimento para enviar o cardapio no painel administrativo.
+                        </p>
+                    </div>
+                </div>
+
+                <div v-else class="mx-auto flex h-full w-full max-w-[1400px] min-h-0">
+                    <section
+                        ref="flipbook_stage"
+                        class="flipbook-stage shell relative flex h-full w-full min-h-[320px] flex-col overflow-hidden p-2 sm:min-h-[420px] sm:p-4"
+                        :class="{
+                            'mobile-fullscreen fixed inset-0 z-40 rounded-none border-0 p-2 sm:p-3': modo_tela_cheia_mobile,
+                        }"
+                    >
+                        <button
+                            v-if="eh_mobile_view"
+                            type="button"
+                            class="icon-btn absolute right-3 top-3 z-30 h-11 w-11 bg-slate-950/55 backdrop-blur-md"
+                            @click="alternar_tela_cheia_mobile"
+                            :aria-label="modo_tela_cheia_mobile ? 'Sair da tela cheia' : 'Abrir em tela cheia'"
+                        >
+                            <svg v-if="!modo_tela_cheia_mobile" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                                <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+                                <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+                                <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 3H5a2 2 0 0 0-2 2v4" />
+                                <path d="M15 3h4a2 2 0 0 1 2 2v4" />
+                                <path d="M21 15v4a2 2 0 0 1-2 2h-4" />
+                                <path d="M3 15v4a2 2 0 0 0 2 2h4" />
+                                <path d="M9 9 3 3" />
+                                <path d="m15 9 6-6" />
+                                <path d="m9 15-6 6" />
+                                <path d="m15 15 6 6" />
+                            </svg>
+                        </button>
+
+                        <div
+                            v-if="renderizando_pdf"
+                            class="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm"
+                        >
+                            <div class="text-center">
+                                <div class="spinner mx-auto mb-3"></div>
+                                <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-80">
+                                    Preparando paginas...
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            ref="flipbook_container"
+                            class="flipbook-container h-full w-full flex-1 min-h-0"
+                        ></div>
+
+                        <template v-if="mostrar_alcas_miolo && !renderizando_pdf">
+                            <button
+                                type="button"
+                                class="spine-handle spine-handle-prev spine-handle-top"
+                                aria-label="Puxar folha anterior por cima"
+                                @pointerdown.prevent="iniciar_arraste_miolo('prev', 'top', $event)"
+                            ></button>
+                            <button
+                                type="button"
+                                class="spine-handle spine-handle-prev spine-handle-bottom"
+                                aria-label="Puxar folha anterior por baixo"
+                                @pointerdown.prevent="iniciar_arraste_miolo('prev', 'bottom', $event)"
+                            ></button>
+                            <button
+                                type="button"
+                                class="spine-handle spine-handle-next spine-handle-top"
+                                aria-label="Puxar proxima folha por cima"
+                                @pointerdown.prevent="iniciar_arraste_miolo('next', 'top', $event)"
+                            ></button>
+                            <button
+                                type="button"
+                                class="spine-handle spine-handle-next spine-handle-bottom"
+                                aria-label="Puxar proxima folha por baixo"
+                                @pointerdown.prevent="iniciar_arraste_miolo('next', 'bottom', $event)"
+                            ></button>
+                        </template>
+
+                        <div
+                            v-if="mostrar_controles_mobile && !renderizando_pdf"
+                            class="mobile-nav"
+                            :class="{ 'mobile-nav-fullscreen': modo_tela_cheia_mobile }"
+                        >
+                            <button
+                                type="button"
+                                class="mobile-nav-btn"
+                                :disabled="!pode_ir_pagina_anterior"
+                                aria-label="Pagina anterior"
+                                @click="ir_pagina_anterior"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m15 18-6-6 6-6" />
+                                </svg>
+                            </button>
+
+                            <div class="mobile-page-indicator">
+                                {{ pagina_atual + 1 }} / {{ total_paginas }}
+                            </div>
+
+                            <button
+                                type="button"
+                                class="mobile-nav-btn"
+                                :disabled="!pode_ir_pagina_proxima"
+                                aria-label="Proxima pagina"
+                                @click="ir_pagina_proxima"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m9 18 6-6-6-6" />
+                                </svg>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </main>
+
+            <footer v-if="!modo_tela_cheia_mobile" class="relative z-10 shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
+
+                <!-- Banner de re-entrada: exibido após encerramento da conta -->
+                <transition name="slide-up">
+                    <div
+                        v-if="sessao_encerrada && !tem_sessao"
+                        class="shell mx-auto mb-2 w-full max-w-3xl p-3"
+                    >
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-[10px] font-black uppercase tracking-[0.25em] opacity-50 leading-none mb-0.5">Visitação livre</p>
+                                <p class="text-xs font-bold opacity-75 truncate">Para entrar na mesa, informe seus dados</p>
+                            </div>
+                            <button
+                                type="button"
+                                class="action-btn-primary shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.15em]"
+                                @click="modal_cadastro_visivel = true"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                                    <polyline points="10 17 15 12 10 7" />
+                                    <line x1="15" y1="12" x2="3" y2="12" />
+                                </svg>
+                                <span>Entrar na mesa</span>
                             </button>
                         </div>
                     </div>
                 </transition>
-            </header>
 
-            <!-- Espaçador dinâmico para o header fixo -->
-            <div :style="{ height: altura_header + 'px' }" ref="spacer_ref"></div>
-            <!-- Header observer (invisível, mede altura) -->
-            <div ref="header_measure_ref" class="pointer-events-none fixed left-0 right-0 top-0 z-[-1] opacity-0">
-                <div class="px-4 py-3">
-                    <div class="h-8"></div>
-                </div>
-                <div class="h-10"></div>
-                <div v-if="aba_ativa === 'cardapio'" class="h-12"></div>
-            </div>
+                <!-- Botões normais de sessão ativa -->
+                <div class="shell mx-auto grid w-full max-w-3xl grid-cols-2 gap-2 p-2 sm:grid-cols-2">
+                    <button
+                        type="button"
+                        class="action-btn flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] sm:px-4 sm:text-xs"
+                        @click="abrir_modal_comanda"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <path d="M14 2v6h6" />
+                            <path d="M16 13H8" />
+                            <path d="M16 17H8" />
+                        </svg>
+                        <span class="leading-tight">Minha comanda</span>
+                    </button>
 
-            <!-- Conteúdo: Cardápio com páginas deslizantes -->
-            <main
-                v-if="aba_ativa === 'cardapio'"
-                class="relative z-10 pb-28"
-                @touchstart.passive="ao_iniciar_toque"
-                @touchend.passive="ao_soltar_toque"
-            >
-                <!-- Barra de pesquisa -->
-                <div class="px-4 pb-2 pt-3">
-                    <label class="search-box flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-2.5">
-                        <span class="text-base text-white/40">⌕</span>
-                        <input
-                            v-model="termo_busca"
-                            type="text"
-                            placeholder="Buscar produtos..."
-                            class="w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-400/60"
-                        />
-                        <button v-if="termo_busca" type="button" class="text-sm text-white/30 hover:text-white/60" @click="termo_busca = ''">×</button>
-                    </label>
-                </div>
-
-                <!-- Sem resultados -->
-                <div v-if="!produtos_por_categoria_filtrados.length" class="px-4 py-16 text-center">
-                    <p class="text-4xl">🔍</p>
-                    <h3 class="mt-4 text-lg font-black text-white">Sem resultados</h3>
-                    <p class="mt-2 text-sm text-slate-400">Tente outra busca ou limpe o filtro.</p>
-                    <button type="button" class="mt-5 text-sm font-bold underline" :style="{ color: 'var(--cardapio-accent)' }" @click="termo_busca = ''">
-                        Limpar busca
+                    <button
+                        type="button"
+                        class="action-btn-primary flex items-center justify-center gap-2 rounded-2xl px-3 py-3 text-[10px] font-black uppercase tracking-[0.18em] sm:px-4 sm:text-xs"
+                        :disabled="enviando_chamada"
+                        @click="chamar_garcom"
+                    >
+                        <svg v-if="!enviando_chamada" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg>
+                        <div v-else class="spinner-sm"></div>
+                        <span class="leading-tight">{{ enviando_chamada ? 'Chamando...' : 'Chamar garcom' }}</span>
                     </button>
                 </div>
-
-                <!-- Book pages -->
-                <div v-else class="relative overflow-hidden">
-                    <transition :name="`page-${direcao_transicao}`" mode="out-in">
-                        <div :key="indice_pagina_atual" class="px-4 pt-2">
-
-                            <!-- Cabeçalho da categoria + paginação -->
-                            <div class="mb-4 flex items-center justify-between gap-4">
-                                <div class="flex min-w-0 items-center gap-3">
-                                    <span class="text-2xl leading-none">{{ emoji_categoria(grupo_atual.categoria) }}</span>
-                                    <div class="min-w-0">
-                                        <h2 class="truncate text-lg font-black text-white">{{ grupo_atual.categoria }}</h2>
-                                        <p class="text-[11px] text-slate-500">{{ grupo_atual.produtos.length }} produto(s)</p>
-                                    </div>
-                                </div>
-
-                                <div class="flex shrink-0 items-center gap-2">
-                                    <button
-                                        type="button"
-                                        class="page-arrow"
-                                        :disabled="indice_pagina_atual === 0"
-                                        @click="mudar_pagina(-1)"
-                                    >‹</button>
-                                    <span class="min-w-[2.5rem] text-center text-[11px] font-black text-slate-400">
-                                        {{ indice_pagina_atual + 1 }}/{{ produtos_por_categoria_filtrados.length }}
-                                    </span>
-                                    <button
-                                        type="button"
-                                        class="page-arrow"
-                                        :disabled="indice_pagina_atual >= produtos_por_categoria_filtrados.length - 1"
-                                        @click="mudar_pagina(1)"
-                                    >›</button>
-                                </div>
-                            </div>
-
-                            <!-- Dots de página -->
-                            <div v-if="produtos_por_categoria_filtrados.length > 1" class="mb-4 flex justify-center gap-1.5">
-                                <button
-                                    v-for="(_, i) in produtos_por_categoria_filtrados"
-                                    :key="i"
-                                    type="button"
-                                    class="page-dot transition-all duration-200"
-                                    :class="i === indice_pagina_atual ? 'page-dot-active' : ''"
-                                    @click="mudar_para_categoria(i)"
-                                ></button>
-                            </div>
-
-                            <!-- Grid de produtos -->
-                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                <article
-                                    v-for="produto in grupo_atual.produtos"
-                                    :key="produto.id"
-                                    class="produto-card overflow-hidden rounded-[1.8rem] border border-white/10 bg-slate-950/28 backdrop-blur-sm"
-                                >
-                                    <div class="relative h-44 overflow-hidden">
-                                        <img
-                                            v-if="produto.foto_produto_url"
-                                            :src="produto.foto_produto_url"
-                                            :alt="produto.nome_produto"
-                                            class="h-full w-full object-cover transition duration-500"
-                                            loading="lazy"
-                                        />
-                                        <div v-else class="fallback-cover flex h-full w-full items-center justify-center text-5xl">
-                                            {{ emoji_categoria(grupo_atual.categoria) }}
-                                        </div>
-                                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent"></div>
-                                        <div
-                                            v-if="obter_quantidade_selecionada(produto.id)"
-                                            class="absolute right-3 top-3 rounded-full border px-2.5 py-1 text-[10px] font-black"
-                                            :style="{ borderColor: 'color-mix(in srgb, var(--cardapio-accent) 50%, transparent)', color: 'var(--cardapio-accent)', background: 'color-mix(in srgb, var(--cardapio-accent) 18%, transparent)' }"
-                                        >
-                                            {{ obter_quantidade_selecionada(produto.id) }}×
-                                        </div>
-                                    </div>
-
-                                    <div class="space-y-3 p-4">
-                                        <div class="flex items-start justify-between gap-3">
-                                            <div class="min-w-0">
-                                                <h3 class="font-black leading-tight text-white">{{ produto.nome_produto }}</h3>
-                                                <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">{{ descricao_produto(produto, grupo_atual.categoria) }}</p>
-                                            </div>
-                                            <p class="shrink-0 font-black" :style="{ color: 'var(--cardapio-accent)' }">{{ formatar_moeda(produto.preco_venda) }}</p>
-                                        </div>
-
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span
-                                                v-if="produto.unidade_medida"
-                                                class="rounded-full border border-white/8 bg-white/4 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500"
-                                            >{{ produto.unidade_medida }}</span>
-                                            <div class="ml-auto flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-                                                <button
-                                                    type="button"
-                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-base font-black text-white transition hover:bg-white/10 disabled:opacity-30"
-                                                    :disabled="!obter_quantidade_selecionada(produto.id)"
-                                                    @click="ajustar_quantidade_solicitacao(produto, -1)"
-                                                >−</button>
-                                                <span class="min-w-[2rem] text-center text-sm font-black text-white">{{ obter_quantidade_selecionada(produto.id) || 0 }}</span>
-                                                <button
-                                                    type="button"
-                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-base font-black text-slate-950 transition hover:scale-105"
-                                                    :style="{ background: 'var(--cardapio-accent)' }"
-                                                    @click="ajustar_quantidade_solicitacao(produto, 1)"
-                                                >+</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </article>
-                            </div>
-
-                            <!-- Navegação inferior entre categorias -->
-                            <div class="mt-5 mb-1 flex items-stretch gap-3">
-                                <button
-                                    type="button"
-                                    class="page-nav-btn flex-1 text-left"
-                                    :disabled="indice_pagina_atual === 0"
-                                    @click="mudar_pagina(-1)"
-                                >
-                                    <span class="block text-[9px] text-slate-500 uppercase tracking-widest font-bold">Anterior</span>
-                                    <span class="block truncate font-black text-white/70 mt-0.5">
-                                        {{ indice_pagina_atual > 0 ? produtos_por_categoria_filtrados[indice_pagina_atual - 1]?.categoria : '—' }}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    class="page-nav-btn flex-1 text-right"
-                                    :disabled="indice_pagina_atual >= produtos_por_categoria_filtrados.length - 1"
-                                    @click="mudar_pagina(1)"
-                                >
-                                    <span class="block text-[9px] text-slate-500 uppercase tracking-widest font-bold">Próxima</span>
-                                    <span class="block truncate font-black text-white/70 mt-0.5">
-                                        {{ indice_pagina_atual < produtos_por_categoria_filtrados.length - 1 ? produtos_por_categoria_filtrados[indice_pagina_atual + 1]?.categoria : '—' }}
-                                    </span>
-                                </button>
-                            </div>
-
-                        </div>
-                    </transition>
-                </div>
-
-                <!-- Debug -->
-                <div v-if="modo_debug" class="mt-4 px-4">
-                    <details class="shell p-4">
-                        <summary class="cursor-pointer text-xs font-black uppercase tracking-wider text-slate-400">Debug</summary>
-                        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-950/60 p-3 text-[10px] text-emerald-300">{{ debug_serializado }}</pre>
-                    </details>
-                </div>
-            </main>
-
-            <!-- Conteúdo: Comanda -->
-            <main v-else class="relative z-10 pb-28 pt-3">
-                <div class="px-4">
-                    <div class="shell p-5">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <p class="text-[10px] font-black uppercase tracking-[0.35em]" :style="{ color: 'var(--cardapio-accent)' }">Minha Comanda</p>
-                                <h2 class="mt-2 text-2xl font-black text-white">{{ comanda?.nome_cliente || cliente_label }}</h2>
-                                <p class="mt-1 text-xs text-slate-400">{{ comanda?.telefone || cadastro.telefone || '' }}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Total</p>
-                                <p class="mt-1 text-2xl font-black" :style="{ color: 'var(--cardapio-accent)' }">{{ formatar_moeda(total_comanda) }}</p>
-                            </div>
-                        </div>
-
-                        <div class="mt-5">
-                            <div v-if="comanda?.itens?.length" class="space-y-2">
-                                <article
-                                    v-for="item in comanda.itens"
-                                    :key="item.id"
-                                    class="rounded-[1.4rem] border border-white/8 bg-white/4 p-4"
-                                >
-                                    <div class="flex items-start justify-between gap-3">
-                                        <div class="min-w-0">
-                                            <p class="font-black text-white">{{ item.nome_produto }}</p>
-                                            <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ item.quantidade }} × {{ formatar_moeda(item.preco_unitario) }}</p>
-                                        </div>
-                                        <p class="shrink-0 font-black" :style="{ color: 'var(--cardapio-accent)' }">{{ formatar_moeda(item.subtotal) }}</p>
-                                    </div>
-                                </article>
-                            </div>
-                            <div v-else class="rounded-[1.4rem] border border-dashed border-white/12 p-8 text-center">
-                                <p class="text-3xl">🧾</p>
-                                <p class="mt-3 font-black text-white">Comanda vazia</p>
-                                <p class="mt-2 text-sm leading-relaxed text-slate-400">Os itens aparecem aqui quando a equipe registrar seus pedidos.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
-
-            <!-- FAB carrinho -->
-            <button
-                v-if="aba_ativa === 'cardapio'"
-                type="button"
-                class="fab"
-                :class="lista_solicitacao.length ? 'fab-pulse' : ''"
-                @click="abrir_modal_solicitacao"
-            >
-                <span class="text-lg font-black leading-none">{{ total_itens_solicitacao }}</span>
-                <span class="text-[9px] font-black uppercase tracking-[0.2em]">Pedido</span>
-            </button>
-
-            <!-- Bottom nav -->
-            <nav class="bottom-nav">
-                <button
-                    type="button"
-                    class="bottom-nav-item"
-                    :class="aba_ativa === 'cardapio' ? 'bottom-nav-item-active' : ''"
-                    @click="aba_ativa = 'cardapio'"
-                >◫ Cardápio</button>
-                <button
-                    type="button"
-                    class="bottom-nav-item"
-                    :class="aba_ativa === 'comanda' ? 'bottom-nav-item-active' : ''"
-                    :disabled="!tem_sessao"
-                    @click="tem_sessao ? (aba_ativa = 'comanda') : null"
-                >
-                    ≣ Comanda
-                    <span v-if="total_itens_comanda && tem_sessao" class="badge-counter ml-1">{{ total_itens_comanda }}</span>
-                </button>
-            </nav>
+            </footer>
         </template>
 
-        <!-- ===== MODAL DE CADASTRO (OBRIGATÓRIO) ===== -->
-        <transition name="modal-entry">
+        <!-- Banner: Aguardando aprovação (não bloqueia o cardápio) -->
+        <transition name="slide-down">
             <div
-                v-if="modal_cadastro_visivel"
-                class="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/80 backdrop-blur-sm sm:items-center sm:p-6"
+                v-if="aguardando_aprovacao"
+                class="fixed top-0 inset-x-0 z-50 flex items-center justify-between gap-3 px-4 py-3 sm:px-6"
+                style="background: rgba(0,0,0,0.82); backdrop-filter: blur(8px);"
             >
-                <div class="modal-sheet w-full max-w-lg rounded-t-[2rem] p-6 sm:rounded-[2rem] sm:p-8">
-                    <!-- Handle bar mobile -->
-                    <div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-white/12 sm:hidden"></div>
-
-                    <div class="mb-6 flex items-start gap-4">
-                        <div class="logo-box shrink-0">
-                            <img v-if="config.logo_url" :src="config.logo_url" :alt="config.nome_exibicao" class="h-full w-full object-cover" />
-                            <span v-else class="text-xs font-black uppercase tracking-wider text-white">M</span>
-                        </div>
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-[0.35em]" :style="{ color: 'var(--cardapio-accent)' }">Bem-vindo</p>
-                            <h2 class="mt-1 text-xl font-black text-white">Entrar na mesa</h2>
-                            <p class="mt-1 text-xs leading-relaxed text-slate-400">{{ config.mensagem_boas_vindas }}</p>
-                        </div>
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="spinner shrink-0"></div>
+                    <div class="min-w-0">
+                        <p class="text-[10px] font-black uppercase tracking-[0.25em] opacity-60 leading-none mb-0.5">Aguardando aprovacao</p>
+                        <p class="text-xs font-medium opacity-80 truncate">O garcom precisa aprovar sua entrada...</p>
                     </div>
+                </div>
+                <button
+                    type="button"
+                    class="action-btn-primary shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.15em]"
+                    :disabled="enviando_chamada"
+                    @click="chamar_garcom"
+                >
+                    <svg v-if="!enviando_chamada" xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    <div v-else class="spinner-sm"></div>
+                    <span>{{ enviando_chamada ? 'Chamando...' : 'Chamar garcom' }}</span>
+                </button>
+            </div>
+        </transition>
 
-                    <form class="space-y-3" @submit.prevent="registrar_cliente">
+        <!-- Modal: Login / Cadastro -->
+        <transition name="modal">
+            <div
+                v-if="modal_cadastro_visivel && !aguardando_aprovacao"
+                class="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop"
+            >
+                <div class="shell w-full max-w-md p-6 sm:p-8">
+                    <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
+                        {{ modo_modal === 'login' ? 'Bem-vindo de volta' : 'Primeiro acesso' }}
+                    </p>
+                    <h2 class="mt-2 text-xl font-black">{{ config.nome_exibicao }}</h2>
+                    <p class="mt-3 text-sm font-medium opacity-80 leading-relaxed">
+                        {{ modo_modal === 'login'
+                            ? 'Informe seu CPF para acessar sua comanda.'
+                            : 'Cadastre-se para chamar o garcom e acompanhar sua comanda.'
+                        }}
+                    </p>
+
+                    <!-- Login por CPF -->
+                    <form v-if="modo_modal === 'login'" class="mt-5 space-y-3" @submit.prevent="login_por_cpf">
                         <label class="block">
-                            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">Nome</span>
+                            <span class="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">CPF</span>
+                            <input
+                                :value="cadastro.cpf"
+                                @input="ao_digitar_cpf"
+                                type="text"
+                                inputmode="numeric"
+                                class="form-input mt-1 w-full"
+                                placeholder="000.000.000-00"
+                                maxlength="14"
+                                required
+                            />
+                        </label>
+
+                        <button
+                            type="submit"
+                            class="cta w-full rounded-full px-6 py-3 text-xs font-black uppercase tracking-[0.28em] text-slate-950 disabled:opacity-60"
+                            :disabled="enviando_cadastro"
+                        >
+                            {{ enviando_cadastro ? 'Entrando...' : 'Entrar' }}
+                        </button>
+
+                        <p class="text-center text-xs font-bold opacity-60 mt-2">
+                            Primeira vez?
+                            <button type="button" class="underline opacity-100 text-white/90" @click="alternar_modo_modal">
+                                Cadastre-se
+                            </button>
+                        </p>
+                    </form>
+
+                    <!-- Cadastro completo -->
+                    <form v-else class="mt-5 space-y-3" @submit.prevent="confirmar_cadastro">
+                        <label class="block">
+                            <span class="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">Nome</span>
                             <input
                                 v-model="cadastro.nome"
                                 type="text"
-                                placeholder="Ex: João Silva"
+                                class="form-input mt-1 w-full"
+                                placeholder="Como devemos te chamar?"
                                 autocomplete="name"
-                                class="menu-input"
+                                required
                             />
                         </label>
+
                         <label class="block">
-                            <span class="mb-1.5 block text-[10px] font-black uppercase tracking-[0.28em] text-slate-400">Telefone</span>
+                            <span class="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">Telefone</span>
                             <input
                                 v-model="cadastro.telefone"
                                 type="tel"
-                                placeholder="(11) 99999-0000"
+                                class="form-input mt-1 w-full"
+                                placeholder="(00) 00000-0000"
                                 autocomplete="tel"
-                                class="menu-input"
+                                required
                             />
                         </label>
+
+                        <label class="block">
+                            <span class="text-[10px] font-black uppercase tracking-[0.25em] opacity-60">CPF</span>
+                            <input
+                                :value="cadastro.cpf"
+                                @input="ao_digitar_cpf"
+                                type="text"
+                                inputmode="numeric"
+                                class="form-input mt-1 w-full"
+                                placeholder="000.000.000-00"
+                                maxlength="14"
+                                required
+                            />
+                        </label>
+
                         <button
                             type="submit"
+                            class="cta w-full rounded-full px-6 py-3 text-xs font-black uppercase tracking-[0.28em] text-slate-950 disabled:opacity-60"
                             :disabled="enviando_cadastro"
-                            class="cta mt-2 w-full rounded-full py-4 text-sm font-black uppercase tracking-[0.28em] text-slate-950 disabled:opacity-60"
                         >
-                            {{ enviando_cadastro ? 'Entrando...' : 'Entrar no Cardápio' }}
+                            {{ enviando_cadastro ? 'Cadastrando...' : 'Cadastrar e entrar' }}
                         </button>
-                    </form>
 
-                    <p class="mt-4 text-center text-[10px] leading-relaxed text-slate-600">
-                        Seus dados ficam vinculados apenas a esta mesa e sessão.
-                    </p>
+                        <p class="text-center text-xs font-bold opacity-60 mt-2">
+                            Ja possui cadastro?
+                            <button type="button" class="underline opacity-100 text-white/90" @click="alternar_modo_modal">
+                                Faca login
+                            </button>
+                        </p>
+                    </form>
                 </div>
             </div>
         </transition>
 
-        <!-- ===== MODAL DE SOLICITAÇÃO ===== -->
-        <transition name="sheet">
+        <transition name="modal">
             <div
-                v-if="modal_solicitacao_aberto"
-                class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/75 p-0 sm:items-center sm:p-6"
+                v-if="modal_comanda_visivel"
+                class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4 backdrop"
+                @click.self="fechar_modal_comanda"
             >
-                <div class="absolute inset-0" @click="fechar_modal_solicitacao"></div>
-                <div class="modal-sheet relative z-10 w-full max-w-lg rounded-t-[2rem] p-5 sm:rounded-[2rem] sm:p-6 shadow-[0_-32px_90px_rgba(2,6,23,0.55)]">
-                    <div class="mx-auto mb-5 h-1.5 w-12 rounded-full bg-white/12 sm:hidden"></div>
-
-                    <div class="flex items-start justify-between gap-4">
+                <div class="shell flex max-h-[85vh] w-full flex-col rounded-b-none p-0 sm:max-w-lg sm:rounded-b-[2rem]">
+                    <header class="flex items-center justify-between border-b border-white/10 p-5">
                         <div>
-                            <p class="text-[10px] font-black uppercase tracking-[0.35em]" :style="{ color: 'var(--cardapio-accent)' }">Solicitar atendimento</p>
-                            <h3 class="mt-2 text-xl font-black text-white">Confirmar pedido ao garçom</h3>
-                            <p class="mt-1 text-xs leading-relaxed text-slate-400">O garçom recebe alerta e já sabe o que você quer.</p>
+                            <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Minha comanda</p>
+                            <h2 class="text-lg font-black">{{ sessao_cliente?.nome || 'Cliente' }}</h2>
                         </div>
                         <button
                             type="button"
-                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-white hover:bg-white/10"
-                            @click="fechar_modal_solicitacao"
-                        >×</button>
-                    </div>
-
-                    <div class="mt-5 max-h-[40vh] space-y-2 overflow-y-auto">
-                        <article
-                            v-for="item in lista_solicitacao"
-                            :key="`sheet-${item.id}`"
-                            class="rounded-[1.4rem] border border-white/8 bg-white/4 p-4"
+                            class="icon-btn"
+                            @click="fechar_modal_comanda"
+                            aria-label="Fechar"
                         >
-                            <div class="flex items-start justify-between gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                            </svg>
+                        </button>
+                    </header>
+
+                    <div class="flex-1 overflow-y-auto p-5">
+                        <div v-if="carregando_comanda" class="py-10 text-center">
+                            <div class="spinner mx-auto mb-3"></div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Carregando...</p>
+                        </div>
+
+                        <div v-else-if="!comanda || !comanda.itens?.length" class="py-10 text-center">
+                            <p class="text-sm font-bold opacity-80">Nenhum item na sua comanda ainda.</p>
+                            <p class="mt-2 text-xs opacity-60">Peca ao garcom para lancar seus itens.</p>
+                        </div>
+
+                        <ul v-else class="space-y-2">
+                            <li
+                                v-for="item in comanda.itens"
+                                :key="item.id"
+                                class="flex items-start justify-between gap-3 rounded-2xl bg-white/5 p-3"
+                            >
                                 <div class="min-w-0">
-                                    <p class="text-sm font-black text-white">{{ item.nome_produto }}</p>
-                                    <p class="mt-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">{{ item.quantidade }} × {{ formatar_moeda(item.preco_venda) }}</p>
+                                    <p class="truncate text-sm font-black">{{ item.nome_produto }}</p>
+                                    <p class="mt-0.5 text-[10px] font-bold opacity-60">
+                                        {{ item.quantidade }}x R$ {{ Number(item.preco_unitario).toFixed(2) }}
+                                    </p>
                                 </div>
-                                <p class="shrink-0 text-sm font-black" :style="{ color: 'var(--cardapio-accent)' }">{{ formatar_moeda(item.preco_venda * item.quantidade) }}</p>
-                            </div>
-                        </article>
+                                <p class="shrink-0 text-sm font-black">
+                                    R$ {{ Number(item.subtotal).toFixed(2) }}
+                                </p>
+                            </li>
+                        </ul>
                     </div>
 
-                    <div class="mt-5 flex items-center justify-between gap-4 rounded-[1.6rem] border border-white/8 bg-white/4 px-4 py-3">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Total estimado</p>
-                            <p class="mt-1 text-lg font-black" :style="{ color: 'var(--cardapio-accent)' }">{{ formatar_moeda(total_solicitacao) }}</p>
+                    <footer v-if="comanda?.itens?.length" class="border-t border-white/10 p-5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Total</span>
+                            <span class="text-xl font-black">
+                                R$ {{ Number(comanda.valor_total).toFixed(2) }}
+                            </span>
                         </div>
+                    </footer>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Modal: Encerramento de conta — despedida do cliente -->
+        <transition name="modal">
+            <div
+                v-if="modal_encerramento_visivel"
+                class="fixed inset-0 z-[70] flex items-center justify-center p-4 backdrop"
+            >
+                <div class="shell encerramento-shell w-full max-w-md p-0 overflow-hidden">
+                    <!-- Cabeçalho comemorativo -->
+                    <div class="encerramento-header px-6 pt-7 pb-5 text-center">
+                        <div class="encerramento-icone mx-auto mb-4">
+                            <svg v-if="!encerramento?.cancelada" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 12V22H4V12" />
+                                <path d="M22 7H2v5h20V7z" />
+                                <path d="M12 22V7" />
+                                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+                            </svg>
+                            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 8v4" />
+                                <path d="M12 16h.01" />
+                            </svg>
+                        </div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
+                            {{ encerramento?.cancelada ? 'Conta encerrada' : 'Pagamento confirmado' }}
+                        </p>
+                        <h2 class="mt-2 text-2xl font-black">
+                            {{ encerramento?.cancelada ? 'Ate logo!' : 'Obrigado(a)!' }}
+                        </h2>
+                        <p class="mt-2 text-sm font-medium opacity-75 leading-relaxed">
+                            Sua conta foi encerrada.
+                            <template v-if="!encerramento?.cancelada">
+                                Volte sempre, {{ encerramento?.nome?.split(' ')[0] || 'cliente' }}!
+                            </template>
+                        </p>
+                    </div>
+
+                    <!-- Itens consumidos -->
+                    <div v-if="encerramento?.itens?.length" class="border-t border-white/10">
+                        <div class="px-5 pt-4 pb-1">
+                            <p class="text-[10px] font-black uppercase tracking-[0.25em] opacity-50">O que voce consumiu</p>
+                        </div>
+                        <ul class="max-h-52 overflow-y-auto px-5 pb-3 space-y-2">
+                            <li
+                                v-for="(item, i) in encerramento.itens"
+                                :key="i"
+                                class="flex items-start justify-between gap-3 rounded-xl bg-white/5 px-3 py-2.5"
+                            >
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-black">{{ item.nome_produto }}</p>
+                                    <p class="mt-0.5 text-[10px] font-bold opacity-55">
+                                        {{ item.quantidade }}x R$ {{ Number(item.preco_unitario).toFixed(2) }}
+                                    </p>
+                                </div>
+                                <p class="shrink-0 text-sm font-black">
+                                    R$ {{ Number(item.subtotal).toFixed(2) }}
+                                </p>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Total e desconto -->
+                    <div class="border-t border-white/10 px-5 py-4">
+                        <div v-if="encerramento?.desconto > 0" class="flex items-center justify-between mb-1 opacity-70">
+                            <span class="text-xs font-bold">Desconto</span>
+                            <span class="text-xs font-bold text-emerald-400">- R$ {{ Number(encerramento.desconto).toFixed(2) }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">Total pago</span>
+                            <span class="encerramento-total text-2xl font-black">R$ {{ Number(encerramento?.valor_total ?? 0).toFixed(2) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Botão fechar -->
+                    <div class="px-5 pb-6">
                         <button
                             type="button"
-                            class="cta rounded-full px-5 py-3 text-xs font-black uppercase tracking-[0.28em] text-slate-950 disabled:opacity-60"
-                            :disabled="enviando_solicitacao"
-                            @click="enviar_solicitacao_atendimento"
+                            class="cta w-full rounded-full px-6 py-3.5 text-xs font-black uppercase tracking-[0.28em] text-slate-950"
+                            @click="fechar_modal_encerramento"
                         >
-                            {{ enviando_solicitacao ? 'Enviando...' : 'Confirmar' }}
+                            Continuar visualizando o cardapio
                         </button>
                     </div>
                 </div>
@@ -503,475 +543,480 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
 import { useLogicaCardapioCliente } from './pagina_cardapio_cliente_logica.js';
-
-const rota_atual = useRoute();
 
 const {
     carregando_inicial,
-    carregando_comanda,
-    enviando_cadastro,
-    enviando_solicitacao,
-    modal_solicitacao_aberto,
-    aba_ativa,
+    erro_carregamento,
     config,
-    mesa,
+    pdfs,
+    pdf_ativo_id,
+    renderizando_pdf,
     comanda,
+    sessao_cliente,
+    tem_sessao,
     cadastro,
     feedback,
-    erro_carregamento,
-    tem_sessao,
-    modo_debug,
-    debug_publico,
+    classes_feedback,
     estilo_cardapio,
-    produtos_por_categoria,
-    lista_solicitacao,
-    total_itens_solicitacao,
-    total_solicitacao,
-    total_comanda,
-    registrar_cliente,
-    obter_quantidade_selecionada,
-    ajustar_quantidade_solicitacao,
-    abrir_modal_solicitacao,
-    fechar_modal_solicitacao,
-    enviar_solicitacao_atendimento,
+    eh_mobile_view,
+    modo_tela_cheia_mobile,
+    pagina_atual,
+    total_paginas,
+    pode_ir_pagina_anterior,
+    pode_ir_pagina_proxima,
+    mostrar_controles_mobile,
+    mostrar_alcas_miolo,
+    aguardando_aprovacao,
+    modo_modal,
+
+    modal_cadastro_visivel,
+    modal_comanda_visivel,
+    modal_encerramento_visivel,
+    encerramento,
+    sessao_encerrada,
+    enviando_cadastro,
+    enviando_chamada,
+    carregando_comanda,
+
+    flipbook_container,
+    flipbook_stage,
+
+    confirmar_cadastro,
+    login_por_cpf,
+    alternar_modo_modal,
+    ao_digitar_cpf,
+    chamar_garcom,
+    abrir_modal_comanda,
+    fechar_modal_comanda,
+    fechar_modal_encerramento,
+    selecionar_pdf,
+    alternar_tela_cheia_mobile,
+    ir_pagina_anterior,
+    ir_pagina_proxima,
+    iniciar_arraste_miolo,
 } = useLogicaCardapioCliente();
-
-// Estado local
-const termo_busca = ref('');
-const indice_pagina_atual = ref(0);
-const direcao_transicao = ref('frente');
-const touch_x_inicio = ref(0);
-const altura_header = ref(148);
-
-// Modal de cadastro obrigatório — sem como fechar
-const modal_cadastro_visivel = computed(() => !tem_sessao.value && !carregando_inicial.value);
-
-// Formatação
-const formatador_moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const formatar_moeda = (valor) => formatador_moeda.format(Number(valor || 0));
-
-const emoji_categoria = (categoria = '') => {
-    const v = String(categoria || '').toLowerCase();
-    if (v.includes('alcool') || v.includes('cervej') || v.includes('vinho')) return '🍺';
-    if (v.includes('drink') || v.includes('coquet') || v.includes('gin')) return '🍸';
-    if (v.includes('nao alcool') || v.includes('refrigerante') || v.includes('suco')) return '🥤';
-    if (v.includes('entrada') || v.includes('petisc')) return '🍟';
-    if (v.includes('sobrem')) return '🍰';
-    if (v.includes('cafe')) return '☕';
-    return '✨';
-};
-
-const descricao_produto = (produto, categoria = '') => {
-    const nome = String(produto?.nome_produto || '').toLowerCase();
-    const cat = String(categoria || produto?.categoria || '').toLowerCase();
-    const un = produto?.unidade_medida ? ` Disponível em ${produto.unidade_medida}.` : '';
-    if (cat.includes('drink') || cat.includes('coquet') || nome.includes('gin')) return 'Preparo autoral servido gelado, apresentado pelo garçom na mesa.';
-    if (cat.includes('alcool') || cat.includes('cervej')) return `Rótulo servido no clima de bar.${un}`;
-    if (cat.includes('nao alcool') || cat.includes('refrigerante')) return `Opção refrescante para acompanhar a experiência.${un}`;
-    if (cat.includes('entrada') || cat.includes('petisc')) return 'Porção para compartilhar enquanto conversa com a equipe.';
-    if (cat.includes('sobrem')) return 'Final doce para completar a experiência.';
-    return `Item em destaque no cardápio.${un}`;
-};
-
-// Produtos filtrados por busca
-const termo_busca_normalizado = computed(() => termo_busca.value.trim().toLowerCase());
-
-const produtos_por_categoria_filtrados = computed(() => {
-    if (!termo_busca_normalizado.value) return produtos_por_categoria.value;
-    return produtos_por_categoria.value
-        .map((grupo) => ({
-            ...grupo,
-            produtos: grupo.produtos.filter((p) =>
-                [p.nome_produto, grupo.categoria, p.unidade_medida]
-                    .filter(Boolean)
-                    .join(' ')
-                    .toLowerCase()
-                    .includes(termo_busca_normalizado.value)
-            ),
-        }))
-        .filter((g) => g.produtos.length > 0);
-});
-
-const grupo_atual = computed(
-    () => produtos_por_categoria_filtrados.value[indice_pagina_atual.value] || { categoria: '', produtos: [] }
-);
-
-// Helpers computados
-const total_itens_comanda = computed(() =>
-    (comanda.value?.itens || []).reduce((acc, item) => acc + Number(item.quantidade || 0), 0)
-);
-const mesa_label = computed(() => mesa.value?.nome_mesa || `Mesa ${rota_atual.params.id_mesa}`);
-const cliente_label = computed(() => comanda.value?.nome_cliente || cadastro.nome || 'Cliente');
-const debug_serializado = computed(() => JSON.stringify(debug_publico.value, null, 2));
-const classes_feedback = computed(() => {
-    const t = feedback.value?.tipo;
-    if (t === 'erro') return 'border-rose-400/40 bg-rose-500/15 text-rose-50';
-    if (t === 'aviso') return 'border-amber-400/40 bg-amber-500/15 text-amber-50';
-    return 'border-emerald-400/40 bg-emerald-500/15 text-emerald-50';
-});
-
-// Navegação entre páginas/categorias
-const mudar_para_categoria = (indice) => {
-    if (indice === indice_pagina_atual.value) return;
-    direcao_transicao.value = indice > indice_pagina_atual.value ? 'frente' : 'tras';
-    indice_pagina_atual.value = indice;
-    // Scroll a pill ativa para o centro da faixa
-    nextTick(() => {
-        const pill = document.getElementById(`cat-pill-${indice}`);
-        if (pill) pill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    });
-};
-
-const mudar_pagina = (delta) => {
-    const novo = indice_pagina_atual.value + delta;
-    if (novo < 0 || novo >= produtos_por_categoria_filtrados.value.length) return;
-    mudar_para_categoria(novo);
-};
-
-// Swipe touch
-const ao_iniciar_toque = (e) => {
-    touch_x_inicio.value = e.touches[0].clientX;
-};
-const ao_soltar_toque = (e) => {
-    const delta = e.changedTouches[0].clientX - touch_x_inicio.value;
-    if (Math.abs(delta) < 48) return;
-    if (delta < 0) mudar_pagina(1);
-    else mudar_pagina(-1);
-};
-
-// Manter índice dentro dos limites quando filtro muda
-watch(produtos_por_categoria_filtrados, (grupos) => {
-    if (indice_pagina_atual.value >= grupos.length) {
-        indice_pagina_atual.value = Math.max(0, grupos.length - 1);
-    }
-});
-
-// Calcular altura do header fixo para o espaçador
-const atualizar_altura_header = () => {
-    const el = document.querySelector('.header-app');
-    if (el) altura_header.value = el.offsetHeight;
-};
-
-watch(aba_ativa, () => nextTick(atualizar_altura_header));
-
-onMounted(() => {
-    nextTick(atualizar_altura_header);
-    window.addEventListener('resize', atualizar_altura_header);
-});
-onUnmounted(() => {
-    window.removeEventListener('resize', atualizar_altura_header);
-});
-
-const recarregar_pagina = () => window.location.reload();
 </script>
 
 <style scoped>
-/* ===== Base ===== */
 .cardapio-page {
     background:
-        radial-gradient(circle at top left, color-mix(in srgb, var(--cardapio-primary) 18%, transparent), transparent 32%),
-        radial-gradient(circle at bottom right, color-mix(in srgb, var(--cardapio-accent) 12%, transparent), transparent 28%),
-        linear-gradient(180deg, color-mix(in srgb, var(--cardapio-bg) 12%, #020617) 0%, #04101d 40%, #020617 100%);
+        radial-gradient(circle at top, rgba(15, 23, 42, 0.92) 0%, rgba(2, 6, 23, 1) 58%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 1));
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-/* ===== Aurora ===== */
-.aurora { position: absolute; border-radius: 9999px; filter: blur(72px); opacity: 0.16; }
-.aurora-primary { width: 22rem; height: 22rem; left: -4rem; top: 2rem; background: color-mix(in srgb, var(--cardapio-primary) 70%, transparent); }
-.aurora-accent  { width: 26rem; height: 26rem; right: -6rem; bottom: 15%; background: color-mix(in srgb, var(--cardapio-accent) 70%, transparent); }
-
-/* ===== Header ===== */
-.header-app {
-    background: rgba(2, 6, 23, 0.92);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+.shell {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 1.75rem;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
 }
 
-/* ===== Tabs ===== */
-.main-tab {
-    position: relative;
+.tabs-shell {
+    border-radius: 1.4rem;
+}
+
+.flipbook-stage {
+    border-radius: 2rem;
+}
+
+.mobile-fullscreen {
+    background:
+        radial-gradient(circle at top, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 1) 62%),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.99), rgba(2, 6, 23, 1));
+    box-shadow: none;
+}
+
+.aurora {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: 0.35;
+    animation: pulso 12s ease-in-out infinite;
+}
+
+.aurora-primary {
+    background: var(--cardapio-primary, #0F766E);
+    width: 50vw;
+    height: 50vw;
+    top: -10vw;
+    left: -10vw;
+}
+
+.aurora-accent {
+    background: var(--cardapio-accent, #F59E0B);
+    width: 40vw;
+    height: 40vw;
+    bottom: -10vw;
+    right: -10vw;
+    animation-delay: -6s;
+}
+
+@keyframes pulso {
+    0%, 100% { transform: scale(1); opacity: 0.35; }
+    50% { transform: scale(1.1); opacity: 0.5; }
+}
+
+.tab-btn {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px);
+}
+
+.tab-active {
+    background: var(--cardapio-accent, #F59E0B);
+    color: #0f172a;
+    border-color: transparent;
+    box-shadow: 0 4px 20px -4px rgba(245, 158, 11, 0.6);
+}
+
+.tab-inactive {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.tab-inactive:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.action-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: white;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.action-btn-primary {
+    background: linear-gradient(135deg, var(--cardapio-accent, #F59E0B), #f97316);
+    color: #0f172a;
+    border: none;
+    box-shadow: 0 8px 30px -8px rgba(245, 158, 11, 0.6);
+    transition: all 0.2s;
+}
+
+.action-btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 35px -8px rgba(245, 158, 11, 0.8);
+}
+
+.action-btn-primary:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.cta {
+    background: linear-gradient(135deg, var(--cardapio-accent, #F59E0B), #f97316);
+    transition: transform 0.2s;
+}
+
+.cta:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: background 0.2s;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.form-input {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 1rem;
     padding: 0.75rem 1rem;
+    color: white;
+    font-weight: 700;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.form-input:focus {
+    border-color: var(--cardapio-accent, #F59E0B);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.form-input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+    font-weight: 500;
+}
+
+.backdrop {
+    background: rgba(2, 6, 23, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top-color: var(--cardapio-accent, #F59E0B);
+    border-radius: 50%;
+    animation: gira 0.9s linear infinite;
+}
+
+.spinner-sm {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(15, 23, 42, 0.25);
+    border-top-color: #0f172a;
+    border-radius: 50%;
+    animation: gira 0.9s linear infinite;
+}
+
+@keyframes gira {
+    to { transform: rotate(360deg); }
+}
+
+.flipbook-container,
+.flipbook-host {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+.flipbook-container :deep(.stf__parent),
+.flipbook-container :deep(.stf__wrapper) {
+    margin: 0 auto;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.flipbook-container :deep(canvas) {
+    max-width: 100%;
+}
+
+.spine-handle {
+    position: absolute;
+    z-index: 15;
+    width: 2.75rem;
+    height: 4.75rem;
+    top: calc(50% - 2.375rem);
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+}
+
+.spine-handle::before {
+    content: '';
+    position: absolute;
+    inset: 0.25rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.spine-handle:hover::before {
+    opacity: 1;
+    transform: scale(1.02);
+}
+
+.spine-handle-prev {
+    left: calc(50% - 3.1rem);
+}
+
+.spine-handle-next {
+    left: calc(50% + 0.35rem);
+}
+
+.spine-handle-top {
+    top: 1rem;
+}
+
+.spine-handle-bottom {
+    top: auto;
+    bottom: 1rem;
+}
+
+.mobile-nav {
+    position: absolute;
+    right: 0.9rem;
+    bottom: 0.9rem;
+    left: 0.9rem;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    pointer-events: none;
+}
+
+.mobile-nav-fullscreen {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.mobile-nav-btn,
+.mobile-page-indicator {
+    pointer-events: auto;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.mobile-nav-btn {
+    display: inline-flex;
+    height: 3.15rem;
+    width: 3.15rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(2, 6, 23, 0.58);
+    color: white;
+    box-shadow: 0 18px 30px -18px rgba(0, 0, 0, 0.8);
+    transition: transform 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.mobile-nav-btn:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+.mobile-nav-btn:disabled {
+    opacity: 0.4;
+}
+
+.mobile-page-indicator {
+    min-width: 5.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(2, 6, 23, 0.48);
+    padding: 0.7rem 1rem;
+    text-align: center;
     font-size: 0.7rem;
     font-weight: 900;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.22em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.45);
-    border-bottom: 2px solid transparent;
-    transition: 160ms ease;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
 }
-.main-tab-active {
-    color: white;
-    border-bottom-color: var(--cardapio-accent);
-}
-.main-tab:disabled { opacity: 0.28; cursor: not-allowed; }
 
-/* ===== Category strip ===== */
-.category-strip-bar {
+.scrollbar-none {
     scrollbar-width: none;
 }
-.category-strip-bar::-webkit-scrollbar { display: none; }
 
-/* ===== Category pills ===== */
-.category-pill {
-    display: inline-flex;
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+    transition: all 0.3s;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+    transform: translateY(-100%);
+    opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+    transition: transform 0.35s ease, opacity 0.35s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+    transform: translateY(16px);
+    opacity: 0;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+    transition: opacity 0.25s;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0;
+}
+
+.modal-enter-active .shell,
+.modal-leave-active .shell {
+    transition: transform 0.25s;
+}
+
+.modal-enter-from .shell {
+    transform: translateY(20px);
+}
+
+.modal-leave-to .shell {
+    transform: translateY(20px);
+}
+
+@media (max-width: 767px) {
+    .shell {
+        border-radius: 1.5rem;
+    }
+
+    .flipbook-stage {
+        border-radius: 1.75rem;
+    }
+
+    .mobile-nav {
+        right: 0.75rem;
+        bottom: 0.75rem;
+        left: 0.75rem;
+    }
+}
+</style>
+
+<style scoped>
+/* ── Modal encerramento ───────────────────────────────────── */
+.encerramento-shell {
+    border-radius: 2rem;
+}
+
+.encerramento-header {
+    background: linear-gradient(160deg, rgba(15, 118, 110, 0.22) 0%, rgba(245, 158, 11, 0.12) 100%);
+}
+
+.encerramento-icone {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, var(--cardapio-accent, #F59E0B), #f97316);
+    display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.4rem;
-    white-space: nowrap;
-    border-radius: 9999px;
-    padding: 0.55rem 0.85rem;
-    font-size: 0.73rem;
-    font-weight: 800;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.65);
-    transition: 160ms ease;
-}
-.category-pill-active {
-    color: white;
-    border-color: color-mix(in srgb, var(--cardapio-accent) 50%, transparent);
-    background: linear-gradient(135deg,
-        color-mix(in srgb, var(--cardapio-accent) 28%, transparent),
-        color-mix(in srgb, var(--cardapio-primary) 20%, transparent));
+    color: #0f172a;
+    box-shadow: 0 8px 24px -8px rgba(245, 158, 11, 0.7);
 }
 
-/* ===== Shell ===== */
-.shell {
-    position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.82));
-    box-shadow: 0 20px 60px rgba(2, 6, 23, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(18px);
-    border-radius: 1.75rem;
+.encerramento-total {
+    background: linear-gradient(135deg, var(--cardapio-accent, #F59E0B), #f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
-
-/* ===== Logo box ===== */
-.logo-box,
-.fallback-cover {
-    background: linear-gradient(135deg,
-        color-mix(in srgb, var(--cardapio-primary) 80%, #020617),
-        color-mix(in srgb, var(--cardapio-accent) 70%, #111827));
-}
-.logo-box {
-    display: flex; align-items: center; justify-content: center;
-    width: 2.5rem; height: 2.5rem;
-    overflow: hidden; border-radius: 0.8rem;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.25);
-}
-
-/* ===== Search box ===== */
-.search-box {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* ===== Menu input ===== */
-.menu-input {
-    display: block;
-    width: 100%;
-    border-radius: 1.2rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.06);
-    padding: 0.85rem 1rem;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: white;
-    outline: none;
-    transition: 160ms ease;
-}
-.menu-input::placeholder { color: rgba(226, 232, 240, 0.42); }
-.menu-input:focus {
-    border-color: color-mix(in srgb, var(--cardapio-accent) 55%, transparent);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* ===== CTA ===== */
-.cta {
-    background: linear-gradient(135deg, var(--cardapio-accent), color-mix(in srgb, var(--cardapio-accent) 65%, white));
-    box-shadow: 0 14px 40px color-mix(in srgb, var(--cardapio-accent) 24%, transparent);
-    display: inline-flex; align-items: center; justify-content: center;
-    transition: 160ms ease;
-}
-.cta:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
-
-/* ===== Page arrows ===== */
-.page-arrow {
-    display: flex; align-items: center; justify-content: center;
-    width: 2rem; height: 2rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    font-size: 1rem; font-weight: 900; color: white;
-    transition: 140ms ease;
-}
-.page-arrow:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
-.page-arrow:disabled { opacity: 0.22; cursor: default; }
-
-/* ===== Page dots ===== */
-.page-dot {
-    height: 5px; width: 5px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, 0.2);
-    cursor: pointer;
-}
-.page-dot-active {
-    width: 18px;
-    background: var(--cardapio-accent);
-}
-
-/* ===== Page nav buttons (bottom) ===== */
-.page-nav-btn {
-    border-radius: 1.2rem;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.04);
-    padding: 0.7rem 1rem;
-    transition: 160ms ease;
-    overflow: hidden;
-}
-.page-nav-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); }
-.page-nav-btn:disabled { opacity: 0.2; cursor: default; }
-
-/* ===== Badge counter ===== */
-.badge-counter {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 1.2rem; height: 1.2rem;
-    border-radius: 9999px;
-    background: var(--cardapio-accent);
-    color: #020617;
-    font-size: 0.58rem; font-weight: 900;
-    padding: 0 0.22rem;
-}
-
-/* ===== Produto card ===== */
-.produto-card {
-    box-shadow: 0 14px 36px rgba(2, 6, 23, 0.2);
-    transition: 200ms ease;
-}
-.produto-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.16);
-}
-
-/* ===== FAB ===== */
-.fab {
-    position: fixed;
-    right: 1rem;
-    bottom: 5rem;
-    z-index: 30;
-    display: inline-flex;
-    min-width: 4.5rem;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.1rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(135deg, var(--cardapio-accent), color-mix(in srgb, var(--cardapio-primary) 46%, white));
-    padding: 0.85rem 1rem;
-    color: #020617;
-    box-shadow: 0 16px 40px rgba(2, 6, 23, 0.4);
-}
-@keyframes fab-pulse {
-    0%, 100% { box-shadow: 0 16px 40px rgba(2,6,23,0.4); }
-    50% { box-shadow: 0 16px 40px rgba(2,6,23,0.4), 0 0 0 7px color-mix(in srgb, var(--cardapio-accent) 28%, transparent); }
-}
-.fab-pulse { animation: fab-pulse 2.2s infinite; }
-
-/* ===== Bottom nav ===== */
-.bottom-nav {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 25;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.6rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(2, 6, 23, 0.96);
-    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-    backdrop-filter: blur(22px);
-}
-.bottom-nav-item {
-    border-radius: 1rem;
-    padding: 0.8rem;
-    font-size: 0.7rem;
-    font-weight: 900;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.55);
-    transition: 160ms ease;
-}
-.bottom-nav-item-active {
-    color: white;
-    border-color: color-mix(in srgb, var(--cardapio-accent) 45%, transparent);
-    background: linear-gradient(135deg,
-        color-mix(in srgb, var(--cardapio-accent) 28%, transparent),
-        color-mix(in srgb, var(--cardapio-primary) 20%, transparent));
-}
-.bottom-nav-item:disabled { opacity: 0.28; cursor: not-allowed; }
-
-/* ===== Modal sheet ===== */
-.modal-sheet {
-    background: linear-gradient(180deg, rgba(10, 18, 38, 0.99), rgba(2, 6, 23, 0.99));
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(24px);
-}
-
-/* ===== Skeleton ===== */
-.cardapio-skeleton {
-    background: linear-gradient(90deg,
-        rgba(255,255,255,0.04) 0%,
-        rgba(255,255,255,0.09) 50%,
-        rgba(255,255,255,0.04) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.6s infinite;
-}
-@keyframes shimmer {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-
-/* ===== Book page transitions ===== */
-.page-frente-enter-active,
-.page-frente-leave-active,
-.page-tras-enter-active,
-.page-tras-leave-active {
-    transition: opacity 220ms ease, transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-.page-frente-enter-from { opacity: 0; transform: translateX(52px) scale(0.98); }
-.page-frente-leave-to  { opacity: 0; transform: translateX(-52px) scale(0.98); }
-.page-tras-enter-from  { opacity: 0; transform: translateX(-52px) scale(0.98); }
-.page-tras-leave-to    { opacity: 0; transform: translateX(52px) scale(0.98); }
-
-/* ===== Toast ===== */
-.toast-enter-active, .toast-leave-active { transition: all 220ms ease; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(-8px) scale(0.95); }
-
-/* ===== Modal de cadastro ===== */
-.modal-entry-enter-active { transition: opacity 300ms ease; }
-.modal-entry-leave-active { transition: opacity 220ms ease; }
-.modal-entry-enter-from, .modal-entry-leave-to { opacity: 0; }
-.modal-entry-enter-active .modal-sheet { animation: sheet-slide-up 300ms cubic-bezier(0.34, 1.3, 0.64, 1) forwards; }
-.modal-entry-leave-active .modal-sheet { animation: sheet-slide-down 200ms ease forwards; }
-@keyframes sheet-slide-up   { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes sheet-slide-down { from { transform: translateY(0); opacity: 1; } to { transform: translateY(32px); opacity: 0; } }
-
-/* ===== Sheet de solicitação ===== */
-.sheet-enter-active, .sheet-leave-active { transition: all 240ms ease; }
-.sheet-enter-from, .sheet-leave-to { opacity: 0; transform: translateY(28px); }
-
-/* ===== Category strip fade ===== */
-.fade-strip-enter-active, .fade-strip-leave-active { transition: opacity 160ms ease; }
-.fade-strip-enter-from, .fade-strip-leave-to { opacity: 0; }
 </style>
